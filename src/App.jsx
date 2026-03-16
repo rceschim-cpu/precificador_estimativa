@@ -1,9 +1,2441 @@
-export default function App() {
+import { useState, useEffect, useMemo } from "react";
+
+// ── STORAGE ──────────────────────────────────────────────────────────────────
+const KEYS = { users: "ptc_users", session: "ptc_session", perfis: "ptc_perfis" };
+
+// ── MÓDULOS disponíveis no sistema ──
+const MODULOS = [
+  { id: "precificacao", label: "Precificação Completa", icone: "🧮", desc: "Calculadora tributária completa — todos os tabs e campos.", ativo: true },
+  { id: "relatorios",   label: "Relatórios",            icone: "📈", desc: "Em desenvolvimento.", ativo: false },
+  { id: "cadastro",     label: "Cadastro de Produtos",  icone: "📦", desc: "Em desenvolvimento.", ativo: false },
+  { id: "sap",          label: "Interface SAP",         icone: "🔗", desc: "Em desenvolvimento.", ativo: false },
+];
+
+// ── PERFIS padrão (seed) ──
+const PERFIS_DEFAULT = [
+  { id: "admin",    label: "Administrador",       icone: "⚙️",  cor: "#0047BB", desc: "Acesso total ao sistema. Gerencia usuários e perfis.", modulos: ["precificacao"], sistema: true  },
+  { id: "custos",   label: "Depto. de Custos",    icone: "📊", cor: "#059669", desc: "Acesso completo à calculadora.", modulos: ["precificacao"], sistema: false },
+];
+
+const loadPerfis = () => {
+  try {
+    const stored = JSON.parse(localStorage.getItem(KEYS.perfis) || "null");
+    return stored || PERFIS_DEFAULT;
+  } catch { return PERFIS_DEFAULT; }
+};
+const savePerfis = (p) => localStorage.setItem(KEYS.perfis, JSON.stringify(p));
+
+// Helper: objeto indexado por id para lookup rápido
+const getPerfisMap = (list) => Object.fromEntries((list||[]).map(p => [p.id, p]));
+
+// PERFIS como objeto estático para compatibilidade com código legado
+// (será substituído por getPerfisMap(loadPerfis()) onde necessário)
+const PERFIS = getPerfisMap(PERFIS_DEFAULT);
+
+const MASTER = {
+  id: "master",
+  nome: "Administrador",
+  email: "admin@positec.com.br",
+  senha: "Positec@2026",
+  perfil: "admin",
+  status: "ativo",
+  criadoEm: new Date("2026-01-01").toISOString(),
+  aprovadoEm: new Date("2026-01-01").toISOString(),
+  aprovadoPor: "sistema",
+};
+
+const loadUsers  = () => { try { return JSON.parse(localStorage.getItem(KEYS.users) || "[]"); } catch { return []; } };
+const saveUsers  = (u) => localStorage.setItem(KEYS.users, JSON.stringify(u));
+const loadSession = () => { try { return JSON.parse(localStorage.getItem(KEYS.session) || "null"); } catch { return null; } };
+const saveSession = (s) => s ? localStorage.setItem(KEYS.session, JSON.stringify(s)) : localStorage.removeItem(KEYS.session);
+
+const getAllUsers = () => {
+  const stored = loadUsers();
+  const hasMaster = stored.find(u => u.id === "master");
+  return hasMaster ? stored : [MASTER, ...stored];
+};
+
+// ── HELPERS ──────────────────────────────────────────────────────────────────
+const fmtDate = (iso) => iso ? new Date(iso).toLocaleString("pt-BR", { day:"2-digit", month:"2-digit", year:"numeric", hour:"2-digit", minute:"2-digit" }) : "—";
+const initials = (nome) => nome ? nome.split(" ").slice(0,2).map(w=>w[0]).join("").toUpperCase() : "?";
+
+// ── CSS ──────────────────────────────────────────────────────────────────────
+const CSS_AUTH = `
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Instrument+Sans:wght@400;500;600&display=swap');
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:#0c0e14;color:#e8eaf0;font-family:'Instrument Sans',sans-serif;min-height:100vh;overflow-x:hidden}
+input,select,textarea,button{font-family:inherit}
+
+/* ── TOKENS ── */
+:root{
+  --bg:       #0c0e14;
+  --surface:  #13161f;
+  --card:     #191c27;
+  --border:   rgba(255,255,255,.08);
+  --border2:  rgba(255,255,255,.13);
+  --text:     #e8eaf0;
+  --muted:    #7a7f96;
+  --blue:     #0047BB;
+  --blue2:    #1a65d4;
+  --blue-glow:rgba(0,71,187,.25);
+}
+
+/* ── LAYOUT ── */
+.root{min-height:100vh;display:flex;flex-direction:column}
+
+/* ── AUTH SCREEN ── */
+.auth-wrap{
+  min-height:100vh;display:flex;align-items:center;justify-content:center;
+  background:radial-gradient(ellipse 80% 60% at 50% 0%, rgba(0,71,187,.18) 0%, transparent 70%),
+             radial-gradient(ellipse 40% 40% at 80% 80%, rgba(0,71,187,.08) 0%, transparent 60%),
+             #0c0e14;
+  padding:24px;
+}
+.auth-box{
+  width:100%;max-width:420px;
+  background:rgba(19,22,31,.9);
+  border:1px solid var(--border2);
+  backdrop-filter:blur(20px);
+  padding:0;
+  position:relative;
+  overflow:hidden;
+  animation:fadeUp .4s ease;
+}
+.auth-box::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:3px;
+  background:linear-gradient(90deg,#0047BB,#1a65d4,#0047BB);
+}
+@keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+
+.auth-head{padding:32px 32px 0;display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center}
+.auth-logo{display:flex;align-items:center;gap:10px}
+.auth-mark{width:36px;height:36px;background:#0047BB;display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-size:18px;font-weight:800;color:#fff}
+.auth-brand{font-family:'Syne',sans-serif;font-size:20px;font-weight:800;color:#fff;letter-spacing:.5px}
+.auth-title{font-family:'Syne',sans-serif;font-size:22px;font-weight:700;color:#fff;margin-top:8px}
+.auth-sub{font-size:13px;color:var(--muted);line-height:1.5}
+
+.auth-body{padding:28px 32px 32px;display:flex;flex-direction:column;gap:16px}
+.auth-tabs{display:flex;border:1px solid var(--border);background:rgba(255,255,255,.03);margin-bottom:4px}
+.auth-tab{flex:1;padding:10px;background:none;border:none;color:var(--muted);font-size:13px;font-weight:600;cursor:pointer;transition:.15s;letter-spacing:.3px}
+.auth-tab.on{background:var(--blue);color:#fff}
+.auth-tab:hover:not(.on){color:var(--text);background:rgba(255,255,255,.04)}
+
+.fld{display:flex;flex-direction:column;gap:6px}
+.fld label{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.8px}
+.fld input,.fld select{
+  background:#0c0e14;border:1px solid var(--border2);color:var(--text);
+  padding:11px 14px;font-size:14px;outline:none;transition:.15s;
+  font-family:'Instrument Sans',sans-serif;
+}
+.fld input:focus,.fld select:focus{border-color:#0047BB;box-shadow:0 0 0 3px var(--blue-glow)}
+.fld input::placeholder{color:#3a3f55}
+
+.btn-primary{
+  width:100%;padding:13px;background:#0047BB;border:none;color:#fff;
+  font-family:'Syne',sans-serif;font-size:14px;font-weight:700;letter-spacing:.5px;
+  cursor:pointer;transition:.15s;text-transform:uppercase;
+}
+.btn-primary:hover{background:#1a65d4}
+.btn-primary:disabled{opacity:.45;cursor:not-allowed}
+
+.auth-msg{padding:10px 14px;font-size:13px;line-height:1.5;border-left:3px solid}
+.auth-msg.err{background:rgba(220,38,38,.1);border-color:#dc2626;color:#f87171}
+.auth-msg.ok{background:rgba(5,150,105,.1);border-color:#059669;color:#34d399}
+.auth-msg.warn{background:rgba(217,119,6,.1);border-color:#d97706;color:#fbbf24}
+
+/* ── DASHBOARD ── */
+.dash{display:flex;flex-direction:column;height:100vh;overflow:hidden}
+.topbar{
+  background:var(--surface);border-bottom:1px solid var(--border);
+  padding:0 28px;height:58px;display:flex;align-items:center;gap:16px;
+  position:sticky;top:0;z-index:100;flex-shrink:0;
+}
+.topbar-logo{display:flex;align-items:center;gap:9px;flex-shrink:0}
+.topbar-mark{width:30px;height:30px;background:#0047BB;display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-size:14px;font-weight:800;color:#fff;flex-shrink:0}
+.topbar-name{font-family:'Syne',sans-serif;font-size:15px;font-weight:700;color:#fff}
+.topbar-divider{width:1px;height:24px;background:var(--border);flex-shrink:0}
+.topbar-title{font-size:13px;color:var(--muted);font-weight:500}
+.topbar-spacer{flex:1}
+.topbar-user{display:flex;align-items:center;gap:10px}
+.topbar-avatar{width:32px;height:32px;border-radius:50%;background:#0047BB;display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-size:12px;font-weight:700;color:#fff;flex-shrink:0}
+.topbar-uname{font-size:13px;font-weight:600;color:var(--text)}
+.topbar-uperfil{font-size:11px;color:var(--muted)}
+.btn-logout{padding:7px 14px;background:rgba(255,255,255,.05);border:1px solid var(--border);color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;transition:.15s;letter-spacing:.3px}
+.btn-logout:hover{border-color:var(--border2);color:var(--text)}
+
+.dash-body{display:flex;flex:1;min-height:0;overflow:hidden}
+.sidebar{width:220px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);padding:16px 0;display:flex;flex-direction:column;gap:2px;overflow-y:auto}
+.snav-item{display:flex;align-items:center;gap:11px;padding:10px 20px;cursor:pointer;color:var(--muted);font-size:13px;font-weight:500;transition:.15s;border-left:3px solid transparent}
+.snav-item:hover{background:rgba(255,255,255,.03);color:var(--text)}
+.snav-item.on{border-left-color:#0047BB;background:rgba(0,71,187,.1);color:#fff;font-weight:600}
+.snav-icon{font-size:16px;flex-shrink:0;width:22px;text-align:center}
+.snav-sep{height:1px;background:var(--border);margin:8px 16px}
+
+.main-content{flex:1;padding:28px;overflow-y:auto;background:var(--bg);min-height:0}
+
+/* ── CARDS ── */
+.page-title{font-family:'Syne',sans-serif;font-size:24px;font-weight:800;color:#fff;margin-bottom:6px}
+.page-sub{font-size:13px;color:var(--muted);margin-bottom:24px}
+
+.stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:24px}
+.stat-card{background:var(--card);border:1px solid var(--border);padding:18px;display:flex;flex-direction:column;gap:6px}
+.stat-label{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.8px}
+.stat-val{font-family:'Syne',sans-serif;font-size:30px;font-weight:800;color:#fff;line-height:1}
+.stat-sub{font-size:11px;color:var(--muted)}
+.stat-card.blue{border-color:rgba(0,71,187,.3);background:rgba(0,71,187,.08)}
+.stat-card.blue .stat-val{color:#93c5fd}
+.stat-card.green{border-color:rgba(5,150,105,.3);background:rgba(5,150,105,.08)}
+.stat-card.green .stat-val{color:#34d399}
+.stat-card.amber{border-color:rgba(217,119,6,.3);background:rgba(217,119,6,.08)}
+.stat-card.amber .stat-val{color:#fbbf24}
+.stat-card.red{border-color:rgba(220,38,38,.3);background:rgba(220,38,38,.08)}
+.stat-card.red .stat-val{color:#f87171}
+
+/* ── TABLE ── */
+.tbl-wrap{background:var(--card);border:1px solid var(--border);overflow:hidden}
+.tbl-head{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px}
+.tbl-head-title{font-family:'Syne',sans-serif;font-size:14px;font-weight:700;color:#fff}
+.tbl-search{background:#0c0e14;border:1px solid var(--border);color:var(--text);padding:7px 12px;font-size:13px;outline:none;min-width:200px;transition:.15s}
+.tbl-search:focus{border-color:#0047BB}
+.tbl-search::placeholder{color:#3a3f55}
+table{width:100%;border-collapse:collapse}
+th{padding:10px 18px;text-align:left;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;border-bottom:1px solid var(--border);background:rgba(255,255,255,.02)}
+td{padding:13px 18px;font-size:13px;color:var(--text);border-bottom:1px solid rgba(255,255,255,.04)}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:rgba(255,255,255,.02)}
+
+/* ── BADGES ── */
+.badge{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;font-size:11px;font-weight:700;letter-spacing:.4px;border-radius:20px}
+.badge-ativo{background:rgba(5,150,105,.15);color:#34d399;border:1px solid rgba(5,150,105,.3)}
+.badge-pendente{background:rgba(217,119,6,.15);color:#fbbf24;border:1px solid rgba(217,119,6,.3)}
+.badge-rejeitado{background:rgba(220,38,38,.15);color:#f87171;border:1px solid rgba(220,38,38,.3)}
+.badge-inativo{background:rgba(122,127,150,.15);color:#7a7f96;border:1px solid rgba(122,127,150,.3)}
+
+/* ── PERFIL BADGE ── */
+.perfil-badge{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;font-size:11px;font-weight:600;border:1px solid;border-radius:2px;opacity:.9}
+
+/* ── ACTIONS ── */
+.act-row{display:flex;gap:6px;align-items:center}
+.btn-sm{padding:5px 12px;font-size:12px;font-weight:600;border:1px solid;cursor:pointer;transition:.15s;letter-spacing:.2px}
+.btn-approve{background:rgba(5,150,105,.1);border-color:rgba(5,150,105,.4);color:#34d399}
+.btn-approve:hover{background:rgba(5,150,105,.2)}
+.btn-reject{background:rgba(220,38,38,.1);border-color:rgba(220,38,38,.4);color:#f87171}
+.btn-reject:hover{background:rgba(220,38,38,.2)}
+.btn-edit{background:rgba(0,71,187,.1);border-color:rgba(0,71,187,.4);color:#93c5fd}
+.btn-edit:hover{background:rgba(0,71,187,.2)}
+.btn-disable{background:rgba(122,127,150,.1);border-color:rgba(122,127,150,.3);color:#7a7f96}
+.btn-disable:hover{background:rgba(122,127,150,.2);color:var(--text)}
+
+/* ── AVATAR TABLE ── */
+.usr-cell{display:flex;align-items:center;gap:10px}
+.usr-av{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-size:11px;font-weight:700;color:#fff;flex-shrink:0}
+.usr-nome{font-weight:600;color:#fff}
+.usr-email{font-size:11px;color:var(--muted)}
+
+/* ── MODAL ── */
+.modal-ov{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:500;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(4px)}
+.modal-box{background:var(--card);border:1px solid var(--border2);width:100%;max-width:460px;max-height:90vh;overflow-y:auto;animation:fadeUp .25s ease}
+.modal-head{padding:18px 22px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:var(--card);z-index:1}
+.modal-title{font-family:'Syne',sans-serif;font-size:16px;font-weight:700;color:#fff}
+.modal-close{background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;padding:2px 6px;line-height:1;transition:.15s}
+.modal-close:hover{color:var(--text)}
+.modal-body{padding:22px;display:flex;flex-direction:column;gap:14px}
+.modal-foot{padding:14px 22px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end}
+.btn-cancel{padding:9px 18px;background:rgba(255,255,255,.05);border:1px solid var(--border);color:var(--muted);font-size:13px;font-weight:600;cursor:pointer;transition:.15s}
+.btn-cancel:hover{color:var(--text);border-color:var(--border2)}
+.btn-confirm{padding:9px 20px;background:#0047BB;border:none;color:#fff;font-family:'Syne',sans-serif;font-size:13px;font-weight:700;cursor:pointer;transition:.15s;letter-spacing:.3px}
+.btn-confirm:hover{background:#1a65d4}
+.btn-confirm.danger{background:#dc2626}
+.btn-confirm.danger:hover{background:#b91c1c}
+
+/* ── PERFIL SELECT ── */
+.perfil-grid{display:flex;flex-direction:column;gap:8px}
+.perfil-opt{display:flex;align-items:center;gap:12px;padding:12px 14px;border:2px solid var(--border);cursor:pointer;transition:.15s;background:rgba(255,255,255,.02)}
+.perfil-opt:hover{border-color:var(--border2)}
+.perfil-opt.sel{border-color:#0047BB;background:rgba(0,71,187,.1)}
+.perfil-opt-icon{font-size:18px;width:28px;text-align:center}
+.perfil-opt-info{flex:1}
+.perfil-opt-label{font-size:13px;font-weight:600;color:#fff}
+.perfil-opt-desc{font-size:11px;color:var(--muted);margin-top:2px}
+.perfil-opt-radio{width:16px;height:16px;border:2px solid var(--border2);border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:.15s}
+.perfil-opt.sel .perfil-opt-radio{border-color:#0047BB;background:#0047BB}
+.perfil-opt.sel .perfil-opt-radio::after{content:'';width:6px;height:6px;border-radius:50%;background:#fff}
+
+/* ── EMPTY STATE ── */
+.empty{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:52px 20px;gap:10px;color:var(--muted)}
+.empty-icon{font-size:36px;opacity:.4}
+.empty-text{font-size:14px;font-weight:500}
+.empty-sub{font-size:12px}
+
+/* ── WELCOME ── */
+.welcome-card{background:linear-gradient(135deg,rgba(0,71,187,.2),rgba(0,71,187,.05));border:1px solid rgba(0,71,187,.25);padding:24px;margin-bottom:24px}
+.welcome-greeting{font-family:'Syne',sans-serif;font-size:22px;font-weight:800;color:#fff;margin-bottom:4px}
+.welcome-sub{font-size:13px;color:#93c5fd}
+
+/* ── PENDING ROW ── */
+.pending-row{background:rgba(217,119,6,.04);border-left:3px solid rgba(217,119,6,.5)}
+.pending-row td:first-child{padding-left:15px}
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar{width:5px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:#0047BB}
+
+/* ── PERFIS DINÂMICOS ── */
+.pfcard{background:var(--card);border:1px solid var(--border);padding:18px;border-radius:4px;display:flex;flex-direction:column;gap:10px;transition:border-color .15s}
+.pfcard:hover{border-color:var(--border2)}
+.pfcard.sistema{opacity:.7}
+.pfcard-head{display:flex;align-items:center;gap:10px}
+.pfcard-icon{font-size:20px;width:32px;text-align:center}
+.pfcard-name{font-family:'Syne',sans-serif;font-size:15px;font-weight:700;color:#fff;flex:1}
+.pfcard-actions{display:flex;gap:6px}
+.pfcard-desc{font-size:12px;color:var(--muted);line-height:1.5}
+.pfcard-mods{display:flex;flex-wrap:wrap;gap:5px}
+.mod-chip{padding:3px 9px;font-size:11px;font-weight:600;border-radius:20px;border:1px solid}
+.mod-chip.on{background:rgba(0,71,187,.15);border-color:rgba(0,71,187,.4);color:#93c5fd}
+.mod-chip.off{background:rgba(255,255,255,.03);border-color:rgba(255,255,255,.08);color:var(--muted);text-decoration:line-through;opacity:.5}
+.pfcard-count{font-size:11px;color:var(--muted);font-weight:500}
+
+/* ── MODAL PERFIL ── */
+.mod-toggle{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--border);cursor:pointer;transition:all .15s;border-radius:3px}
+.mod-toggle:hover{border-color:var(--border2)}
+.mod-toggle.on{border-color:rgba(0,71,187,.4);background:rgba(0,71,187,.08)}
+.mod-toggle.disabled-mod{opacity:.4;cursor:not-allowed}
+.mod-toggle-icon{font-size:16px;width:24px;text-align:center}
+.mod-toggle-info{flex:1}
+.mod-toggle-label{font-size:13px;font-weight:600;color:#fff}
+.mod-toggle-desc{font-size:11px;color:var(--muted);margin-top:1px}
+.mod-toggle-check{width:18px;height:18px;border:2px solid var(--border2);border-radius:3px;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:.15s;font-size:11px;color:transparent}
+.mod-toggle.on .mod-toggle-check{background:#0047BB;border-color:#0047BB;color:#fff}
+.cor-grid{display:flex;gap:6px;flex-wrap:wrap}
+.cor-dot{width:24px;height:24px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:.15s}
+.cor-dot.sel{border-color:#fff;box-shadow:0 0 0 2px rgba(255,255,255,.3)}
+.icone-grid{display:flex;gap:4px;flex-wrap:wrap}
+.icone-opt{width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:16px;cursor:pointer;border:1px solid var(--border);border-radius:3px;transition:.15s}
+.icone-opt:hover{border-color:var(--border2)}
+.icone-opt.sel{border-color:#0047BB;background:rgba(0,71,187,.15)}
+.btn-add-perfil{display:flex;align-items:center;justify-content:center;gap:8px;padding:14px;border:2px dashed rgba(0,71,187,.3);background:rgba(0,71,187,.04);color:#7a90b0;font-size:13px;font-weight:600;cursor:pointer;transition:.15s;border-radius:4px}
+.btn-add-perfil:hover{border-color:rgba(0,71,187,.6);color:#93c5fd;background:rgba(0,71,187,.08)}
+`;
+
+// ── COMPONENTS ───────────────────────────────────────────────────────────────
+
+function PerfilBadge({ perfil }) {
+  const perfisMap = getPerfisMap(loadPerfis());
+  const p = perfisMap[perfil] || { label: perfil, cor: "#7a7f96", icone: "?" };
   return (
-    <div style={{background:"#1c2333",color:"#fff",height:"100vh",display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:16,fontFamily:"sans-serif"}}>
-      <div style={{fontSize:48}}>✅</div>
-      <div style={{fontSize:24,fontWeight:700}}>Deploy funcionando!</div>
-      <div style={{fontSize:14,color:"#7a90b0"}}>Pipeline OK — {new Date().toLocaleString("pt-BR")}</div>
+    <span className="perfil-badge" style={{ borderColor: p.cor + "55", color: p.cor, background: p.cor + "15" }}>
+      {p.icone} {p.label}
+    </span>
+  );
+}
+
+// ── MODAL CRIAR/EDITAR PERFIL ─────────────────────────────────────────────────
+const CORES_OPCOES = ["#0047BB","#059669","#7c3aed","#d97706","#dc2626","#0891b2","#be185d","#4f46e5","#16a34a","#9333ea","#ea580c","#0d9488"];
+const ICONES_OPCOES = ["👥","📊","📦","🏷️","🔄","📐","💼","🔐","🧮","📈","🔗","📋","💡","🎯","⚡","🛠️","📌","🔑"];
+
+function ModalPerfil({ perfil, onClose, onSave, users }) {
+  const isNew = !perfil;
+  const [form, setForm] = useState(perfil ? { ...perfil } : {
+    id: "", label: "", icone: "👥", cor: "#0047BB", desc: "", modulos: ["precificacao"], sistema: false
+  });
+  const [erro, setErro] = useState("");
+  const F = k => v => setForm(p => ({ ...p, [k]: v }));
+
+  const toggleMod = (mid) => {
+    setForm(p => ({
+      ...p,
+      modulos: p.modulos.includes(mid) ? p.modulos.filter(m => m !== mid) : [...p.modulos, mid]
+    }));
+  };
+
+  const handleSave = () => {
+    setErro("");
+    if (!form.label.trim()) return setErro("Informe o nome do perfil.");
+    if (isNew && !form.id.trim()) return setErro("Informe o ID do perfil (ex: comercial).");
+    if (isNew && !/^[a-z0-9_]+$/.test(form.id)) return setErro("ID deve conter apenas letras minúsculas, números e _");
+    if (form.modulos.length === 0) return setErro("Selecione ao menos um módulo.");
+    onSave({ ...form, id: form.id.toLowerCase().trim() });
+  };
+
+  const usersCount = users.filter(u => u.perfil === form.id && u.status === "ativo").length;
+
+  return (
+    <div className="modal-ov" onClick={onClose}>
+      <div className="modal-box" style={{ maxWidth: 500 }} onClick={e => e.stopPropagation()}>
+        <div className="modal-head">
+          <span className="modal-title">{isNew ? "Novo Perfil" : `Editar — ${perfil.label}`}</span>
+          <button className="modal-close" onClick={onClose}>×</button>
+        </div>
+        <div className="modal-body">
+          {erro && <div className="auth-msg err">{erro}</div>}
+
+          {/* Preview */}
+          <div style={{ display:"flex", alignItems:"center", gap:12, padding:"12px 14px",
+            background: form.cor+"15", border:`1px solid ${form.cor}44`, borderRadius:4 }}>
+            <span style={{ fontSize:24 }}>{form.icone}</span>
+            <div>
+              <div style={{ fontFamily:"Syne", fontWeight:700, color:"#fff", fontSize:15 }}>{form.label||"Nome do perfil"}</div>
+              <div style={{ fontSize:11, color:form.cor, fontWeight:600 }}>
+                {!isNew && usersCount > 0 ? `${usersCount} usuário${usersCount!==1?"s":""} ativo${usersCount!==1?"s":""}` : "Novo perfil"}
+              </div>
+            </div>
+          </div>
+
+          {isNew && (
+            <div className="fld">
+              <label>ID do perfil <span style={{color:"var(--muted)",fontWeight:400}}>(slug único, ex: comercial)</span></label>
+              <input placeholder="comercial" value={form.id} onChange={e=>F("id")(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g,""))}/>
+            </div>
+          )}
+
+          <div className="fld">
+            <label>Nome do perfil</label>
+            <input placeholder="Ex: Depto. Comercial" value={form.label} onChange={e=>F("label")(e.target.value)}/>
+          </div>
+
+          <div className="fld">
+            <label>Descrição</label>
+            <input placeholder="O que este perfil pode fazer..." value={form.desc} onChange={e=>F("desc")(e.target.value)}/>
+          </div>
+
+          {/* Ícone */}
+          <div className="fld">
+            <label>Ícone</label>
+            <div className="icone-grid">
+              {ICONES_OPCOES.map(ic => (
+                <div key={ic} className={`icone-opt ${form.icone===ic?"sel":""}`} onClick={()=>F("icone")(ic)}>{ic}</div>
+              ))}
+            </div>
+          </div>
+
+          {/* Cor */}
+          <div className="fld">
+            <label>Cor de identificação</label>
+            <div className="cor-grid">
+              {CORES_OPCOES.map(cor => (
+                <div key={cor} className={`cor-dot ${form.cor===cor?"sel":""}`}
+                  style={{ background:cor }} onClick={()=>F("cor")(cor)}/>
+              ))}
+            </div>
+          </div>
+
+          {/* Módulos */}
+          <div className="fld">
+            <label>Módulos habilitados</label>
+            <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
+              {MODULOS.map(m => {
+                const isOn = form.modulos.includes(m.id);
+                const isDisabled = !m.ativo;
+                return (
+                  <div key={m.id} className={`mod-toggle ${isOn&&m.ativo?"on":""} ${isDisabled?"disabled-mod":""}`}
+                    onClick={() => !isDisabled && toggleMod(m.id)}>
+                    <span className="mod-toggle-icon">{m.icone}</span>
+                    <div className="mod-toggle-info">
+                      <div className="mod-toggle-label">{m.label} {isDisabled&&<span style={{fontSize:10,color:"var(--muted)",fontWeight:400}}>(em desenvolvimento)</span>}</div>
+                      <div className="mod-toggle-desc">{m.desc}</div>
+                    </div>
+                    <div className="mod-toggle-check">{isOn&&m.ativo?"✓":""}</div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+        <div className="modal-foot">
+          <button className="btn-cancel" onClick={onClose}>Cancelar</button>
+          <button className="btn-confirm" onClick={handleSave}>{isNew?"Criar perfil":"Salvar alterações"}</button>
+        </div>
+      </div>
     </div>
+  );
+}
+
+function StatusBadge({ status }) {
+  const map = { ativo: ["badge-ativo","● Ativo"], pendente: ["badge-pendente","◉ Pendente"], rejeitado: ["badge-rejeitado","✕ Rejeitado"], inativo: ["badge-inativo","○ Inativo"] };
+  const [cls, label] = map[status] || ["badge-inativo", status];
+  return <span className={`badge ${cls}`}>{label}</span>;
+}
+
+// ── LOGIN / REGISTRO ──────────────────────────────────────────────────────────
+
+function AuthScreen({ onLogin }) {
+  const [aba, setAba] = useState("login");
+  const [form, setForm] = useState({ email: "", senha: "", nome: "", confirma: "", perfil: "comercial" });
+  const [msg, setMsg] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  const F = k => v => setForm(p => ({ ...p, [k]: v }));
+
+  const handleLogin = () => {
+    setMsg(null);
+    const users = getAllUsers();
+    const user = users.find(u => u.email.toLowerCase() === form.email.toLowerCase().trim());
+    if (!user) return setMsg({ type: "err", text: "E-mail não encontrado." });
+    if (user.senha !== form.senha) return setMsg({ type: "err", text: "Senha incorreta." });
+    if (user.status === "pendente") return setMsg({ type: "warn", text: "Sua conta ainda não foi aprovada pelo administrador." });
+    if (user.status === "rejeitado") return setMsg({ type: "err", text: "Acesso negado. Conta rejeitada. Entre em contato com o administrador." });
+    if (user.status === "inativo") return setMsg({ type: "err", text: "Conta inativa. Entre em contato com o administrador." });
+    saveSession(user);
+    onLogin(user);
+  };
+
+  const handleRegister = () => {
+    setMsg(null);
+    if (!form.nome.trim()) return setMsg({ type: "err", text: "Informe seu nome completo." });
+    if (!form.email.includes("@")) return setMsg({ type: "err", text: "Informe um e-mail válido." });
+    if (form.senha.length < 6) return setMsg({ type: "err", text: "Senha deve ter ao menos 6 caracteres." });
+    if (form.senha !== form.confirma) return setMsg({ type: "err", text: "As senhas não conferem." });
+    const users = getAllUsers();
+    if (users.find(u => u.email.toLowerCase() === form.email.toLowerCase().trim()))
+      return setMsg({ type: "err", text: "Este e-mail já está cadastrado." });
+    const novo = {
+      id: Date.now().toString(),
+      nome: form.nome.trim(),
+      email: form.email.toLowerCase().trim(),
+      senha: form.senha,
+      perfil: form.perfil,
+      status: "pendente",
+      criadoEm: new Date().toISOString(),
+      aprovadoEm: null,
+      aprovadoPor: null,
+    };
+    const stored = loadUsers().filter(u => u.id !== "master");
+    saveUsers([...stored, novo]);
+    setMsg({ type: "ok", text: "Cadastro realizado! Aguarde aprovação do administrador para acessar o sistema." });
+    setForm({ email: novo.email, senha: "", nome: "", confirma: "", perfil: "comercial" });
+    setTimeout(() => setAba("login"), 2500);
+  };
+
+  return (
+    <div className="auth-wrap">
+      <style>{CSS_AUTH}</style>
+      <div className="auth-box">
+        <div className="auth-head">
+          <div className="auth-logo">
+            <div className="auth-mark">PT</div>
+            <span className="auth-brand">POSITEC</span>
+          </div>
+          <div>
+            <div className="auth-title">Calculadora Tributária</div>
+            <div className="auth-sub">Sistema de precificação industrial</div>
+          </div>
+        </div>
+
+        <div className="auth-body">
+          <div className="auth-tabs">
+            <button className={`auth-tab ${aba === "login" ? "on" : ""}`} onClick={() => { setAba("login"); setMsg(null); }}>Entrar</button>
+            <button className={`auth-tab ${aba === "reg" ? "on" : ""}`} onClick={() => { setAba("reg"); setMsg(null); }}>Solicitar Acesso</button>
+          </div>
+
+          {msg && <div className={`auth-msg ${msg.type}`}>{msg.text}</div>}
+
+          {aba === "login" ? <>
+            <div className="fld">
+              <label>E-mail</label>
+              <input placeholder="seu@email.com.br" value={form.email} onChange={e => F("email")(e.target.value)} onKeyDown={e => e.key === "Enter" && handleLogin()} autoComplete="username"/>
+            </div>
+            <div className="fld">
+              <label>Senha</label>
+              <input type="password" placeholder="••••••••" value={form.senha} onChange={e => F("senha")(e.target.value)} onKeyDown={e => e.key === "Enter" && handleLogin()} autoComplete="current-password"/>
+            </div>
+            <button className="btn-primary" onClick={handleLogin}>Entrar</button>
+            <div style={{ textAlign: "center", fontSize: 11, color: "var(--muted)" }}>
+              Acesso inicial: admin@positec.com.br / Positec@2026
+            </div>
+          </> : <>
+            <div className="fld">
+              <label>Nome completo</label>
+              <input placeholder="João Silva" value={form.nome} onChange={e => F("nome")(e.target.value)}/>
+            </div>
+            <div className="fld">
+              <label>E-mail corporativo</label>
+              <input placeholder="joao@positec.com.br" value={form.email} onChange={e => F("email")(e.target.value)} autoComplete="username"/>
+            </div>
+            <div className="fld">
+              <label>Perfil solicitado</label>
+              <select value={form.perfil} onChange={e => F("perfil")(e.target.value)}>
+                {loadPerfis().filter(p => p.id !== "admin").map(p =>
+                  <option key={p.id} value={p.id}>{p.icone} {p.label}</option>
+                )}
+              </select>
+            </div>
+            <div className="fld">
+              <label>Senha</label>
+              <input type="password" placeholder="Mínimo 6 caracteres" value={form.senha} onChange={e => F("senha")(e.target.value)} autoComplete="new-password"/>
+            </div>
+            <div className="fld">
+              <label>Confirmar senha</label>
+              <input type="password" placeholder="Repita a senha" value={form.confirma} onChange={e => F("confirma")(e.target.value)}/>
+            </div>
+            <button className="btn-primary" onClick={handleRegister}>Solicitar Acesso</button>
+            <div style={{ textAlign: "center", fontSize: 11, color: "var(--muted)", lineHeight: 1.5 }}>
+              Seu cadastro será analisado pelo administrador.<br/>Você receberá confirmação após aprovação.
+            </div>
+          </>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── MODAL EDITAR USUÁRIO ──────────────────────────────────────────────────────
+
+function ModalEditUser({ user, onClose, onSave }) {
+  const [perfil, setPerfil] = useState(user.perfil);
+  const [status, setStatus] = useState(user.status);
+  const perfisLista = loadPerfis();
+  const perfisMap = getPerfisMap(perfisLista);
+
+  return (
+    <div className="modal-ov" onClick={onClose}>
+      <div className="modal-box" onClick={e => e.stopPropagation()}>
+        <div className="modal-head">
+          <span className="modal-title">Editar usuário</span>
+          <button className="modal-close" onClick={onClose}>×</button>
+        </div>
+        <div className="modal-body">
+          <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", background: "rgba(255,255,255,.03)", border: "1px solid var(--border)" }}>
+            <div className="usr-av" style={{ background: (perfisMap[user.perfil]?.cor) || "#0047BB", width: 38, height: 38, fontSize: 14 }}>{initials(user.nome)}</div>
+            <div>
+              <div style={{ fontWeight: 600, color: "#fff", fontSize: 14 }}>{user.nome}</div>
+              <div style={{ fontSize: 12, color: "var(--muted)" }}>{user.email}</div>
+            </div>
+          </div>
+
+          <div className="fld">
+            <label>Status da conta</label>
+            <select value={status} onChange={e => setStatus(e.target.value)}>
+              <option value="ativo">Ativo</option>
+              <option value="inativo">Inativo</option>
+              <option value="rejeitado">Rejeitado</option>
+            </select>
+          </div>
+
+          <div style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)", textTransform: "uppercase", letterSpacing: ".8px" }}>Perfil de acesso</div>
+          <div className="perfil-grid">
+            {perfisLista.filter(p => user.id !== "master" || p.id === "admin").map(p => (
+              <div key={p.id} className={`perfil-opt ${perfil === p.id ? "sel" : ""}`} onClick={() => setPerfil(p.id)}>
+                <span className="perfil-opt-icon">{p.icone}</span>
+                <div className="perfil-opt-info">
+                  <div className="perfil-opt-label">{p.label}</div>
+                  <div className="perfil-opt-desc">{p.desc}</div>
+                </div>
+                <div className="perfil-opt-radio"></div>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="modal-foot">
+          <button className="btn-cancel" onClick={onClose}>Cancelar</button>
+          <button className="btn-confirm" onClick={() => onSave({ ...user, perfil, status })}>Salvar alterações</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── MODAL APROVAR ──────────────────────────────────────────────────────────────
+
+function ModalAprovar({ user, currentUser, onClose, onSave }) {
+  const [perfil, setPerfil] = useState(user.perfil);
+  const [action, setAction] = useState("aprovar");
+
+  const handleConfirm = () => {
+    if (action === "aprovar") {
+      onSave({ ...user, perfil, status: "ativo", aprovadoEm: new Date().toISOString(), aprovadoPor: currentUser.nome });
+    } else {
+      onSave({ ...user, status: "rejeitado", aprovadoEm: new Date().toISOString(), aprovadoPor: currentUser.nome });
+    }
+  };
+
+  return (
+    <div className="modal-ov" onClick={onClose}>
+      <div className="modal-box" onClick={e => e.stopPropagation()}>
+        <div className="modal-head">
+          <span className="modal-title">Analisar solicitação</span>
+          <button className="modal-close" onClick={onClose}>×</button>
+        </div>
+        <div className="modal-body">
+          <div style={{ padding: "12px 14px", background: "rgba(217,119,6,.08)", border: "1px solid rgba(217,119,6,.25)" }}>
+            <div style={{ fontSize: 11, color: "#fbbf24", fontWeight: 700, textTransform: "uppercase", letterSpacing: ".8px", marginBottom: 8 }}>Solicitação pendente</div>
+            <div style={{ fontWeight: 600, color: "#fff", marginBottom: 2 }}>{user.nome}</div>
+            <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 6 }}>{user.email}</div>
+            <div style={{ fontSize: 12, color: "var(--muted)" }}>Solicitado em: {fmtDate(user.criadoEm)}</div>
+            <div style={{ fontSize: 12, color: "var(--muted)" }}>Perfil solicitado: <PerfilBadge perfil={user.perfil}/></div>
+          </div>
+
+          <div className="fld">
+            <label>Decisão</label>
+            <select value={action} onChange={e => setAction(e.target.value)}>
+              <option value="aprovar">✓ Aprovar acesso</option>
+              <option value="rejeitar">✕ Rejeitar solicitação</option>
+            </select>
+          </div>
+
+          {action === "aprovar" && <>
+            <div style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)", textTransform: "uppercase", letterSpacing: ".8px" }}>Confirmar perfil de acesso</div>
+            <div className="perfil-grid">
+              {loadPerfis().filter(p => p.id !== "admin").map(p => (
+                <div key={p.id} className={`perfil-opt ${perfil === p.id ? "sel" : ""}`} onClick={() => setPerfil(p.id)}>
+                  <span className="perfil-opt-icon">{p.icone}</span>
+                  <div className="perfil-opt-info">
+                    <div className="perfil-opt-label">{p.label}</div>
+                    <div className="perfil-opt-desc">{p.desc}</div>
+                  </div>
+                  <div className="perfil-opt-radio"></div>
+                </div>
+              ))}
+            </div>
+          </>}
+
+          {action === "rejeitar" && (
+            <div className="auth-msg err">O usuário será notificado de que o acesso foi negado e não poderá fazer login.</div>
+          )}
+        </div>
+        <div className="modal-foot">
+          <button className="btn-cancel" onClick={onClose}>Cancelar</button>
+          <button className={`btn-confirm ${action === "rejeitar" ? "danger" : ""}`} onClick={handleConfirm}>
+            {action === "aprovar" ? "✓ Aprovar acesso" : "✕ Rejeitar"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── VIEW PERFIS ───────────────────────────────────────────────────────────────
+function ViewPerfis({ users }) {
+  const [perfisLista, setPerfisLista] = useState(loadPerfis);
+  const [modalPerfil, setModalPerfil] = useState(null);
+  const [confirmDel, setConfirmDel] = useState(null);
+
+  const salvarPerfil = (p) => {
+    const nova = perfisLista.find(x=>x.id===p.id)
+      ? perfisLista.map(x=>x.id===p.id?p:x)
+      : [...perfisLista, p];
+    savePerfis(nova); setPerfisLista(nova); setModalPerfil(null);
+  };
+  const deletarPerfil = (id) => {
+    const nova = perfisLista.filter(p=>p.id!==id);
+    savePerfis(nova); setPerfisLista(nova); setConfirmDel(null);
+  };
+
+  return (
+    <div>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20}}>
+        <div>
+          <div className="page-title">Perfis de Acesso</div>
+          <div className="page-sub">Crie e gerencie perfis — defina nome, ícone e módulos habilitados</div>
+        </div>
+        <button className="btn-confirm" style={{padding:"9px 18px",borderRadius:3}}
+          onClick={()=>setModalPerfil("novo")}>+ Novo Perfil</button>
+      </div>
+
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(300px,1fr))",gap:12}}>
+        {perfisLista.map(p=>{
+          const count=users.filter(u=>u.perfil===p.id&&u.status==="ativo").length;
+          const isAdmin=p.id==="admin";
+          return(
+            <div key={p.id} className={`pfcard ${p.sistema?"sistema":""}`}
+              style={{borderColor:p.cor+"33"}}>
+              <div className="pfcard-head">
+                <span className="pfcard-icon">{p.icone}</span>
+                <div style={{flex:1}}>
+                  <div className="pfcard-name">{p.label}</div>
+                  <div className="pfcard-count" style={{color:p.cor}}>
+                    {count} usuário{count!==1?"s":""} ativo{count!==1?"s":""}
+                  </div>
+                </div>
+                <div className="pfcard-actions">
+                  {!isAdmin&&<button className="btn-sm btn-edit" onClick={()=>setModalPerfil(p)}>✎ Editar</button>}
+                  {!isAdmin&&(
+                    confirmDel===p.id
+                      ? <>
+                          <button className="btn-sm btn-reject" onClick={()=>deletarPerfil(p.id)}>Confirmar</button>
+                          <button className="btn-sm btn-disable" onClick={()=>setConfirmDel(null)}>Cancelar</button>
+                        </>
+                      : <button className="btn-sm btn-reject"
+                          style={{opacity:count>0?.4:1,cursor:count>0?"not-allowed":"pointer"}}
+                          title={count>0?"Mova os usuários antes de deletar":"Deletar perfil"}
+                          onClick={()=>count===0&&setConfirmDel(p.id)}>✕</button>
+                  )}
+                  {isAdmin&&<span style={{fontSize:11,color:"var(--muted)",fontStyle:"italic",padding:"4px 8px"}}>sistema</span>}
+                </div>
+              </div>
+              {p.desc&&<div className="pfcard-desc">{p.desc}</div>}
+              <div className="pfcard-mods">
+                {MODULOS.map(m=>(
+                  <span key={m.id} className={`mod-chip ${p.modulos?.includes(m.id)?"on":"off"}`}>
+                    {m.icone} {m.label}
+                  </span>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+        <div className="btn-add-perfil" onClick={()=>setModalPerfil("novo")}>
+          <span style={{fontSize:22}}>+</span> Criar novo perfil
+        </div>
+      </div>
+
+      {modalPerfil&&(
+        <ModalPerfil
+          perfil={modalPerfil==="novo"?null:modalPerfil}
+          users={users}
+          onClose={()=>setModalPerfil(null)}
+          onSave={salvarPerfil}/>
+      )}
+    </div>
+  );
+}
+
+// ── PAINEL ADMIN ──────────────────────────────────────────────────────────────
+
+function PainelAdmin({ currentUser }) {
+  const [view, setView] = useState("pendentes");
+  const [users, setUsers] = useState(getAllUsers);
+  const [search, setSearch] = useState("");
+  const [modal, setModal] = useState(null); // { type: "edit"|"aprovar", user }
+
+  const refresh = () => setUsers(getAllUsers());
+
+  const saveUser = (updated) => {
+    const stored = loadUsers().filter(u => u.id !== "master");
+    const isMaster = updated.id === "master";
+    if (!isMaster) {
+      const idx = stored.findIndex(u => u.id === updated.id);
+      if (idx >= 0) stored[idx] = updated;
+      else stored.push(updated);
+      saveUsers(stored);
+    }
+    refresh();
+    setModal(null);
+  };
+
+  const pendentes = users.filter(u => u.status === "pendente");
+  const todos = users.filter(u => {
+    const q = search.toLowerCase();
+    return !q || u.nome.toLowerCase().includes(q) || u.email.toLowerCase().includes(q);
+  });
+
+  const stats = {
+    total: users.length,
+    ativos: users.filter(u => u.status === "ativo").length,
+    pendentes: pendentes.length,
+    inativos: users.filter(u => u.status === "inativo" || u.status === "rejeitado").length,
+  };
+
+  const NAV = [
+    { id: "calc",      icon: "🧮", label: "Calculadora" },
+    { id: "sep" },
+    { id: "pendentes", icon: "⏳", label: "Pendentes", badge: pendentes.length },
+    { id: "usuarios",  icon: "👥", label: "Usuários" },
+    { id: "perfis",    icon: "🔐", label: "Perfis" },
+  ];
+
+  // Se view === "calc", renderiza a Calculadora inline
+  if (view === "calc") {
+    return (
+      <>
+        <div className="sidebar">
+          {NAV.filter(n=>n.id!=="sep").map(n => (
+            <div key={n.id} className={`snav-item ${view === n.id ? "on" : ""}`} onClick={() => setView(n.id)}>
+              <span className="snav-icon">{n.icon}</span>
+              <span style={{ flex: 1 }}>{n.label}</span>
+              {n.badge > 0 && <span style={{ background: "#d97706", color: "#fff", borderRadius: 20, fontSize: 10, fontWeight: 700, padding: "1px 7px" }}>{n.badge}</span>}
+            </div>
+          ))}
+        </div>
+        <div style={{flex:1,display:"flex",overflow:"hidden"}}>
+          <Calculadora user={currentUser}/>
+        </div>
+      </>
+    );
+  }
+
+  return (
+    <>
+      <div className="sidebar">
+        {NAV.map(n => n.id === "sep"
+          ? <div key="sep" className="snav-sep"/>
+          : (
+            <div key={n.id} className={`snav-item ${view === n.id ? "on" : ""}`} onClick={() => setView(n.id)}>
+              <span className="snav-icon">{n.icon}</span>
+              <span style={{ flex: 1 }}>{n.label}</span>
+              {n.badge > 0 && <span style={{ background: "#d97706", color: "#fff", borderRadius: 20, fontSize: 10, fontWeight: 700, padding: "1px 7px" }}>{n.badge}</span>}
+            </div>
+          )
+        )}
+      </div>
+
+      <div className="main-content">
+        {/* STATS */}
+        <div className="stats-row">
+          <div className="stat-card blue"><div className="stat-label">Total</div><div className="stat-val">{stats.total}</div><div className="stat-sub">usuários cadastrados</div></div>
+          <div className="stat-card green"><div className="stat-label">Ativos</div><div className="stat-val">{stats.ativos}</div><div className="stat-sub">com acesso liberado</div></div>
+          <div className="stat-card amber"><div className="stat-label">Pendentes</div><div className="stat-val">{stats.pendentes}</div><div className="stat-sub">aguardando aprovação</div></div>
+          <div className="stat-card red"><div className="stat-label">Inativos</div><div className="stat-val">{stats.inativos}</div><div className="stat-sub">sem acesso</div></div>
+        </div>
+
+        {/* PENDENTES */}
+        {view === "pendentes" && (
+          <div className="tbl-wrap">
+            <div className="tbl-head">
+              <span className="tbl-head-title">⏳ Solicitações Pendentes</span>
+              <span style={{ fontSize: 12, color: "var(--muted)" }}>{pendentes.length} aguardando análise</span>
+            </div>
+            {pendentes.length === 0
+              ? <div className="empty"><div className="empty-icon">✓</div><div className="empty-text">Nenhuma pendência</div><div className="empty-sub">Todas as solicitações foram analisadas</div></div>
+              : <table>
+                  <thead><tr>
+                    <th>Usuário</th><th>Perfil Solicitado</th><th>Solicitado em</th><th>Ações</th>
+                  </tr></thead>
+                  <tbody>
+                    {pendentes.map(u => (
+                      <tr key={u.id} className="pending-row">
+                        <td><div className="usr-cell">
+                          <div className="usr-av" style={{ background: getPerfisMap(loadPerfis())[u.perfil]?.cor || "#7a7f96" }}>{initials(u.nome)}</div>
+                          <div><div className="usr-nome">{u.nome}</div><div className="usr-email">{u.email}</div></div>
+                        </div></td>
+                        <td><PerfilBadge perfil={u.perfil}/></td>
+                        <td style={{ fontFamily: "JetBrains Mono", fontSize: 12, color: "var(--muted)" }}>{fmtDate(u.criadoEm)}</td>
+                        <td><div className="act-row">
+                          <button className="btn-sm btn-approve" onClick={() => setModal({ type: "aprovar", user: u })}>✓ Analisar</button>
+                        </div></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+            }
+          </div>
+        )}
+
+        {/* TODOS USUÁRIOS */}
+        {view === "usuarios" && (
+          <div className="tbl-wrap">
+            <div className="tbl-head">
+              <span className="tbl-head-title">👥 Todos os Usuários</span>
+              <input className="tbl-search" placeholder="Buscar por nome ou e-mail..." value={search} onChange={e => setSearch(e.target.value)}/>
+            </div>
+            <table>
+              <thead><tr>
+                <th>Usuário</th><th>Perfil</th><th>Status</th><th>Criado em</th><th>Aprovado por</th><th>Ações</th>
+              </tr></thead>
+              <tbody>
+                {todos.map(u => (
+                  <tr key={u.id}>
+                    <td><div className="usr-cell">
+                      <div className="usr-av" style={{ background: getPerfisMap(loadPerfis())[u.perfil]?.cor || "#7a7f96" }}>{initials(u.nome)}</div>
+                      <div><div className="usr-nome">{u.nome}</div><div className="usr-email">{u.email}</div></div>
+                    </div></td>
+                    <td><PerfilBadge perfil={u.perfil}/></td>
+                    <td><StatusBadge status={u.status}/></td>
+                    <td style={{ fontFamily: "JetBrains Mono", fontSize: 11, color: "var(--muted)" }}>{fmtDate(u.criadoEm)}</td>
+                    <td style={{ fontSize: 12, color: "var(--muted)" }}>{u.aprovadoPor || "—"}</td>
+                    <td><div className="act-row">
+                      {u.id !== "master" && <>
+                        <button className="btn-sm btn-edit" onClick={() => setModal({ type: "edit", user: u })}>✎ Editar</button>
+                        {u.status === "ativo" && <button className="btn-sm btn-disable" onClick={() => saveUser({ ...u, status: "inativo" })}>Desativar</button>}
+                        {u.status === "inativo" && <button className="btn-sm btn-approve" onClick={() => saveUser({ ...u, status: "ativo" })}>Reativar</button>}
+                        {u.status === "pendente" && <button className="btn-sm btn-approve" onClick={() => setModal({ type: "aprovar", user: u })}>Analisar</button>}
+                      </>}
+                      {u.id === "master" && <span style={{ fontSize: 11, color: "var(--muted)", fontStyle: "italic" }}>master</span>}
+                    </div></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* PERFIS */}
+        {view === "perfis" && <ViewPerfis users={users}/>}
+      </div>
+
+      {modal?.type === "edit" && <ModalEditUser user={modal.user} onClose={() => setModal(null)} onSave={saveUser}/>}
+      {modal?.type === "aprovar" && <ModalAprovar user={modal.user} currentUser={currentUser} onClose={() => setModal(null)} onSave={saveUser}/>}
+    </>
+  );
+}
+
+// ── DASHBOARD USUÁRIO ─────────────────────────────────────────────────────────
+
+
+const PRODUTOS = [
+  {id:"pos-mao", ncm:"8470.50.10",nome:"Terminal de Pagamento - MAO",   uf:"AM",ipi:0,    pcBase:"zmf", icms:12,cred:12,mva:0,  aliqST:0,  fti:0  },
+  {id:"nb12-mao",ncm:"8471.30.12",nome:'Notebook/Tablet 8"-14" - MAO',  uf:"AM",ipi:0,    pcBase:"zmf", icms:12,cred:12,mva:35, aliqST:19, fti:0  },
+  {id:"nb19-mao",ncm:"8471.30.19",nome:'Notebook/Tablet 15"+ - MAO',    uf:"AM",ipi:0,    pcBase:"zmf", icms:12,cred:12,mva:35, aliqST:19, fti:0  },
+  {id:"cpu-mao", ncm:"8471.50.10",nome:"CPU Peq. Capac. - MAO",         uf:"AM",ipi:0,    pcBase:"zmf", icms:12,cred:12,mva:35, aliqST:19, fti:0  },
+  {id:"smt-mao", ncm:"8517.13.00",nome:"Smartphone - MAO",              uf:"AM",ipi:0,    pcBase:"zmf", icms:12,cred:12,mva:25, aliqST:19, fti:2.2},
+  {id:"cam-mao", ncm:"8525.89.29",nome:"Smart Camera WiFi - MAO",       uf:"AM",ipi:0,    pcBase:"zmf", icms:12,cred:12,mva:35, aliqST:19, fti:2.2},
+  {id:"mon-mao", ncm:"8528.52.00",nome:"Monitor PPB MAO - MAO",         uf:"AM",ipi:0,    pcBase:"zmf", icms:12,cred:12,mva:25, aliqST:19, fti:0  },
+  {id:"mon3-mao",ncm:"8528.52.00",nome:"Monitor 3o PPB fora ZFM - MAO", uf:"AM",ipi:0,    pcBase:9.25,  icms:12,cred:0, mva:25, aliqST:19, fti:0  },
+  {id:"kbd-mao", ncm:"8471.60.52",nome:"Teclado Imp. Direta - MAO",     uf:"AM",ipi:9.75, pcBase:9.25,  icms:4, cred:3, mva:35, aliqST:19, fti:0  },
+  {id:"nb12-ios",ncm:"8471.30.12",nome:'Notebook/Tablet 8"-14" - IOS',  uf:"BA",ipi:15,   pcBase:9.25,  icms:12,cred:12,mva:35, aliqST:19, fti:0  },
+  {id:"nb19-ios",ncm:"8471.30.19",nome:'Notebook/Tablet 15"+ - IOS',    uf:"BA",ipi:15,   pcBase:9.25,  icms:12,cred:12,mva:35, aliqST:19, fti:0  },
+  {id:"aio-ios", ncm:"8471.49.00",nome:"All In One / Servidor - IOS",   uf:"BA",ipi:9.75, pcBase:9.25,  icms:12,cred:12,mva:35, aliqST:19, fti:0  },
+  {id:"smt-ios", ncm:"8517.13.00",nome:"Smartphone - IOS",              uf:"BA",ipi:15,   pcBase:9.25,  icms:12,cred:12,mva:25, aliqST:19, fti:0  },
+  {id:"mon-ios", ncm:"8528.52.00",nome:"Monitor - IOS",                 uf:"BA",ipi:0,    pcBase:9.25,  icms:12,cred:12,mva:25, aliqST:19, fti:0  },
+  {id:"smt-cwb", ncm:"8517.13.00",nome:"Smartphone - CWB",              uf:"PR",ipi:15,   pcBase:9.25,  icms:4, cred:4, mva:25, aliqST:19, fti:0  },
+  {id:"fp-cwb",  ncm:"8517.14.31",nome:"Feature Phone (linha P) - CWB", uf:"PR",ipi:11.25,pcBase:9.25,  icms:4, cred:4, mva:25, aliqST:19, fti:0  },
+  {id:"vpc-cwb", ncm:"8517.62.77",nome:"Smart Video Porteiro - CWB",    uf:"PR",ipi:15,   pcBase:9.25,  icms:7, cred:0, mva:37, aliqST:19, fti:0  },
+  {id:"tab-cwb", ncm:"8471.30.11",nome:'Tablet 7" - CWB',               uf:"PR",ipi:15,   pcBase:9.25,  icms:7, cred:7, mva:35, aliqST:19, fti:0  },
+  {id:"gw-cwb",  ncm:"8517.62.94",nome:"Smart Central/Gateway - CWB",   uf:"PR",ipi:9.75, pcBase:9.25,  icms:4, cred:4, mva:35, aliqST:19, fti:0  },
+  {id:"spk-cwb", ncm:"8518.22.00",nome:"Caixa de Som Bluetooth - CWB",  uf:"PR",ipi:15,   pcBase:9.25,  icms:4, cred:0, mva:35, aliqST:19, fti:0  },
+  {id:"spg-cwb", ncm:"8536.50.90",nome:"Smart Plug WiFi (Ex03) - CWB",  uf:"PR",ipi:3.25, pcBase:9.25,  icms:7, cred:0, mva:38, aliqST:19, fti:0  },
+  {id:"chr-cwb", ncm:"8504.40.10",nome:"Carregador Celular - CWB",      uf:"PR",ipi:5,    pcBase:9.25,  icms:4, cred:0, mva:50, aliqST:19, fti:0  },
+  {id:"lmp-cwb", ncm:"8539.52.00",nome:"Smart Lampada WiFi - CWB",      uf:"PR",ipi:6.5,  pcBase:9.25,  icms:4, cred:0, mva:63.67,aliqST:19,fti:0 },
+  {id:"rob-cwb", ncm:"8508.11.00",nome:"Smart Robo Aspirador - CWB",    uf:"PR",ipi:6.5,  pcBase:9.25,  icms:4, cred:0, mva:35, aliqST:19, fti:0  },
+  {id:"tot-cwb", ncm:"8471.60.80",nome:"Totem - CWB",                   uf:"PR",ipi:9.75, pcBase:9.25,  icms:7, cred:0, mva:0,  aliqST:0,  fti:0  },
+  {id:"rtr-cwb", ncm:"8517.62.41",nome:"Router Mesh - CWB",             uf:"PR",ipi:15,   pcBase:9.25,  icms:4, cred:0, mva:35, aliqST:19, fti:0  },
+];
+
+const PC_ZFM = [
+  {k:"dentro_zmf",   label:"Comprador dentro da ZFM",pct:0,
+   sub:"PJ ou PF nos municipios de Manaus, Pres. Figueiredo ou Rio Preto da Eva.",
+   base:"Despacho MF S/N de 13.11.2017 / Parecer PGFN 1743/2016"},
+  {k:"nao_cumulativo",label:"Lucro Real (100% nao-cumulativo)",pct:3.65,
+   sub:"PJ fora da ZFM com 100% das receitas no regime nao-cumulativo.",
+   base:"Lei 10.637/02, art. 2o, par.4o, I,b | Lei 10.833/03, art. 2o, par.5o, I,b"},
+  {k:"cumulativo",   label:"Lucro Presumido / Simples / Misto / Orgao Publico",pct:7.30,
+   sub:"Lucro Presumido, Simples Nacional, Lucro Real parcial e adm. publica.",
+   base:"Lei 10.637/02, art. 2o, par.4o, II | Lei 10.833/03, art. 2o, par.5o"},
+  {k:"outros",       label:"ONG / Entidade sem fins lucrativos / PF",pct:9.25,
+   sub:"Sistema S (Sesi, Senai), APAE, APM, pessoa fisica fora da ZFM.",
+   base:"Lei 10.637/02, art. 2o, caput | Lei 10.833/03, art. 2o, caput"},
+];
+
+const UFS=["AC","AL","AM","AP","BA","CE","DF","ES","GO","MA","MG","MS","MT","PA","PB","PE","PI","PR","RJ","RN","RO","RR","RS","SC","SE","SP","TO"];
+const MX={
+  AC:[19,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12],
+  AL:[12,21.5,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12],
+  AM:[12,12,20,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12],
+  AP:[12,12,12,18,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12],
+  BA:[12,12,12,12,20.5,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12],
+  CE:[12,12,12,12,12,20,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12],
+  DF:[12,12,12,12,12,12,20,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12],
+  ES:[12,12,12,12,12,12,12,17,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12],
+  GO:[12,12,12,12,12,12,12,12,19,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12],
+  MA:[12,12,12,12,12,12,12,12,12,23,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12],
+  MG:[7,7,7,7,7,7,7,7,7,7,18,7,7,7,7,7,7,12,12,7,7,7,12,12,7,12,7],
+  MS:[12,12,12,12,12,12,12,12,12,12,12,17,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12],
+  MT:[12,12,12,12,12,12,12,12,12,12,12,12,17,12,12,12,12,12,12,12,12,12,12,12,12,12,12],
+  PA:[12,12,12,12,12,12,12,12,12,12,12,12,12,19,12,12,12,12,12,12,12,12,12,12,12,12,12],
+  PB:[12,12,12,12,12,12,12,12,12,12,12,12,12,12,20,12,12,12,12,12,12,12,12,12,12,12,12],
+  PE:[12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,20.5,12,12,12,12,12,12,12,12,12,12,12],
+  PI:[12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,22.5,12,12,12,12,12,12,12,12,12,12],
+  PR:[7,7,7,7,7,7,7,7,7,7,12,7,7,7,7,7,7,19.5,12,7,7,7,12,12,7,12,7],
+  RJ:[7,7,7,7,7,7,7,7,7,7,12,7,7,7,7,7,7,12,22,7,7,7,12,12,7,12,7],
+  RN:[12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,20,12,12,12,12,12,12,12],
+  RO:[12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,19.5,12,12,12,12,12,12],
+  RR:[12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,20,12,12,12,12,12],
+  RS:[7,7,7,7,7,7,7,7,7,7,12,7,7,7,7,7,7,12,12,7,7,7,17,12,7,12,7],
+  SC:[7,7,7,7,7,7,7,7,7,7,12,7,7,7,7,7,7,12,12,7,7,7,12,17,12,12,7],
+  SE:[12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,20,12,12],
+  SP:[7,7,7,7,7,7,7,7,7,7,12,7,7,7,7,7,7,12,12,7,7,7,12,12,7,18,7],
+  TO:[12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,20],
+};
+const ALIQ_INT={AC:19,AL:21.5,AM:20,AP:18,BA:20.5,CE:20,DF:20,ES:17,GO:19,MA:23,MG:18,MS:17,MT:17,PA:19,PB:20,PE:20.5,PI:22.5,PR:19.5,RJ:22,RN:20,RO:19.5,RR:20,RS:17,SC:17,SE:20,SP:18,TO:20};
+const FCP={AL:1,MG:1,RJ:2,SE:1};
+const getICMS=(o,d)=>{if(o===d)return ALIQ_INT[o]||18;const r=MX[o],i=UFS.indexOf(d);return(r&&i>=0)?r[i]:12;};
+
+const PPB_ITEMS=[
+  {id:"injecao",label:"Injecao Plastica"},{id:"bateria",label:"Bateria"},
+  {id:"carregador",label:"Carregador"},{id:"memoria",label:"Memoria"},
+  {id:"cabo",label:"Cabo"},{id:"placa",label:"Producao da Placa (PCB)"},
+];
+
+const brl=v=>(!isFinite(v)||isNaN(v))?"":v.toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
+const usd=v=>(!isFinite(v)||isNaN(v))?"":"USD "+v.toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2});
+const pct=v=>`${(+v||0).toFixed(3).replace(/\.?0+$/,"").replace(".",",")}%`;
+const n3=v=>(+v||0).toFixed(3).replace(/\.?0+$/,"").replace(".",",");
+const parse=s=>parseFloat(String(s).replace(",","."))||0;
+
+const DEF={
+  prodId:"pos-mao",pcZfmKey:"nao_cumulativo",regimeVendedor:"real",
+  tipoComprador:"contrib",destinacaoCliente:"revenda",ufDestino:"SP",
+  fobUSD:60,freteUSD:5,ptax:5.70,seguroBRL:2,aliqII:4.19,
+  despesas:1.1,despesasPct:1.1,despesasModo:"pct",
+  cfImp:0,cra:0,
+  ppbAtivos:{injecao:false,bateria:false,carregador:false,memoria:false,cabo:false,placa:false},
+  ppbVals:{injecao:0,bateria:0,carregador:0,memoria:0,cabo:0,placa:0},
+  producao:38.5,garantia:21.27,bkpPct:2,outrosBRL:6.8,ftiAtivo:true,
+  pd:3.47,cfixo:4.63,scrap:0.91,royal:1.27,cfVenda:2.11,frete:0.80,
+  comis:0.15,comisX:0.10,mkt:0,rebate:0,margem:5,
+  stAtivo:false,mva:0,icmsDestST:18,precoAlvo:0,
+  moedaCusto:"BRL",
+};
+
+const CALC_DEF={
+  frete:{sUSD:0,aUSD:0,saUSD:0,pS:100,pA:0,pSA:0,applied:false},
+  cfImp:{tr:30,pp:-30,tx:0.8,applied:false},
+  pcb:{tl:0,vol:1000,tempo:0,pctFob:0},
+  cfVenda:{prazo:30,taxa:1.14,applied:false},
+};
+
+// ── Storage de Registros ──────────────────────────────────────────────────────
+const STORAGE_KEY = "positec_calc_registros";
+const loadRegistros = () => { try { return JSON.parse(localStorage.getItem(STORAGE_KEY)||"[]"); } catch { return []; } };
+const saveRegistros = (list) => localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+
+// ── NInput ────────────────────────────────────────────────────────────────────
+function NInput({value,onChange,readOnly,width=80}){
+  const [raw,setRaw]=useState(String(value).replace(".",","));
+  const [lastProp,setLastProp]=useState(value);
+  const [focused,setFocused]=useState(false);
+  // Sincroniza raw quando value muda externamente (calculadora PCB, frete, etc.)
+  if(!focused&&value!==lastProp){
+    setLastProp(value);
+    setRaw(String(+value||0).replace(".",","));
+  }
+  const shown=readOnly?String(+value||0).replace(".",","):raw;
+  return(
+    <input type="text" inputMode="decimal" value={shown} readOnly={!!readOnly}
+      style={{background:"none",border:"none",outline:"none",fontFamily:"'DM Mono',monospace",
+        fontSize:11,fontWeight:500,color:"#f1f5f9",padding:"5px 8px",width,textAlign:"right"}}
+      onFocus={()=>setFocused(true)}
+      onChange={e=>{
+        if(readOnly)return;
+        const v=e.target.value;
+        if(/^-?\d*[,.]?\d{0,3}$/.test(v)||v===""||v==="-"){setRaw(v);onChange(parse(v));}
+      }}
+      onBlur={()=>{setFocused(false);if(!readOnly){const n=parse(raw);setRaw(String(n).replace(".",","));}}}
+    />
+  );
+}
+
+// ── Field ─────────────────────────────────────────────────────────────────────
+function Field({label,value,onChange,sfx="",hint,note,readOnly,action,locked,onUnlock}){
+  const isRO=readOnly||locked;
+  return(
+    <div style={{display:"flex",alignItems:"flex-start",gap:8,justifyContent:"space-between"}}>
+      <div style={{flex:1,display:"flex",flexDirection:"column",gap:2}}>
+        <span style={{fontSize:12,fontWeight:600,color:"#dce7f7",letterSpacing:".3px"}}>{label}</span>
+        {hint&&<span style={{fontSize:10,color:"#7a90b0",fontFamily:"'DM Mono',monospace"}}>{hint}</span>}
+        {note&&<span style={{fontSize:10,color:"#f87171",fontFamily:"'DM Mono',monospace"}}>{note}</span>}
+      </div>
+      <div style={{display:"flex",gap:4,alignItems:"center",flexShrink:0}}>
+        <div className={`fw ${isRO?"fro":""} ${locked?"flocked":""}`}>
+          {sfx&&<span className="fpre">{sfx}</span>}
+          <NInput value={value} onChange={onChange||(()=>{})} readOnly={isRO}/>
+        </div>
+        {locked&&onUnlock&&(
+          <button className="cbtn cunlock" title="Desvincular calculadora — editar manualmente" onClick={onUnlock}>↩</button>
+        )}
+        {action}
+      </div>
+    </div>
+  );
+}
+
+function RG({label,val,onChange,opts}){
+  return(
+    <div style={{display:"flex",flexDirection:"column",gap:5}}>
+      {label&&<div style={{fontSize:12,fontWeight:600,color:"#dce7f7",letterSpacing:".3px"}}>{label}</div>}
+      <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
+        {opts.map(o=><button key={o.v} className={`rgb ${val===o.v?"on":""}`} onClick={()=>onChange(o.v)}>{o.l}</button>)}
+      </div>
+    </div>
+  );
+}
+function Tog({label,val,onChange,hint}){
+  return(
+    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}>
+      <div style={{flex:1}}>
+        <div style={{fontSize:12,fontWeight:600,color:"#dce7f7",letterSpacing:".3px"}}>{label}</div>
+        {hint&&<div style={{fontSize:10,color:"#7a90b0",fontFamily:"'DM Mono',monospace"}}>{hint}</div>}
+      </div>
+      <button className={`tog ${val?"on":""}`} onClick={()=>onChange(!val)}><span className="tknob"/></button>
+    </div>
+  );
+}
+function Box({children,t="warn"}){return <div className={`ib ${t}`}>{children}</div>;}
+function DR({label,value,accent,bold,sep}){
+  return(
+    <div className={`dr ${bold?"drb":""} ${sep?"drs":""} ${accent||""}`}>
+      <span>{label}</span><span className="dv">{value}</span>
+    </div>
+  );
+}
+function WF({label,val,total,color,isT,sub}){
+  const p=total>0?(Math.abs(val)/total)*100:0;
+  return(
+    <div className={`wfr ${isT?"wft":""} ${sub?"wfs":""}`}>
+      <span className="wfl">{label}</span>
+      <div className="wftr"><div className="wff" style={{width:`${Math.min(100,p)}%`,background:color}}/></div>
+      <span className="wfp">{pct(p)}</span>
+      <span className="wfv">{brl(val)}</span>
+    </div>
+  );
+}
+function Sec({title,tag,children,hl}){
+  return(
+    <div className={`sec ${hl?"hl":""}`}>
+      <div className="sech">
+        <span className="sect">{title}</span>
+        {tag&&<span className="sectag">{tag}</span>}
+      </div>
+      <div className="secb">{children}</div>
+    </div>
+  );
+}
+function MI({val,onChange,sfx="USD",width=60}){
+  const [r,setR]=useState(String(val).replace(".",","));
+  return(
+    <div className="fw" style={{minWidth:88}}>
+      <span className="fpre">{sfx}</span>
+      <input type="text" inputMode="decimal" value={r}
+        style={{background:"none",border:"none",outline:"none",fontFamily:"'DM Mono',monospace",
+          fontSize:11,fontWeight:500,color:"#f1f5f9",padding:"5px 6px",width,textAlign:"right"}}
+        onChange={e=>{const v=e.target.value;if(/^-?\d*[,.]?\d{0,3}$/.test(v)||v===""){setR(v);onChange(parse(v));}}}
+        onBlur={()=>{const n=parse(r);setR(String(n).replace(".",","));}}/>
+    </div>
+  );
+}
+
+// ── Modal CF Importação ───────────────────────────────────────────────────────
+// Formula: FOB * ((1+taxa_mensal)^(dias/30) - 1)
+// taxa em % a.m. (ex: 0,8% a.m.)  |  prazo negativo = antecipacao
+function ModalCF({onClose,onApply,fobUSD,ptax,data,setData}){
+  const dias=data.tr+data.pp;
+  const cfFactor=Math.pow(1+data.tx/100,dias/30)-1;
+  const cfUSD=fobUSD*cfFactor;
+  const cfBRL=cfUSD*ptax;
+  return(
+    <div className="ov">
+      <div className="mb" onClick={e=>e.stopPropagation()}>
+        <div className="mh"><span className="mt">Custo Financeiro de Importacao</span><button className="mc" onClick={onClose}>x</button></div>
+        <div className="mbody">
+          <Box t="blue">{"Formula: FOB x ((1+taxa_mensal)^(dias/30) - 1)\nTaxa em % a.m. (ex: 0,8% a.m.) | Prazo negativo = antecipacao = reducao de custo."}</Box>
+          <div className="pbase"><span>FOB de referencia</span><span>{usd(fobUSD)}</span></div>
+          <Field label="Transit Time" sfx="dias" value={data.tr} onChange={v=>setData({...data,tr:v})} hint="Dias embarque ate chegada no porto"/>
+          <Field label="Prazo de Pagamento ao Fornecedor" sfx="dias" value={data.pp} onChange={v=>setData({...data,pp:v})} hint="Negativo = antecipacao (ex: -30 dias)"/>
+          <Field label="Taxa Financeira Mensal" sfx="%" value={data.tx} onChange={v=>setData({...data,tx:v})} hint="Custo do capital mensal (ex: 0,8% a.m.)"/>
+          <div className="pdecomp">
+            <div><span>Total dias financiados</span><span style={{color:dias<0?"#4ade80":"#94a3b8"}}>{dias} dias {dias<0?"(credito)":""}</span></div>
+            <div><span>Fator total ({n3(dias/30)} meses)</span><span>{n3(cfFactor*100)}%</span></div>
+            <div><span>CF em USD</span><span style={{color:cfUSD<0?"#4ade80":"#94a3b8"}}>{usd(cfUSD)}</span></div>
+            <div><span>PTAX</span><span>R$ {n3(ptax)}</span></div>
+          </div>
+          <div className="pres" style={{borderColor:cfBRL<0?"#16a34a":"#0047BB"}}>
+            <span style={{color:cfBRL<0?"#4ade80":"#93c5fd"}}>Custo Financeiro (BRL)</span>
+            <span style={{fontFamily:"'DM Mono',monospace",fontSize:16,fontWeight:700,color:cfBRL<0?"#4ade80":"#93c5fd"}}>{brl(cfBRL)}</span>
+          </div>
+          {cfBRL<0&&<Box t="ok">Antecipacao gera reducao de custo. O valor negativo sera subtraido do CMV.</Box>}
+          <button className="mapp" onClick={()=>onApply(parseFloat(cfBRL.toFixed(3)))}>Aplicar ao campo CF Importacao</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Modal Frete Ponderado ─────────────────────────────────────────────────────
+function ModalFrete({onClose,onApply,data,setData}){
+  const tot=data.pS+data.pA+data.pSA;
+  const fp=data.sUSD*(data.pS/100)+data.aUSD*(data.pA/100)+data.saUSD*(data.pSA/100);
+  const ok=Math.abs(tot-100)<0.001;
+  return(
+    <div className="ov">
+      <div className="mb" onClick={e=>e.stopPropagation()}>
+        <div className="mh"><span className="mt">Frete Internacional Ponderado</span><button className="mc" onClick={onClose}>x</button></div>
+        <div className="mbody">
+          <Box t="blue">{"SEA x %SEA + AIR x %AIR + SEA+AIR x %SEA+AIR\nCusto por modal (USD/un) x percentual de utilizacao."}</Box>
+          <div className="ftable">
+            <div className="fth"><span>Modal</span><span>USD / un</span><span>% embarques</span></div>
+            {[{k:"s",label:"SEA (maritimo)"},{k:"a",label:"AIR (aereo)"},{k:"sa",label:"SEA+AIR (combinado)"}].map(({k,label})=>(
+              <div key={k} className="ftr">
+                <span style={{fontSize:10,fontWeight:600,color:"#64748b"}}>{label}</span>
+                <MI val={data[k+"USD"]} onChange={v=>setData({...data,[k+"USD"]:v})}/>
+                <MI val={data["p"+k.toUpperCase()]} onChange={v=>setData({...data,["p"+k.toUpperCase()]:v})} sfx="%"/>
+              </div>
+            ))}
+          </div>
+          <div className={`ftot ${ok?"ftok":"ftwarn"}`}>
+            <span>Soma: <strong>{n3(tot)}%</strong></span>
+            {!ok&&<span style={{fontSize:9,marginLeft:6}}> — deve somar 100%</span>}
+          </div>
+          <div className="pres"><span>Frete ponderado</span><span>{usd(fp)}</span></div>
+          <button className="mapp" disabled={!ok} style={{opacity:ok?1:0.4,cursor:ok?"pointer":"not-allowed"}}
+            onClick={()=>onApply(parseFloat(fp.toFixed(3)))}>Aplicar ao campo Frete Internacional</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Modal PCB ─────────────────────────────────────────────────────────────────
+function ModalPCB({onClose,onApply,cfrImp,data,setData}){
+  const custo=useMemo(()=>(data.tl/Math.max(1,data.vol))+(data.tempo*1.40)+((data.pctFob/100)*cfrImp*0.01)+1.00,[data,cfrImp]);
+  return(
+    <div className="ov">
+      <div className="mb" onClick={e=>e.stopPropagation()}>
+        <div className="mh"><span className="mt">Producao da Placa (PCB)</span><button className="mc" onClick={onClose}>x</button></div>
+        <div className="mbody">
+          <Box t="blue">{"Formula: (Tooling / Vol.) + (Tempo x R$1,40/min) + (% PCB no FOB x CFR x 1%) + R$1,00"}</Box>
+          <Field label="Custo de Tooling" sfx="R$" value={data.tl} onChange={v=>setData({...data,tl:v})}/>
+          <Field label="Volume previsto" sfx="un" value={data.vol} onChange={v=>setData({...data,vol:v})}/>
+          <Field label="Tempo de fabricacao" sfx="min" value={data.tempo} onChange={v=>setData({...data,tempo:v})} hint="Minutos por unidade — custo: R$1,40/min"/>
+          <Field label="% da placa no FOB" sfx="%" value={data.pctFob} onChange={v=>setData({...data,pctFob:v})} hint="% do FOB referente a componentes PCB"/>
+          <div className="pbase"><span>CFR importacao (base)</span><span>{brl(cfrImp)}</span></div>
+          <div className="pdecomp">
+            <div><span>Tooling / vol.</span><span>{brl(data.tl/Math.max(1,data.vol))}</span></div>
+            <div><span>Fabricacao ({n3(data.tempo)} min x R$1,40)</span><span>{brl(data.tempo*1.40)}</span></div>
+            <div><span>% PCB ({n3(data.pctFob)}%) x CFR x 1%</span><span>{brl((data.pctFob/100)*cfrImp*0.01)}</span></div>
+            <div><span>Fixo</span><span>R$ 1,00</span></div>
+          </div>
+          <div className="pres"><span>Custo unitario da placa</span><span>{brl(custo)}</span></div>
+          <button className="mapp" onClick={()=>onApply(parseFloat(custo.toFixed(3)))}>Aplicar ao PPB - Placa</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Modal CF Venda ────────────────────────────────────────────────────────────
+// Formula: (1 + taxa/30)^(prazo + 10) - 1
+// taxa em % (ex: 1.14 = 1,14% a.m.)
+function ModalCFVenda({onClose,onApply,data,setData}){
+  const cfPct=(Math.pow(1+data.taxa/100/30,data.prazo+10)-1)*100;
+  return(
+    <div className="ov">
+      <div className="mb" onClick={e=>e.stopPropagation()}>
+        <div className="mh"><span className="mt">Custo Financeiro de Venda</span><button className="mc" onClick={onClose}>x</button></div>
+        <div className="mbody">
+          <Box t="blue">{"Formula: (1 + taxa/30)^(prazo + 10) - 1\nResultado como % sobre o preco de venda."}</Box>
+          <Field label="Prazo de pagamento do cliente" sfx="dias" value={data.prazo} onChange={v=>setData({...data,prazo:v})} hint="Dias de prazo concedidos ao cliente"/>
+          <Field label="Taxa financeira (a.m.)" sfx="%" value={data.taxa} onChange={v=>setData({...data,taxa:v})} hint="Padrao: 1,14% a.m."/>
+          <div className="pdecomp">
+            <div><span>Expoente (prazo + 10)</span><span>{data.prazo+10}</span></div>
+            <div><span>Base (1 + taxa/30)</span><span>{n3(1+data.taxa/100/30)}</span></div>
+            <div><span>Resultado (decimal)</span><span>{n3(cfPct/100)}</span></div>
+          </div>
+          <div className="pres"><span>CF Venda (% sobre preco)</span><span>{pct(cfPct)}</span></div>
+          <button className="mapp" onClick={()=>onApply(parseFloat(cfPct.toFixed(3)))}>Aplicar ao indice CF Venda</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Modal Registros ───────────────────────────────────────────────────────────
+function ModalRegistros({onClose, onLoad, currentD, currentCalcs, prodNome}){
+  const [registros, setRegistros] = useState(loadRegistros);
+  const [nome, setNome] = useState("");
+  const [confirmDel, setConfirmDel] = useState(null);
+
+  const handleSave = () => {
+    const label = nome.trim() || prodNome;
+    const novo = {
+      id: Date.now(),
+      nome: label,
+      data: new Date().toLocaleString("pt-BR"),
+      d: currentD,
+      calcs: currentCalcs,
+    };
+    const updated = [novo, ...registros];
+    saveRegistros(updated);
+    setRegistros(updated);
+    setNome("");
+  };
+
+  const handleDelete = (id) => {
+    const updated = registros.filter(r => r.id !== id);
+    saveRegistros(updated);
+    setRegistros(updated);
+    setConfirmDel(null);
+  };
+
+  return (
+    <div className="ov">
+      <div className="mb" style={{maxWidth:520}} onClick={e=>e.stopPropagation()}>
+        <div className="mh">
+          <span className="mt">Registros Salvos</span>
+          <button className="mc" onClick={onClose}>×</button>
+        </div>
+        <div className="mbody">
+
+          {/* Salvar atual */}
+          <div style={{background:"rgba(0,71,187,.08)",border:"1px solid rgba(0,71,187,.25)",padding:"12px 14px",borderRadius:4}}>
+            <div style={{fontSize:11,fontWeight:700,color:"#93c5fd",marginBottom:8,letterSpacing:.5,textTransform:"uppercase"}}>Salvar precificação atual</div>
+            <div style={{display:"flex",gap:8}}>
+              <div className="fw" style={{flex:1,minWidth:0}}>
+                <input
+                  type="text"
+                  placeholder={prodNome}
+                  value={nome}
+                  onChange={e=>setNome(e.target.value)}
+                  onKeyDown={e=>e.key==="Enter"&&handleSave()}
+                  style={{background:"none",border:"none",outline:"none",fontFamily:"'IBM Plex Sans',sans-serif",fontSize:12,color:"#dce7f7",padding:"7px 10px",width:"100%"}}
+                />
+              </div>
+              <button className="mapp" style={{padding:"7px 18px",borderRadius:4,fontSize:12}} onClick={handleSave}>
+                💾 Salvar
+              </button>
+            </div>
+          </div>
+
+          {/* Lista */}
+          {registros.length === 0
+            ? <div style={{textAlign:"center",padding:"24px 0",fontFamily:"'DM Mono',monospace",fontSize:11,color:"#5a6a84"}}>Nenhum registro salvo ainda.</div>
+            : <div style={{display:"flex",flexDirection:"column",gap:4,maxHeight:380,overflowY:"auto"}}>
+                {registros.map(r=>(
+                  <div key={r.id} style={{display:"flex",alignItems:"center",gap:8,padding:"10px 12px",background:"#2a3550",border:"1px solid rgba(255,255,255,.08)",borderRadius:4}}>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:13,fontWeight:700,color:"#dce7f7",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{r.nome}</div>
+                      <div style={{fontSize:10,fontFamily:"'DM Mono',monospace",color:"#5a6a84",marginTop:2}}>
+                        {r.data} · {PRODUTOS.find(p=>p.id===r.d.prodId)?.uf||""} → {r.d.ufDestino} · M {r.d.margem}%
+                      </div>
+                    </div>
+                    {confirmDel===r.id
+                      ? <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                          <span style={{fontSize:11,color:"#f87171"}}>Excluir?</span>
+                          <button onClick={()=>handleDelete(r.id)} style={{padding:"4px 10px",background:"#dc2626",border:"none",color:"#fff",fontSize:11,fontWeight:700,cursor:"pointer",borderRadius:3}}>Sim</button>
+                          <button onClick={()=>setConfirmDel(null)} style={{padding:"4px 10px",background:"#2a3550",border:"1px solid rgba(255,255,255,.15)",color:"#94a3b8",fontSize:11,cursor:"pointer",borderRadius:3}}>Não</button>
+                        </div>
+                      : <div style={{display:"flex",gap:6}}>
+                          <button onClick={()=>{onLoad(r.d, r.calcs);onClose();}}
+                            style={{padding:"6px 14px",background:"#0047BB",border:"none",color:"#fff",fontSize:12,fontWeight:700,cursor:"pointer",borderRadius:3,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:.5}}>
+                            ↩ Carregar
+                          </button>
+                          <button onClick={()=>setConfirmDel(r.id)}
+                            style={{padding:"6px 10px",background:"rgba(220,38,38,.1)",border:"1px solid rgba(220,38,38,.25)",color:"#f87171",fontSize:12,cursor:"pointer",borderRadius:3}}>
+                            ✕
+                          </button>
+                        </div>
+                    }
+                  </div>
+                ))}
+              </div>
+          }
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Breakdown Panel ───────────────────────────────────────────────────────────
+function BreakdownPanel({c,d,prod,ppbTot,calcs}){
+  const fobBRL=d.fobUSD*d.ptax;
+  const freteBRL=d.freteUSD*d.ptax;
+  const cmvImpTotal=c.cmvImp+d.cfImp; // CMV Imp inclui CF
+  const vplDisp=cmvImpTotal+ppbTot+(d.cra||0);
+  const garantiaBkp=d.garantia+c.bkpV;
+  const custosLocais=d.producao+d.outrosBRL;
+  const totalImp=c.cargaTot+(c.ftiPct>0?c.ftiV:0);
+  const totalIndGerPct=d.pd+d.scrap+d.royal+d.frete;
+  const totalIndGerV=c.pdV+c.scV+c.ryV+c.frV;
+  const totalIndComPct=d.comis+(d.comis*2/3)+d.mkt+d.rebate+d.cfVenda;
+  const totalIndComV=c.cmV+c.mktV+c.rebateV+c.cfnV;
+  const mcV=c.margV+c.cfxV;
+
+  // row helpers
+  const R=({l,v,p,acc,bold,sep,sub,indent,dual})=>(
+    <div className={`bdr ${bold?"bdb":""} ${sep?"bds":""} ${acc||""} ${sub?"bdsub":""}`}>
+      <span className="bdl" style={indent?{paddingLeft:14}:undefined}>{l}</span>
+      {p!=null&&<span className="bdp">{pct(p)}</span>}
+      <span className="bdv">
+        {dual&&<span className="bdv2">{dual}</span>}
+        {brl(v)}
+      </span>
+    </div>
+  );
+  const Sep=({label,v,p,color})=>(
+    <div className="bdtot" style={color?{borderColor:color}:undefined}>
+      <span>{label}</span>
+      {p!=null&&<span className="bdtotp">{pct(p)}</span>}
+      <span className="bdtotv" style={color?{color}:undefined}>{brl(v)}</span>
+    </div>
+  );
+  const GH=({t})=><div className="bdgh">{t}</div>;
+
+  return(
+    <div className="bdc">
+      {/* ── CUSTO DE IMPORTAÇÃO ── */}
+      <GH t="CUSTO DE IMPORTAÇÃO"/>
+      <R l="FOB" v={fobBRL} dual={usd(d.fobUSD)}/>
+      <R l="(+) Frete Internacional" v={freteBRL} dual={usd(d.freteUSD)} indent/>
+      <R l={`(+) II (${pct(d.aliqII)})`} v={c.iiV} indent acc="red"/>
+      <R l={`(+) Despesas (${d.despesasModo==="pct"?pct(d.despesasPct)+" CFR":"manual"})`} v={c.despesas} indent acc="red"/>
+      <R l="(+) Seguro" v={d.seguroBRL} indent/>
+      {d.cfImp!==0&&<R l="(+) CF Importação" v={d.cfImp} indent acc={d.cfImp<0?"green":""}/>}
+      <Sep label="CMV IMPORTAÇÃO" v={cmvImpTotal}/>
+
+      {/* ── PPB + VPL ── */}
+      {ppbTot>0&&<R l="(+) PPB Total" v={ppbTot}/>}
+      {(d.cra||0)>0&&<R l="(+) CRA / Créditos" v={d.cra}/>}
+      <Sep label="VPL" v={vplDisp} color="#2563eb"/>
+
+      {/* ── CUSTOS LOCAIS ── */}
+      <GH t="CUSTOS LOCAIS"/>
+      <R l="Garantia" v={d.garantia}/>
+      <R l={`BKP (${pct(d.bkpPct)} × VPL)`} v={c.bkpV} indent sub/>
+      <R l="Garantia + BKP" v={garantiaBkp} bold sep/>
+      <R l="Produção / Montagem" v={d.producao}/>
+      <R l="Outros custos BRL" v={d.outrosBRL} indent sub/>
+      <R l="Custos Locais" v={custosLocais} bold sep/>
+      <Sep label="CUSTO TOTAL" v={c.cmvTotal} color="#0047BB"/>
+
+      {/* ── IMPOSTOS DE VENDA ── */}
+      <GH t="IMPOSTOS DE VENDA"/>
+      <R l={`P/C nominal (${pct(c.pcPct)})`} v={c.pSI*(c.pcPct/100)} p={c.pcPct} acc="red"/>
+      {c.pcBaseRedPct>0.001&&<R l={`(-) Redução base — ICMS incidente NF (${pct(c.aliqInter)})`} v={-c.pSI*(c.pcBaseRedPct/100)} p={-c.pcBaseRedPct} indent acc="green"/>}
+      {c.pcSubvPct>0.001&&<R l={`(+) P/C sobre subvenção — crédito (${pct(c.pcSubvPct)})`} v={c.pcSubvV} p={c.pcSubvPct} indent acc="red"/>}
+      {c.difal>0&&<R l={`(-) Redução base — DIFAL (${pct(c.difal)})`} v={-c.pSI*(c.pcPct*c.difal/100/100)} p={-(c.pcPct*c.difal/100)} indent acc="green"/>}
+      <R l={`P/C efetivo no preço (${pct(c.pcEf)})`} v={c.pcV} p={c.pcEf} bold sep/>
+      {c.icmsEfPct>0&&<R l={`ICMS efetivo (${pct(c.icmsEfPct)})`} v={c.icmsEfV} p={c.icmsEfPct} acc="red"/>}
+      {c.difal>0&&<R l={`DIFAL (${pct(c.difal)})`} v={c.difalV} p={c.difal} acc="red"/>}
+      {c.ipi>0&&<R l={`IPI (${pct(c.ipi)})`} v={c.ipiV} p={c.ipi} acc="red"/>}
+      {c.stV>0&&<R l="ICMS-ST" v={c.stV} acc="warn"/>}
+      {c.ftiPct>0&&<R l={`FTI/UEA-AM (${pct(c.ftiPct)})`} v={c.ftiV} acc="red"/>}
+      {c.fcpPct>0&&<R l={`Fundo Pobreza ${d.ufDestino}`} v={c.fcpV} acc="warn"/>}
+      <R l="Total Impostos" v={totalImp} p={c.cargaPct} bold sep/>
+
+      {/* ── ÍNDICES GERAIS ── */}
+      <GH t="ÍNDICES GERAIS"/>
+      <R l={`P&D (${pct(d.pd)})`} v={c.pdV} p={d.pd}/>
+      <R l={`Scrap (${pct(d.scrap)})`} v={c.scV} p={d.scrap}/>
+      <R l={`Royalties (${pct(d.royal)})`} v={c.ryV} p={d.royal}/>
+      <R l={`Frete venda (${pct(d.frete)})`} v={c.frV} p={d.frete}/>
+      <R l="Subtotal Índices Gerais" v={totalIndGerV} p={totalIndGerPct} bold sep/>
+
+      {/* ── ÍNDICES COMERCIAIS ── */}
+      <GH t="ÍNDICES COMERCIAIS"/>
+      <R l={`Comissão + Encargos (${pct(d.comis+c.comisXPct)})`} v={c.cmV} p={d.comis+c.comisXPct}/>
+      {d.mkt>0&&<R l={`Marketing (${pct(d.mkt)})`} v={c.mktV} p={d.mkt}/>}
+      {d.rebate>0&&<R l={`Rebate (${pct(d.rebate)})`} v={c.rebateV} p={d.rebate}/>}
+      <R l={`CF Venda (${pct(d.cfVenda)})`} v={c.cfnV} p={d.cfVenda}/>
+      <R l="Subtotal Índices Comerciais" v={totalIndComV} p={totalIndComPct} bold sep/>
+
+      {/* ── RESULTADO ── */}
+      <div style={{height:4}}/>
+      <R l={`MC — Margem de Contribuição`} v={mcV} p={c.mc} bold acc="blue" sep/>
+      <R l={`Custo Fixo (${pct(d.cfixo)})`} v={c.cfxV} p={d.cfixo} indent/>
+      <Sep label="ML — MARGEM LÍQUIDA" v={c.margV} p={c.margPct} color="#059669"/>
+    </div>
+  );
+}
+
+// ── Modal Gestão de Usuários ─────────────────────────────────────────────────
+function ModalGestaoUsers({ onClose, currentUser }) {
+  const [aba, setAba] = useState("pendentes");
+  const [users, setUsers] = useState(getAllUsers);
+  const [search, setSearch] = useState("");
+  const [modal, setModal] = useState(null);
+  const [perfisLista, setPerfisLista] = useState(loadPerfis);
+  const [modalPerfil, setModalPerfil] = useState(null);
+  const [confirmDel, setConfirmDel] = useState(null);
+
+  const refresh = () => setUsers(getAllUsers());
+
+  const saveUser = (updated) => {
+    const stored = loadUsers().filter(u => u.id !== "master");
+    if (updated.id !== "master") {
+      const idx = stored.findIndex(u => u.id === updated.id);
+      if (idx >= 0) stored[idx] = updated; else stored.push(updated);
+      saveUsers(stored);
+    }
+    refresh(); setModal(null);
+  };
+
+  const salvarPerfil = (p) => {
+    const nova = perfisLista.find(x=>x.id===p.id)
+      ? perfisLista.map(x=>x.id===p.id?p:x) : [...perfisLista, p];
+    savePerfis(nova); setPerfisLista(nova); setModalPerfil(null);
+  };
+  const deletarPerfil = (id) => {
+    const nova = perfisLista.filter(p=>p.id!==id);
+    savePerfis(nova); setPerfisLista(nova); setConfirmDel(null);
+  };
+
+  const pendentes = users.filter(u => u.status === "pendente");
+  const todos = users.filter(u => {
+    const q = search.toLowerCase();
+    return !q || u.nome.toLowerCase().includes(q) || u.email.toLowerCase().includes(q);
+  });
+
+  const btnStyle = (on) => ({
+    padding:"7px 16px", background: on?"#0047BB":"rgba(255,255,255,.05)",
+    border:`1px solid ${on?"#0047BB":"rgba(255,255,255,.1)"}`,
+    color: on?"#fff":"var(--muted)", fontSize:12, fontWeight:700,
+    cursor:"pointer", borderRadius:3, transition:".15s", letterSpacing:".3px"
+  });
+
+  return (
+    <div className="modal-ov" onClick={onClose}>
+      <div className="modal-box" style={{maxWidth:760,width:"95vw"}} onClick={e=>e.stopPropagation()}>
+        <div className="modal-head">
+          <span className="modal-title">👥 Gestão de Usuários e Perfis</span>
+          <button className="modal-close" onClick={onClose}>×</button>
+        </div>
+
+        {/* Tabs */}
+        <div style={{display:"flex",gap:4,padding:"10px 16px",borderBottom:"1px solid var(--border)",background:"rgba(255,255,255,.02)"}}>
+          <button style={btnStyle(aba==="pendentes")} onClick={()=>setAba("pendentes")}>
+            ⏳ Pendentes {pendentes.length>0&&<span style={{marginLeft:4,background:"#d97706",color:"#fff",borderRadius:20,padding:"0 6px",fontSize:10}}>{pendentes.length}</span>}
+          </button>
+          <button style={btnStyle(aba==="usuarios")} onClick={()=>setAba("usuarios")}>👥 Usuários</button>
+          <button style={btnStyle(aba==="perfis")} onClick={()=>setAba("perfis")}>🔐 Perfis</button>
+        </div>
+
+        <div style={{padding:16,maxHeight:"70vh",overflowY:"auto"}}>
+
+          {/* ABA PENDENTES */}
+          {aba==="pendentes"&&(pendentes.length===0
+            ? <div className="empty"><div className="empty-icon">✓</div><div className="empty-text">Nenhuma pendência</div></div>
+            : <table style={{width:"100%",borderCollapse:"collapse"}}>
+                <thead><tr>
+                  {["Usuário","Perfil Solicitado","Data","Ação"].map(h=>(
+                    <th key={h} style={{padding:"8px 12px",textAlign:"left",fontSize:11,fontWeight:700,color:"var(--muted)",textTransform:"uppercase",letterSpacing:".8px",borderBottom:"1px solid var(--border)"}}>{h}</th>
+                  ))}
+                </tr></thead>
+                <tbody>
+                  {pendentes.map(u=>(
+                    <tr key={u.id} style={{background:"rgba(217,119,6,.04)"}}>
+                      <td style={{padding:"10px 12px"}}>
+                        <div style={{fontWeight:600,color:"#fff"}}>{u.nome}</div>
+                        <div style={{fontSize:11,color:"var(--muted)"}}>{u.email}</div>
+                      </td>
+                      <td style={{padding:"10px 12px"}}><PerfilBadge perfil={u.perfil}/></td>
+                      <td style={{padding:"10px 12px",fontFamily:"JetBrains Mono",fontSize:11,color:"var(--muted)"}}>{fmtDate(u.criadoEm)}</td>
+                      <td style={{padding:"10px 12px"}}>
+                        <button className="btn-sm btn-approve" onClick={()=>setModal({type:"aprovar",user:u})}>✓ Analisar</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+          )}
+
+          {/* ABA USUARIOS */}
+          {aba==="usuarios"&&(
+            <>
+              <input className="tbl-search" placeholder="Buscar por nome ou e-mail..."
+                value={search} onChange={e=>setSearch(e.target.value)}
+                style={{width:"100%",marginBottom:12}}/>
+              <table style={{width:"100%",borderCollapse:"collapse"}}>
+                <thead><tr>
+                  {["Usuário","Perfil","Status","Ações"].map(h=>(
+                    <th key={h} style={{padding:"8px 12px",textAlign:"left",fontSize:11,fontWeight:700,color:"var(--muted)",textTransform:"uppercase",letterSpacing:".8px",borderBottom:"1px solid var(--border)"}}>{h}</th>
+                  ))}
+                </tr></thead>
+                <tbody>
+                  {todos.map(u=>{
+                    const pm=getPerfisMap(loadPerfis());
+                    return(
+                    <tr key={u.id} style={{borderBottom:"1px solid rgba(255,255,255,.04)"}}>
+                      <td style={{padding:"10px 12px"}}>
+                        <div style={{display:"flex",alignItems:"center",gap:8}}>
+                          <div style={{width:28,height:28,borderRadius:"50%",background:pm[u.perfil]?.cor||"#7a7f96",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,color:"#fff",flexShrink:0}}>{initials(u.nome)}</div>
+                          <div>
+                            <div style={{fontWeight:600,color:"#fff",fontSize:13}}>{u.nome}</div>
+                            <div style={{fontSize:11,color:"var(--muted)"}}>{u.email}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td style={{padding:"10px 12px"}}><PerfilBadge perfil={u.perfil}/></td>
+                      <td style={{padding:"10px 12px"}}><StatusBadge status={u.status}/></td>
+                      <td style={{padding:"10px 12px"}}>
+                        <div style={{display:"flex",gap:5}}>
+                          {u.id!=="master"&&<button className="btn-sm btn-edit" onClick={()=>setModal({type:"edit",user:u})}>✎</button>}
+                          {u.id!=="master"&&u.status==="ativo"&&<button className="btn-sm btn-disable" onClick={()=>saveUser({...u,status:"inativo"})}>Desativar</button>}
+                          {u.id!=="master"&&u.status==="inativo"&&<button className="btn-sm btn-approve" onClick={()=>saveUser({...u,status:"ativo"})}>Reativar</button>}
+                          {u.id!=="master"&&u.status==="pendente"&&<button className="btn-sm btn-approve" onClick={()=>setModal({type:"aprovar",user:u})}>Analisar</button>}
+                          {u.id==="master"&&<span style={{fontSize:11,color:"var(--muted)",fontStyle:"italic"}}>master</span>}
+                        </div>
+                      </td>
+                    </tr>
+                  )})}
+                </tbody>
+              </table>
+            </>
+          )}
+
+          {/* ABA PERFIS */}
+          {aba==="perfis"&&(
+            <div style={{display:"flex",flexDirection:"column",gap:10}}>
+              <div style={{display:"flex",justifyContent:"flex-end"}}>
+                <button className="btn-confirm" style={{padding:"7px 16px",borderRadius:3}}
+                  onClick={()=>setModalPerfil("novo")}>+ Novo Perfil</button>
+              </div>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))",gap:10}}>
+                {perfisLista.map(p=>{
+                  const count=users.filter(u=>u.perfil===p.id&&u.status==="ativo").length;
+                  const isAdminP=p.id==="admin";
+                  return(
+                    <div key={p.id} className="pfcard" style={{borderColor:p.cor+"33"}}>
+                      <div className="pfcard-head">
+                        <span className="pfcard-icon">{p.icone}</span>
+                        <div style={{flex:1}}>
+                          <div className="pfcard-name">{p.label}</div>
+                          <div className="pfcard-count" style={{color:p.cor}}>{count} ativo{count!==1?"s":""}</div>
+                        </div>
+                        <div className="pfcard-actions">
+                          {!isAdminP&&<button className="btn-sm btn-edit" onClick={()=>setModalPerfil(p)}>✎</button>}
+                          {!isAdminP&&(confirmDel===p.id
+                            ? <><button className="btn-sm btn-reject" onClick={()=>deletarPerfil(p.id)}>Sim</button>
+                                <button className="btn-sm btn-disable" onClick={()=>setConfirmDel(null)}>Não</button></>
+                            : <button className="btn-sm btn-reject" style={{opacity:count>0?.4:1}}
+                                onClick={()=>count===0&&setConfirmDel(p.id)}>✕</button>
+                          )}
+                          {isAdminP&&<span style={{fontSize:10,color:"var(--muted)",fontStyle:"italic"}}>sistema</span>}
+                        </div>
+                      </div>
+                      <div className="pfcard-mods">
+                        {MODULOS.map(m=>(
+                          <span key={m.id} className={`mod-chip ${p.modulos?.includes(m.id)?"on":"off"}`}>
+                            {m.icone} {m.label}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              {modalPerfil&&<ModalPerfil perfil={modalPerfil==="novo"?null:modalPerfil}
+                users={users} onClose={()=>setModalPerfil(null)} onSave={salvarPerfil}/>}
+            </div>
+          )}
+        </div>
+      </div>
+      {modal?.type==="edit"&&<ModalEditUser user={modal.user} onClose={()=>setModal(null)} onSave={saveUser}/>}
+      {modal?.type==="aprovar"&&<ModalAprovar user={modal.user} currentUser={currentUser} onClose={()=>setModal(null)} onSave={saveUser}/>}
+    </div>
+  );
+}
+
+// ── CSS ───────────────────────────────────────────────────────────────────────
+const CSS=`
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=DM+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:#1c2333;color:#dce7f7;font-family:'IBM Plex Sans',sans-serif;min-height:100vh}
+input::-webkit-inner-spin-button,input::-webkit-outer-spin-button{-webkit-appearance:none}
+.app{display:flex;flex-direction:column;flex:1;overflow:hidden}
+.hdr{background:#232c3d;color:#fff;padding:0 20px;display:flex;align-items:center;gap:16px;min-height:58px;border-bottom:3px solid #0047BB;flex-wrap:wrap}
+.buf{padding:4px 10px;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:.5px;border-radius:20px}
+.buf.zmf{background:rgba(0,71,187,.35);color:#93c5fd;border:1px solid rgba(0,71,187,.5)}.buf.ios{background:rgba(26,101,212,.35);color:#93c5fd;border:1px solid rgba(26,101,212,.5)}.buf.cwb{background:rgba(100,116,139,.2);color:#94a3b8;border:1px solid rgba(100,116,139,.3)}
+.brt{padding:3px 9px;font-family:'DM Mono',monospace;font-size:9px;border:1px solid rgba(255,255,255,.12);color:#7a90b0;border-radius:20px}
+.bdf{padding:3px 9px;font-family:'DM Mono',monospace;font-size:9px;border-radius:20px;background:rgba(220,38,38,.12);border:1px solid rgba(220,38,38,.25);color:#f87171}
+.layout{display:grid;grid-template-columns:320px 1fr;grid-template-rows:1fr;flex:1;min-height:0;overflow:hidden}
+.pleft{background:#1a2030;border-right:1px solid rgba(255,255,255,.08);display:flex;flex-direction:column;overflow:hidden}
+.tnav{display:flex;flex-wrap:nowrap;border-bottom:1px solid rgba(255,255,255,.08);background:#161e2c;flex-shrink:0;overflow-x:auto;scrollbar-width:none}.tnav::-webkit-scrollbar{display:none}
+.tbtn{flex:0 0 auto;padding:9px 7px;background:none;border:none;border-bottom:2px solid transparent;color:#7a90b0;font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;cursor:pointer;transition:.15s;white-space:nowrap}
+.tbtn.on{color:#f0f4ff;border-bottom-color:#0047BB;background:rgba(0,71,187,.15)}
+.tbtn:hover:not(.on){color:#c4d4e8;background:rgba(255,255,255,.04)}
+.pscroll{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:10px}
+.sec{border:1px solid rgba(255,255,255,.08);overflow:hidden;background:#232c3d;border-radius:6px}
+.sec.hl{border-color:rgba(0,71,187,.6)}
+.sech{padding:9px 13px;background:#2a3550;border-bottom:1px solid rgba(255,255,255,.08);display:flex;align-items:center;justify-content:space-between;min-height:34px}
+.sec.hl .sech{background:#0047BB}
+.sect{font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#f0f4ff}
+.sec.hl .sect{color:#fff}
+.sectag{font-family:'DM Mono',monospace;font-size:9px;color:#7a90b0;padding:2px 7px;border:1px solid rgba(255,255,255,.1);border-radius:20px}
+.sec.hl .sectag{color:rgba(255,255,255,.65);border-color:rgba(255,255,255,.25)}
+.secb{padding:12px 13px;display:flex;flex-direction:column;gap:9px}
+.fw{display:flex;align-items:center;border:1px solid rgba(255,255,255,.1);background:#1a2030;overflow:hidden;min-width:115px;flex-shrink:0;transition:.15s;border-radius:4px}
+.fw:focus-within{border-color:#0047BB;box-shadow:0 0 0 2px rgba(0,71,187,.2)}
+.fro{opacity:.45;pointer-events:none}
+.flocked{border-color:rgba(0,71,187,.5)!important;background:rgba(0,71,187,.07)!important}
+.fpre{padding:0 8px;font-family:'DM Mono',monospace;font-size:10px;color:#7a90b0;background:#161e2c;border-right:1px solid rgba(255,255,255,.08);white-space:nowrap;align-self:stretch;display:flex;align-items:center}
+.fsel{border:1px solid rgba(255,255,255,.1);background:#1a2030;padding:7px 8px;font-family:'DM Mono',monospace;font-size:11px;color:#dce7f7;outline:none;min-width:115px;flex-shrink:0;cursor:pointer;border-radius:4px}
+.fsel:focus{border-color:#0047BB}
+.cbtn{width:28px;height:28px;background:#2a3550;border:1px solid rgba(255,255,255,.1);cursor:pointer;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:.15s;border-radius:4px;color:#7a90b0;font-family:'DM Mono',monospace}
+.cbtn:hover{border-color:#0047BB;background:rgba(0,71,187,.2);color:#93c5fd}
+.cbtn.cactive{border-color:#0047BB!important;color:#93c5fd!important;background:rgba(0,71,187,.25)!important}
+.cunlock{font-size:13px;color:#7a90b0!important}
+.cunlock:hover{color:#fbbf24!important;border-color:rgba(251,191,36,.4)!important;background:rgba(251,191,36,.08)!important}
+.rgb{flex:1;padding:7px 8px;background:#1a2030;border:1px solid rgba(255,255,255,.1);color:#7a90b0;font-family:'IBM Plex Sans',sans-serif;font-size:12px;font-weight:500;cursor:pointer;transition:.15s;min-width:60px;border-radius:3px}
+.rgb.on{background:rgba(0,71,187,.2);border-color:rgba(0,71,187,.5);color:#93c5fd;font-weight:600}
+.rgb:hover:not(.on){border-color:rgba(255,255,255,.2);color:#c4d4e8}
+.tog{width:40px;height:22px;background:#2a3550;border:1px solid rgba(255,255,255,.12);border-radius:11px;cursor:pointer;position:relative;transition:.2s;flex-shrink:0}
+.tog.on{background:#0047BB;border-color:#0047BB}
+.tknob{position:absolute;top:3px;left:3px;width:14px;height:14px;background:#7a90b0;border-radius:50%;transition:.2s}
+.tog.on .tknob{transform:translateX(18px);background:#fff}
+.ib{padding:8px 11px;font-size:11px;line-height:1.65;border-left:3px solid;white-space:pre-wrap;border-radius:0 4px 4px 0}
+.ib.blue{background:rgba(0,71,187,.1);border-color:#0047BB;color:#93c5fd}
+.ib.gray{background:rgba(255,255,255,.03);border-color:rgba(255,255,255,.1);color:#7a90b0;font-family:'DM Mono',monospace;font-size:10px}
+.ib.ok{background:rgba(22,163,74,.08);border-color:#16a34a;color:#4ade80}
+.ib.warn{background:rgba(217,119,6,.08);border-color:#d97706;color:#fbbf24}
+.dr{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.04);font-size:12px;color:#7a90b0}
+.dr:last-child{border-bottom:none}.drb{font-weight:700;color:#dce7f7}.drs{border-top:1px solid rgba(255,255,255,.08);margin-top:4px;padding-top:7px}
+.dr.red .dv{color:#f87171;font-weight:600}.dr.green .dv{color:#4ade80;font-weight:600}.dr.blue .dv{color:#60a5fa;font-weight:600}.dr.warn .dv{color:#fbbf24;font-weight:600}
+.dv{font-family:'DM Mono',monospace;font-size:12px;font-weight:500;color:#a8b5cc}
+.drb .dv{color:#dce7f7}
+.psel{width:100%;padding:8px 10px;border:1px solid rgba(255,255,255,.1);background:#1a2030;font-family:'DM Mono',monospace;font-size:11px;color:#dce7f7;outline:none;border-radius:4px}
+.psel:focus{border-color:#0047BB}
+.pgrid{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:5px}
+.pchip{background:#1a2030;border:1px solid rgba(255,255,255,.08);padding:6px 10px;border-radius:4px}
+.pcl{display:block;font-size:9px;color:#3d5070;text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px;font-family:'DM Mono',monospace}
+.pcv{font-family:'DM Mono',monospace;font-size:12px;font-weight:700;color:#dce7f7}
+.zmfi{display:flex;gap:8px;padding:9px 11px;border:1px solid rgba(255,255,255,.08);cursor:pointer;background:#1a2030;transition:.15s;border-radius:4px}
+.zmfi.sel{border-color:rgba(0,71,187,.6);background:rgba(0,71,187,.1)}.zmfi:hover:not(.sel){border-color:rgba(255,255,255,.18)}
+.rdot{width:13px;height:13px;border-radius:50%;border:2px solid rgba(255,255,255,.15);transition:.15s;margin-top:2px;flex-shrink:0}
+.rdot.on{border-color:#0047BB;background:#0047BB;box-shadow:0 0 0 3px rgba(0,71,187,.2)}
+.ppbi{border:1px solid rgba(255,255,255,.08);overflow:hidden;border-radius:5px}.ppbc{display:flex;align-items:center;gap:8px;padding:9px 12px;cursor:pointer;background:#2a3550;width:100%}
+.ppbc input[type=checkbox]{display:none}
+.ppbcb{width:16px;height:16px;border:2px solid rgba(255,255,255,.15);flex-shrink:0;background:#1a2030;transition:.15s;position:relative;border-radius:3px}
+.ppbc input:checked+.ppbcb{background:#0047BB;border-color:#0047BB}
+.ppbc input:checked+.ppbcb::after{content:"v";position:absolute;top:-1px;left:2px;color:#fff;font-size:10px;font-weight:700}
+.ppbtot{display:flex;justify-content:space-between;align-items:center;padding:9px 12px;background:#0047BB;color:#fff;font-family:'DM Mono',monospace;font-size:13px;font-weight:700;margin-top:4px}
+.cvres{display:flex;justify-content:space-between;align-items:center;padding:11px 13px;background:rgba(0,71,187,.12);border:1px solid rgba(0,71,187,.35);border-radius:4px}
+.cvres span:first-child{font-size:12px;font-weight:600;color:#93c5fd}
+.txgrid{display:grid;grid-template-columns:1fr 1fr;gap:5px}
+.txc{padding:9px 11px;border:1px solid rgba(255,255,255,.08);background:#1a2030;border-radius:4px}
+.txon{border-color:rgba(248,113,113,.25);background:rgba(220,38,38,.06)}.txok{border-color:rgba(74,222,128,.2);background:rgba(22,163,74,.06)}.txwn{border-color:rgba(251,191,36,.2);background:rgba(217,119,6,.06)}
+.txl{font-size:9px;color:#5a6a84;text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px;font-family:'DM Mono',monospace;line-height:1.3}
+.txv{font-family:'DM Mono',monospace;font-size:14px;font-weight:700;color:#dce7f7}
+.txon .txv{color:#f87171}.txok .txv{color:#4ade80}
+.pright{display:flex;flex-direction:column;overflow:hidden;background:#1c2333}
+.form-topbar{display:flex;align-items:center;border-bottom:1px solid rgba(255,255,255,.08);background:#161e2c;flex-shrink:0;min-height:40px}
+.form-topbar .tnav{border-bottom:none;background:transparent}
+.price-hero{background:linear-gradient(150deg,#0f2a6e 0%,#0a1a45 100%);padding:14px 16px;border:1px solid rgba(37,99,235,.2);border-bottom:3px solid #0047BB;border-radius:6px;margin-bottom:4px}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.form-grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+.form-col{display:flex;flex-direction:column;gap:10px}
+.hero{background:linear-gradient(135deg,#0f2a6e,#0a1a45);padding:18px 22px;display:flex;align-items:flex-end;justify-content:space-between;gap:14px;flex-wrap:wrap;border:1px solid rgba(0,71,187,.2);border-bottom:3px solid #0047BB;border-radius:6px}
+.kpi{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);padding:9px 14px;text-align:center;min-width:80px;border-radius:5px}
+.kpi-red{border-color:rgba(248,113,113,.2);background:rgba(220,38,38,.06)}.kpi-green{border-color:rgba(74,222,128,.2);background:rgba(22,163,74,.06)}.kpi-blue{border-color:rgba(96,165,250,.2);background:rgba(0,71,187,.07)}
+.kpi-red span:last-child{color:#f87171!important}.kpi-green span:last-child{color:#4ade80!important}.kpi-blue span:last-child{color:#93c5fd!important}
+.rcard{background:#232c3d;border:1px solid rgba(255,255,255,.08);padding:12px 16px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;border-radius:6px}
+.rlbl{font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:#5a6a84;white-space:nowrap;flex-shrink:0}
+.rbody{display:flex;align-items:center;gap:12px;flex:1;flex-wrap:wrap}
+.riw{display:flex;align-items:center;border:1px solid rgba(255,255,255,.12);background:#1a2030;overflow:hidden;border-radius:4px}
+.riw:focus-within{border-color:#0047BB}
+.rpfx{padding:0 10px;font-family:'DM Mono',monospace;font-size:12px;color:#7a90b0;background:#161e2c;border-right:1px solid rgba(255,255,255,.08);align-self:stretch;display:flex;align-items:center}
+.ri{background:none;border:none;outline:none;font-family:'DM Mono',monospace;font-size:15px;font-weight:700;color:#dce7f7;padding:8px 10px;width:160px;text-align:right}
+.rcl{padding:0 9px;background:none;border:none;border-left:1px solid rgba(255,255,255,.08);color:#7a90b0;font-size:12px;cursor:pointer;align-self:stretch;display:flex;align-items:center}
+.rcl:hover{color:#f87171}
+.rres{display:flex;flex-direction:column;gap:4px;flex:1}
+.rrmain{display:flex;justify-content:space-between;align-items:center;font-size:12px;font-weight:600;color:#a8b5cc}
+.rrv{font-family:'DM Mono',monospace;font-size:20px;font-weight:800}
+.rpos .rrv{color:#4ade80}.rneg .rrv{color:#f87171}
+.rrsub{display:flex;flex-direction:column;gap:2px}
+.rrsub span{font-family:'DM Mono',monospace;font-size:10px;color:#5a6a84}
+.strip{display:flex;align-items:center;gap:3px;flex-wrap:wrap;background:#232c3d;border:1px solid rgba(255,255,255,.08);padding:10px 14px;border-radius:6px}
+.sb{border:1px solid rgba(255,255,255,.08);padding:6px 10px;min-width:68px;text-align:center;background:#1a2030;border-radius:4px}
+.sb.hl{border-color:rgba(255,255,255,.15);background:#2a3550}.sb.blue{border-color:rgba(0,71,187,.4);background:rgba(0,71,187,.12)}.sb.dk{border-color:rgba(255,255,255,.1);background:#1a2030}
+.sbl{font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#5a6a84;margin-bottom:2px;font-family:'Barlow Condensed',sans-serif}
+.sbv{font-family:'DM Mono',monospace;font-size:10px;font-weight:700;color:#a8b5cc}
+.sb.hl .sbv,.sb.dk .sbv{color:#dce7f7}.sb.blue .sbv{color:#93c5fd}
+.wfc{background:#232c3d;border:1px solid rgba(255,255,255,.08);padding:14px;border-radius:6px}
+.ctit{font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:#dce7f7;margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid #0047BB;display:inline-block}
+.wfr{display:flex;align-items:center;gap:6px;padding:3px 0}
+.wft .wfl{font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:800;color:#dce7f7;text-transform:uppercase}
+.wfs .wfl{color:#5a6a84;font-size:10px;padding-left:10px}
+.wfl{width:195px;font-size:11px;font-weight:600;color:#7a90b0;flex-shrink:0;line-height:1.3}
+.wftr{flex:1;height:12px;background:#1a2030;overflow:hidden;border-radius:3px}
+.wff{height:100%;transition:width .3s;opacity:.9}
+.wfp{width:42px;text-align:right;font-family:'DM Mono',monospace;font-size:9px;color:#3d5070;flex-shrink:0}
+.wfv{width:80px;text-align:right;font-family:'DM Mono',monospace;font-size:10px;font-weight:500;color:#7a90b0;flex-shrink:0}
+.wft .wfv{font-size:13px;font-weight:700;color:#93c5fd}
+.dc{background:#232c3d;border:1px solid rgba(255,255,255,.08);padding:14px;border-radius:6px}
+.ov{position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px}
+.mb{background:#232c3d;border:1.5px solid rgba(0,71,187,.6);width:100%;max-width:460px;max-height:90vh;overflow-y:auto;display:flex;flex-direction:column;border-radius:8px}
+.mh{padding:13px 17px;background:#2a3550;border-bottom:1px solid rgba(0,71,187,.3);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:1;border-radius:8px 8px 0 0}
+.mt{font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:#f0f4ff}
+.mc{background:none;border:none;color:#7a90b0;font-size:18px;cursor:pointer;padding:2px 6px;line-height:1}
+.mc:hover{color:#dce7f7}
+.mbody{padding:15px;display:flex;flex-direction:column;gap:10px}
+.pbase{display:flex;justify-content:space-between;align-items:center;padding:7px 11px;background:#1a2030;border:1px solid rgba(255,255,255,.08);font-family:'DM Mono',monospace;font-size:11px;color:#7a90b0;border-radius:4px}
+.pbase span:last-child{color:#93c5fd;font-weight:700}
+.pdecomp{background:#1a2030;border:1px solid rgba(255,255,255,.08);padding:9px 11px;display:flex;flex-direction:column;gap:5px;border-radius:4px}
+.pdecomp div{display:flex;justify-content:space-between;font-size:11px;font-family:'DM Mono',monospace;color:#7a90b0;border-bottom:1px solid rgba(255,255,255,.04);padding-bottom:4px}
+.pdecomp div:last-child{border-bottom:none;padding-bottom:0}
+.pdecomp div span:last-child{color:#a8b5cc}
+.pres{display:flex;justify-content:space-between;align-items:center;padding:11px 14px;background:rgba(0,71,187,.14);border:1.5px solid rgba(0,71,187,.5);border-radius:4px}
+.pres span:first-child{font-size:12px;font-weight:600;color:#93c5fd}.pres span:last-child{font-family:'DM Mono',monospace;font-size:17px;font-weight:700;color:#93c5fd}
+.mapp{padding:11px;background:#0047BB;border:none;color:#fff;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;transition:.15s}
+.mapp:hover{background:#1a65d4}
+.ftable{display:flex;flex-direction:column;gap:3px}
+.fth{display:grid;grid-template-columns:1fr 100px 100px;gap:6px;padding:4px 9px;font-family:'DM Mono',monospace;font-size:9px;color:#3d5070;text-transform:uppercase;letter-spacing:.5px}
+.ftr{display:grid;grid-template-columns:1fr 100px 100px;gap:6px;align-items:center;padding:5px 9px;background:#1a2030;border:1px solid rgba(255,255,255,.05);border-radius:3px}
+.ftot{display:flex;align-items:center;padding:7px 11px;font-family:'DM Mono',monospace;font-size:11px;font-weight:600;border-radius:4px}
+.ftok{background:rgba(22,163,74,.08);border:1px solid rgba(22,163,74,.2);color:#4ade80}
+.ftwarn{background:rgba(217,119,6,.08);border:1px solid rgba(217,119,6,.2);color:#fbbf24}
+.desp-row{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.desp-modes{display:flex;gap:3px}
+.moeda-toggle{display:flex;align-items:center;gap:7px;padding:7px 14px;border-bottom:1px solid rgba(255,255,255,.07);background:#1c2333;flex-shrink:0}
+.moeda-toggle span{font-size:10px;font-weight:700;color:#5a6a84;letter-spacing:.4px;text-transform:uppercase}
+.moeda-toggle .rgb{flex:none;padding:4px 12px;font-size:11px}
+.bdc{background:#232c3d;border:1px solid rgba(255,255,255,.08);border-radius:8px;overflow:hidden}
+.bdgh{padding:9px 14px;background:#2a3550;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:#f0f4ff;border-bottom:1px solid rgba(255,255,255,.07);margin-top:0}
+.bdgh:not(:first-child){border-top:2px solid rgba(255,255,255,.06);margin-top:4px}
+.bdr{display:flex;align-items:center;padding:5px 14px;gap:6px;border-bottom:1px solid rgba(255,255,255,.03)}
+.bdr:last-child{border-bottom:none}
+.bdr.bdb{font-weight:700}
+.bdr.bds{border-top:1px solid rgba(255,255,255,.08);margin-top:2px;padding-top:7px}
+.bdr.bdsub .bdl{color:#5a6a84}
+.bdr.red .bdv{color:#f87171}.bdr.green .bdv{color:#4ade80!important}.bdr.blue .bdv{color:#93c5fd}.bdr.warn .bdv{color:#fbbf24}
+.bdr.red .bdp{color:#f87171}.bdr.green .bdp{color:#4ade80}.bdr.blue .bdp{color:#93c5fd}
+.bdl{flex:1;font-size:11px;color:#a8b5cc;line-height:1.3}
+.bdb .bdl{color:#dce7f7;font-weight:700}
+.bdp{width:52px;text-align:right;font-family:'DM Mono',monospace;font-size:10px;color:#5a6a84;flex-shrink:0}
+.bdv{width:100px;text-align:right;font-family:'DM Mono',monospace;font-size:11px;font-weight:500;color:#a8b5cc;flex-shrink:0;display:flex;flex-direction:column;align-items:flex-end;gap:1px}
+.bdb .bdv{font-size:12px;font-weight:700;color:#dce7f7}
+.bdv2{font-size:9px;color:#5a6a84;font-weight:400}
+.bdtot{display:flex;align-items:center;padding:9px 14px;gap:6px;border-top:2px solid rgba(255,255,255,.1);background:#1a2030;margin:2px 0 0}
+.bdtot span:first-child{flex:1;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:#dce7f7}
+.bdtotp{width:52px;text-align:right;font-family:'DM Mono',monospace;font-size:11px;color:#7a90b0;flex-shrink:0}
+.bdtotv{width:100px;text-align:right;font-family:'DM Mono',monospace;font-size:14px;font-weight:800;color:#93c5fd;flex-shrink:0}
+::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:#1c2333}::-webkit-scrollbar-thumb{background:#2a3550;border-radius:3px}::-webkit-scrollbar-thumb:hover{background:#0047BB}
+`;
+
+// ── APP ────────────────────────────────────────────────────────────────────────
+function Calculadora({user:currentUser, isAdmin=false}){
+  const [d,setD]=useState(DEF);
+  const [calcs,setCalcs]=useState(CALC_DEF);
+  const [tab,setTab]=useState("perfil");
+  const [modal,setModal]=useState(null);
+
+  const S=k=>v=>setD(p=>({...p,[k]:v}));
+  const SC=k=>v=>setCalcs(p=>({...p,[k]:{...p[k],...v}}));
+  // ── Helpers de moeda (campos BRL que podem ser editados em USD) ──
+  const isBRL=d.moedaCusto!=="USD";
+  const toDisp=v=>isBRL?v:+(v/d.ptax).toFixed(4);
+  const toStore=v=>isBRL?v:+(v*d.ptax).toFixed(4);
+  const sfxM=isBRL?"R$":"USD";
+
+  const prod=useMemo(()=>PRODUTOS.find(p=>p.id===d.prodId)||PRODUTOS[0],[d.prodId]);
+  const isZFM=prod.uf==="AM";
+  const pcEntry=PC_ZFM.find(e=>e.k===d.pcZfmKey)||PC_ZFM[1];
+  const setProd=id=>{const p=PRODUTOS.find(x=>x.id===id)||PRODUTOS[0];setD(pv=>({...pv,prodId:id,stAtivo:p.mva>0,mva:p.mva,icmsDestST:p.aliqST}));};
+  const ppbTot=useMemo(()=>PPB_ITEMS.reduce((s,i)=>s+(d.ppbAtivos[i.id]?+d.ppbVals[i.id]||0:0),0),[d.ppbAtivos,d.ppbVals]);
+
+  const c=useMemo(()=>{
+    const cfrUSD=d.fobUSD+d.freteUSD;
+    const cfrBRL=cfrUSD*d.ptax;
+    const iiV=cfrBRL*(d.aliqII/100);
+    const despesas=d.despesasModo==="pct"?cfrBRL*d.despesasPct/100:d.despesas;
+    const cfrImp=cfrBRL+iiV+despesas;
+    const cmvImp=cfrBRL+iiV+despesas+d.seguroBRL;
+    const vpl=cmvImp+d.cfImp+ppbTot+d.cra;
+    const bkpV=vpl*(d.bkpPct/100);
+    const cmvTotal=cmvImp+d.producao+d.garantia+bkpV+d.outrosBRL+ppbTot;
+
+    let pcPct,pcLabel;
+    if(isZFM&&prod.pcBase==="zmf"){pcPct=pcEntry.pct;pcLabel=`ZFM ${pct(pcPct)}`;}
+    else if(typeof prod.pcBase==="number"){pcPct=prod.pcBase;pcLabel=pct(pcPct);}
+    else{pcPct=d.regimeVendedor==="presumido"?3.65:9.25;pcLabel=pct(pcPct);}
+
+    const ufO=prod.uf,ufD=d.ufDestino,intra=ufO===ufD;
+    const aliqInter=getICMS(ufO,ufD);
+    const aliqDest=ALIQ_INT[ufD]||18;
+    const icmsEfPct=Math.max(0,aliqInter-prod.cred);
+    let difal=0;
+    const deveDifal=d.tipoComprador==="naocontrib"||(d.tipoComprador==="contrib"&&d.destinacaoCliente==="imobilizado");
+    if(!intra&&deveDifal){const delta=aliqDest-aliqInter;if(delta>0)difal=(prod.aliqST>0&&delta<prod.aliqST)?0:delta;}
+
+    const pcEf=pcPct*(1-(icmsEfPct+difal)/100);  // líquido: base reduzida por ICMS − P/C sobre crédito
+    const ftiPct=(isZFM&&d.ftiAtivo)?prod.fti:0;
+    const fcpPct=FCP[ufD]||0;
+    const ipi=prod.ipi;
+    const comisXPct=d.comis*(2/3);
+    const indPct=d.pd+d.cfixo+d.scrap+d.royal+d.cfVenda+d.frete+d.comis+comisXPct+d.mkt+d.rebate;
+    const soma=(pcEf+icmsEfPct+difal+ftiPct+fcpPct+indPct+d.margem)/100;
+    const pSI=soma<1?cmvTotal/(1-soma):cmvTotal*99;
+    const ipiV=pSI*(ipi/100),pCI=pSI+ipiV;
+    const pcV=pSI*(pcEf/100),icmsV=pSI*(aliqInter/100);
+    const icmsEfV=pSI*(icmsEfPct/100),difalV=pSI*(difal/100);
+    // P/C subvenção: P/C que incide sobre o crédito presumido recebido (custo adicional, não economia)
+    const pcSubvPct=pcPct*(prod.cred/100);   // ex: 9,25% × 12% = 1,11%
+    const pcSubvV=pSI*(pcSubvPct/100);
+    // P/C base (só redução por incidência ICMS, sem o custo subvenção)
+    const pcBaseRedPct=pcPct*(aliqInter/100);
+    const ftiV=pSI*(ftiPct/100),fcpV=pSI*(fcpPct/100);
+    const margV=pSI*(d.margem/100);
+    const pdV=pSI*(d.pd/100),cfxV=pSI*(d.cfixo/100);
+    const scV=pSI*(d.scrap/100),ryV=pSI*(d.royal/100);
+    const cfnV=pSI*(d.cfVenda/100),frV=pSI*(d.frete/100),cmV=pSI*((d.comis+comisXPct)/100);
+    const mktV=pSI*(d.mkt/100),rebateV=pSI*(d.rebate/100);
+    let stV=0,stBase=0;
+    if(d.stAtivo&&d.mva>0){stBase=pCI*(1+d.mva/100);stV=Math.max(0,stBase*(d.icmsDestST/100)-icmsV);}
+    const pF=pCI+stV;
+    const pUSD=d.ptax>0?pF/d.ptax:0;
+    const cargaTot=pcV+ipiV+icmsEfV+difalV+stV+fcpV;
+    const cargaPct=pF>0?(cargaTot/pF)*100:0;
+    const margPct=pF>0?(margV/pF)*100:0;
+    // MC = Margem de Contribuicao = ML + Custo Fixo (ambos sobre o preco)
+    const mc=pF>0?((margV+cfxV)/pF)*100:0;
+    const mkp=cmvTotal>0?pF/cmvTotal:0;
+    let margemAlvo=null;
+    if(d.precoAlvo>0){
+      const pSIa=d.precoAlvo/(1+ipi/100);
+      const sf=(pcEf+icmsEfPct+difal+ftiPct+fcpPct+indPct)/100;
+      margemAlvo=pSIa>0?(1-cmvTotal/pSIa)*100-sf*100:null;
+    }
+    return{cfrUSD,cfrBRL,iiV,vpl,bkpV,cfrImp,cmvImp,cmvTotal,ppbTot,despesas,
+      pcPct,pcEf,pcLabel,pcV,pcSubvPct,pcSubvV,pcBaseRedPct,aliqInter,aliqDest,icmsEfPct,icmsV,icmsEfV,
+      difal,difalV,ftiPct,ftiV,fcpPct,fcpV,ipi,ipiV,pSI,pCI,
+      margV,indPct,pdV,cfxV,scV,ryV,cfnV,frV,cmV,mktV,rebateV,stV,stBase,pF,pUSD,
+      cargaTot,cargaPct,margPct,mc,mkp,ufO,intra,deveDifal,margemAlvo,comisXPct};
+  },[d,prod,isZFM,pcEntry,ppbTot]);
+
+  const TABS=["perfil","importacao","ppb","producao","indices","venda","st"];
+  const TLBL=["Perfil","Importacao","PPB","Producao","Indices","Venda","ST"];
+
+  return(
+    <>
+    {modal==="cfImp"&&<ModalCF onClose={()=>setModal(null)} fobUSD={d.fobUSD} ptax={d.ptax}
+      data={calcs.cfImp} setData={v=>SC("cfImp")(v)}
+      onApply={v=>{setD(p=>({...p,cfImp:v}));SC("cfImp")({applied:true});setModal(null);}}/>}
+    {modal==="frete"&&<ModalFrete onClose={()=>setModal(null)}
+      data={calcs.frete} setData={v=>SC("frete")(v)}
+      onApply={v=>{setD(p=>({...p,freteUSD:v}));SC("frete")({applied:true});setModal(null);}}/>}
+    {modal==="pcb"&&<ModalPCB onClose={()=>setModal(null)} cfrImp={c.cfrImp}
+      data={calcs.pcb} setData={v=>SC("pcb")(v)}
+      onApply={v=>{setD(p=>({...p,ppbAtivos:{...p.ppbAtivos,placa:true},ppbVals:{...p.ppbVals,placa:v}}));setModal(null);}}/>}
+    {modal==="cfVenda"&&<ModalCFVenda onClose={()=>setModal(null)}
+      data={calcs.cfVenda} setData={v=>SC("cfVenda")(v)}
+      onApply={v=>{setD(p=>({...p,cfVenda:v}));SC("cfVenda")({applied:true});setModal(null);}}/>}
+    {modal==="registros"&&<ModalRegistros
+      onClose={()=>setModal(null)}
+      currentD={d} currentCalcs={calcs}
+      prodNome={prod.nome}
+      onLoad={(savedD, savedCalcs)=>{setD(savedD);setCalcs(savedCalcs);}}/>}
+    {modal==="gestao"&&<ModalGestaoUsers onClose={()=>setModal(null)} currentUser={currentUser}/> }
+
+    <div className="app">
+    <style>{CSS}</style>
+
+      {/* sub-header: badges de contexto + botão Registros */}
+      <div style={{display:"flex",alignItems:"center",gap:6,padding:"6px 16px",background:"#1e2a3d",borderBottom:"1px solid rgba(255,255,255,.07)",flexWrap:"wrap",flexShrink:0,flexBasis:"auto"}}>
+        {isZFM&&<span className="buf zmf">ZFM / MAO</span>}
+        {prod.uf==="BA"&&<span className="buf ios">IOS / BA</span>}
+        {prod.uf==="PR"&&<span className="buf cwb">CWB / PR</span>}
+        <span className="brt">{c.ufO} → {d.ufDestino}</span>
+        <span className="bdf">{c.difal>0?`DIFAL ${pct(c.difal)}`:"DIFAL 0%"}</span>
+        <div style={{flex:1}}/>
+        <button onClick={()=>setModal("registros")}
+          style={{padding:"4px 12px",background:"rgba(0,71,187,.2)",border:"1px solid rgba(0,71,187,.45)",color:"#93c5fd",fontFamily:"'Barlow Condensed',sans-serif",fontSize:11,fontWeight:700,letterSpacing:.5,cursor:"pointer",borderRadius:20,display:"flex",alignItems:"center",gap:5}}>
+          💾 Registros
+        </button>
+        {isAdmin&&<button onClick={()=>setModal("gestao")}
+          style={{padding:"4px 12px",background:"rgba(5,150,105,.15)",border:"1px solid rgba(5,150,105,.4)",color:"#34d399",fontFamily:"'Barlow Condensed',sans-serif",fontSize:11,fontWeight:700,letterSpacing:.5,cursor:"pointer",borderRadius:20,display:"flex",alignItems:"center",gap:5}}>
+          👥 Gestão de Usuários
+        </button>}
+      </div>
+
+      <div className="layout">
+        <aside className="pleft">
+          <div className="pscroll">
+            <div className="price-hero">
+              <div>
+                <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:9,fontWeight:700,letterSpacing:2,color:"#7a90b0",marginBottom:4}}>PREÇO DE VENDA FINAL</div>
+                <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:44,fontWeight:800,color:"#f1f5f9",letterSpacing:-1.5,lineHeight:1,display:"flex",alignItems:"flex-start",gap:4}}>
+                  <span style={{fontSize:18,fontWeight:400,color:"#0047BB",marginTop:6}}>R$</span>{n3(c.pF)}
+                </div>
+                <div style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:"#5a6a84",marginTop:4,lineHeight:1.6}}>
+                  {c.ipi>0&&`s/IPI ${brl(c.pSI)} · IPI ${brl(c.ipiV)} · `}
+                  {c.stV>0&&`ST ${brl(c.stV)} · `}
+                  {c.difal>0&&`DIFAL ${brl(c.difalV)} · `}
+                  {d.ptax>0&&<span style={{color:"#0047BB"}}>{usd(c.pUSD)}</span>}
+                </div>
+              </div>
+              <div style={{display:"flex",gap:5,flexWrap:"wrap",marginTop:8}}>
+                {[["CARGA","kpi-red",pct(c.cargaPct)],["ML","kpi-green",pct(c.margPct)],["MC","kpi-blue",pct(c.mc)],["MKP","",n3(c.mkp)+"x"]].map(([l,cls,v])=>(
+                  <div key={l} className={`kpi ${cls}`} style={{minWidth:60}}>
+                    <span style={{display:"block",fontFamily:"'Barlow Condensed',sans-serif",fontSize:7,fontWeight:700,letterSpacing:1,color:"#475569",marginBottom:2}}>{l}</span>
+                    <span style={{fontFamily:"'DM Mono',monospace",fontSize:13,fontWeight:700}}>{v}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <RevCalc precoAlvo={d.precoAlvo} onChange={S("precoAlvo")} c={c} margem={d.margem}/>
+
+            <BreakdownPanel c={c} d={d} prod={prod} ppbTot={ppbTot} calcs={calcs}/>
+          </div>
+        </aside>
+
+        <main className="pright">
+          <div className="form-topbar">
+            <nav className="tnav" style={{flex:1,background:"transparent",borderBottom:"none"}}>
+              {TABS.map((t,i)=><button key={t} className={`tbtn ${tab===t?"on":""}`} onClick={()=>setTab(t)}>{TLBL[i]}</button>)}
+            </nav>
+            <div style={{display:"flex",alignItems:"center",gap:6,padding:"0 12px",flexShrink:0}}>
+              <span style={{fontSize:10,fontWeight:700,color:"#5a6a84",letterSpacing:".4px",textTransform:"uppercase"}}>Moeda</span>
+              <button className={`rgb ${isBRL?"on":""}`} style={{padding:"3px 10px",fontSize:10}} onClick={()=>S("moedaCusto")("BRL")}>BRL</button>
+              <button className={`rgb ${!isBRL?"on":""}`} style={{padding:"3px 10px",fontSize:10}} onClick={()=>S("moedaCusto")("USD")}>USD</button>
+              {!isBRL&&<span style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:"#7a90b0"}}>×{n3(d.ptax)}</span>}
+            </div>
+          </div>
+          <div className="pscroll">
+
+          {tab==="perfil"&&<>
+            <div className="form-grid">
+              <div className="form-col">
+                <Sec title="Produto" tag="NCM / PLAN_TRIB">
+              <select className="psel" value={d.prodId} onChange={e=>setProd(e.target.value)}>
+                {PRODUTOS.map(p=><option key={p.id} value={p.id}>{p.ncm} -- {p.nome}</option>)}
+              </select>
+              <div className="pgrid">
+                {[["NCM",prod.ncm],["Origem",prod.uf],["IPI",pct(prod.ipi)],
+                  ["P/C Base",prod.pcBase==="zmf"?"ZFM":pct(+prod.pcBase)],
+                  ["ICMS NF",pct(prod.icms)],["Cred.Pres.",pct(prod.cred)],
+                  ["MVA",prod.mva>0?pct(prod.mva):"N/A"],["FTI/UEA",prod.fti>0?pct(prod.fti):"--"],
+                ].map(([l,v])=>(
+                  <div key={l} className="pchip"><span className="pcl">{l}</span><span className="pcv">{v}</span></div>
+                ))}
+              </div>
+            </Sec>
+
+            {isZFM&&prod.pcBase==="zmf"?(
+              <Sec title="P/C ZFM — Regime do Comprador" tag="Lei 10.637/02">
+                <Box t="blue">Regime do COMPRADOR determina a aliquota de P/C debitada pelo vendedor.</Box>
+                <div style={{display:"flex",flexDirection:"column",gap:4}}>
+                  {PC_ZFM.map(e=>(
+                    <div key={e.k} className={`zmfi ${d.pcZfmKey===e.k?"sel":""}`} onClick={()=>setD(p=>({...p,pcZfmKey:e.k}))}>
+                      <div className={`rdot ${d.pcZfmKey===e.k?"on":""}`}/>
+                      <div style={{flex:1}}>
+                        <div style={{fontSize:10,fontWeight:600,color:d.pcZfmKey===e.k?"#93c5fd":"#94a3b8"}}>{e.label}</div>
+                        <div style={{fontSize:9,color:"#475569",marginTop:2}}>{e.sub}</div>
+                        <div style={{fontFamily:"'DM Mono',monospace",fontSize:10,fontWeight:700,color:d.pcZfmKey===e.k?"#93c5fd":"#0047BB",marginTop:3}}>
+                          {e.pct===0?"Nao incidencia":pct(e.pct)+" debito vendedor"}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <Box t="gray"><em>{pcEntry.base}</em></Box>
+              </Sec>
+            ):(
+              <Sec title="Regime do Vendedor" tag="P/C Saida">
+                <Box t="gray">Para produtos fora da ZFM, o regime do vendedor determina a aliquota de P/C.</Box>
+                <RG val={d.regimeVendedor} onChange={S("regimeVendedor")}
+                  opts={[{v:"real",l:"Lucro Real — 9,25%"},{v:"presumido",l:"Lucro Presumido — 3,65%"}]}/>
+              </Sec>
+            )}
+
+            <Sec title="Perfil do Comprador" tag="ICMS / DIFAL">
+              <RG label="Tipo de contribuinte" val={d.tipoComprador} onChange={S("tipoComprador")}
+                opts={[{v:"contrib",l:"Contribuinte ICMS"},{v:"naocontrib",l:"Nao-contribuinte"}]}/>
+              {d.tipoComprador==="contrib"&&(
+                <RG label="Destinacao" val={d.destinacaoCliente} onChange={S("destinacaoCliente")}
+                  opts={[{v:"revenda",l:"Revenda"},{v:"imobilizado",l:"Ativo Imobilizado"}]}/>
+              )}
+              <Box t={c.difal>0?"warn":"ok"}>
+                {d.tipoComprador==="naocontrib"?"Nao-contribuinte: vendedor recolhe DIFAL (EC 87/2015). Incluido no preco."
+                  :d.destinacaoCliente==="imobilizado"?"Ativo imobilizado: vendedor recolhe DIFAL. Incluido no preco."
+                  :"Revenda para contribuinte: DIFAL e responsabilidade do destinatario."}
+              </Box>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}>
+                <span style={{fontSize:11,fontWeight:600,color:"#94a3b8"}}>UF Destino</span>
+                <select className="fsel" value={d.ufDestino} onChange={e=>S("ufDestino")(e.target.value)}>
+                  {UFS.map(u=><option key={u} value={u}>{u}</option>)}
+                </select>
+              </div>
+              <DR label={`ICMS ${c.ufO} -> ${d.ufDestino}`} value={pct(c.aliqInter)} bold/>
+              <DR label={`ICMS interna ${d.ufDestino}`} value={pct(c.aliqDest)}/>
+              {c.difal>0&&<DR label={`DIFAL (${c.ufO}->${d.ufDestino})`} value={pct(c.difal)} accent="red" bold/>}
+              {c.deveDifal&&prod.aliqST>0&&c.difal===0&&(
+                <Box t="ok">DIFAL zerado: diff. ({pct(c.aliqDest-c.aliqInter)}) menor que ICMS-ST ({pct(prod.aliqST)}) — ST cobre.</Box>
+              )}
+            </Sec>
+          </>}
+
+          {tab==="importacao"&&<>
+            <div className="form-grid">
+              <div className="form-col">
+                <Sec title="FOB + Frete" tag="USD → BRL">
+                  <Box t="blue">CFR = FOB + Frete. Conversão pela PTAX.</Box>
+                  <Field label="FOB" sfx="USD" value={d.fobUSD} onChange={S("fobUSD")}/>
+                  <Field label="Frete Internacional" sfx="USD" value={d.freteUSD}
+                    onChange={calcs.frete.applied?undefined:S("freteUSD")}
+                    locked={calcs.frete.applied} onUnlock={()=>SC("frete")({applied:false})}
+                    action={<button className={`cbtn ${calcs.frete.applied?"cactive":""}`}
+                      title="Calcular frete ponderado" onClick={()=>setModal("frete")}>+/-</button>}/>
+                  <DR label="CFR (FOB + Frete)" value={usd(c.cfrUSD)} bold/>
+                  <Field label="PTAX" sfx="R$/USD" value={d.ptax} onChange={S("ptax")} hint="Cotação do dia anterior ao DI"/>
+                  <div className="cvres"><span>CFR em BRL</span>
+                    <span style={{fontFamily:"'DM Mono',monospace",fontSize:16,fontWeight:700,color:"#93c5fd"}}>{brl(c.cfrBRL)}</span>
+                  </div>
+                </Sec>
+                {isZFM&&<Sec title="Isenções ZFM" tag="Lei 8.387/91">
+                  <Box t="ok">{"IPI = 0% · ICMS = 0% · PIS/COFINS Suspenso"}</Box>
+                </Sec>}
+              </div>
+              <div className="form-col">
+                <Sec title="Encargos de Importação" tag="II + Despesas">
+                  <Field label="Alíquota II (TEC)" sfx="%" value={d.aliqII} onChange={S("aliqII")}
+                    note={isZFM?"II incide mesmo na ZFM":undefined}/>
+                  <DR label="II sobre CFR" value={brl(c.iiV)} accent="red"/>
+                  <Field label={`Seguro (${sfxM})`} sfx={sfxM} value={toDisp(d.seguroBRL)} onChange={v=>S("seguroBRL")(toStore(v))}/>
+                  <div className="desp-row">
+                    <span style={{fontSize:11,fontWeight:600,color:"#dce7f7"}}>Despesas Imp.</span>
+                    <div className="desp-modes">
+                      <button className={`rgb ${d.despesasModo==="pct"?"on":""}`} style={{padding:"3px 8px",fontSize:9}} onClick={()=>S("despesasModo")("pct")}>% CFR</button>
+                      <button className={`rgb ${d.despesasModo==="manual"?"on":""}`} style={{padding:"3px 8px",fontSize:9}} onClick={()=>S("despesasModo")("manual")}>{sfxM}</button>
+                    </div>
+                  </div>
+                  {d.despesasModo==="pct"
+                    ?<><Field label="% sobre CFR" sfx="%" value={d.despesasPct} onChange={S("despesasPct")} hint="SISCOMEX+Despachante+Armazenagem"/>
+                       <div className="pbase"><span>Despesas</span><span>{brl(c.despesas)}</span></div></>
+                    :<Field label={`Despesas (${sfxM})`} sfx={sfxM} value={toDisp(d.despesas)} onChange={v=>S("despesas")(toStore(v))} hint="SISCOMEX+Despachante+Armazenagem"/>
+                  }
+                </Sec>
+                <Sec title="Custo Financeiro + CRA" tag="VPL">
+                  <Field label={`CF Importação (${sfxM})`} sfx={sfxM} value={toDisp(d.cfImp)}
+                    onChange={calcs.cfImp.applied?undefined:v=>S("cfImp")(toStore(v))}
+                    locked={calcs.cfImp.applied} onUnlock={()=>SC("cfImp")({applied:false})}
+                    hint="Juros/IOF — entra no VPL"
+                    action={<button className={`cbtn ${calcs.cfImp.applied?"cactive":""}`}
+                      title="Calcular CF" onClick={()=>setModal("cfImp")}>$</button>}/>
+                  <Field label={`CRA / Créditos (${sfxM})`} sfx={sfxM} value={toDisp(d.cra)} onChange={v=>S("cra")(toStore(v))} hint="Entram no VPL"/>
+                  <DR label="CMV Importação" value={brl(c.cmvImp)} bold sep/>
+                  <DR label="VPL" value={brl(c.vpl)} bold accent="blue"/>
+                </Sec>
+              </div>
+            </div>
+          </>}
+
+          {tab==="ppb"&&<>
+            <Sec title="Itens de PPB" tag="Processo Produtivo Basico">
+              <Box t="blue">Marque os itens do PPB. Os valores sao incorporados ao CMV e ao VPL (base do BKP).</Box>
+              {PPB_ITEMS.map(item=>(
+                <div key={item.id} className="ppbi">
+                  <label className="ppbc">
+                    <input type="checkbox" checked={d.ppbAtivos[item.id]||false}
+                      onChange={e=>setD(p=>({...p,ppbAtivos:{...p.ppbAtivos,[item.id]:e.target.checked}}))}/>
+                    <span className="ppbcb"/>
+                    <span style={{fontSize:11,fontWeight:600,color:d.ppbAtivos[item.id]?"#93c5fd":"#64748b",flex:1}}>{item.label}</span>
+                    {item.id==="placa"&&<button className="cbtn" onClick={e=>{e.preventDefault();setModal("pcb");}}>PCB</button>}
+                  </label>
+                  {d.ppbAtivos[item.id]&&(
+                    <div style={{padding:"6px 10px",borderTop:"1px solid #1a2233",background:"#111827"}}>
+                      <Field label="Custo unitario" sfx="R$" value={d.ppbVals[item.id]||0}
+                        onChange={v=>setD(p=>({...p,ppbVals:{...p.ppbVals,[item.id]:v}}))}/>
+                    </div>
+                  )}
+                </div>
+              ))}
+              <div className="ppbtot"><span>Total PPB</span><span>{brl(ppbTot)}</span></div>
+            </Sec>
+            {isZFM&&<Sec title="FTI / UEA-AM" tag="Fundo Tecnologico">
+              <Tog label={`FTI/UEA-AM ativo (${prod.fti>0?pct(prod.fti):"0% — N/A"})`}
+                val={d.ftiAtivo} onChange={S("ftiAtivo")} hint="1% faturamento bruto + 10% credito estimulo"/>
+              {prod.fti===0&&d.ftiAtivo&&<Box t="warn">Produto sem FTI/UEA-AM na PLAN_TRIB.</Box>}
+            </Sec>}
+          </>}
+
+          {tab==="producao"&&<>
+            <div className="form-grid">
+              <div className="form-col">
+                <Sec title="Custos de Produção" tag="sempre R$">
+                  <Box t="gray">Produção, Garantia e Outros sempre em R$ — independente da moeda de importação.</Box>
+                  <Field label="Produção / Montagem" sfx="R$" value={d.producao} onChange={S("producao")}/>
+                  <Field label="Garantia" sfx="R$" value={d.garantia} onChange={S("garantia")}/>
+                  <Field label="Outros Custos BRL" sfx="R$" value={d.outrosBRL} onChange={S("outrosBRL")}/>
+                </Sec>
+              </div>
+              <div className="form-col">
+                <Sec title="BKP — Backup de Custódia" tag="% sobre VPL" hl>
+                  <Box t="blue">BKP = % sobre VPL (CFR+II+Desp+Seguro+CF+PPB+CRA).</Box>
+                  <DR label="VPL (base)" value={brl(c.vpl)} bold accent="blue"/>
+                  <Field label="BKP (%)" sfx="%" value={d.bkpPct} onChange={S("bkpPct")} hint={`= ${brl(c.bkpV)}`}/>
+                  <DR label="BKP (R$)" value={brl(c.bkpV)} accent="blue"/>
+                </Sec>
+                <Sec title="Resumo Custos" hl>
+                  <DR label="CMV Importação" value={brl(c.cmvImp)}/>
+                  <DR label="PPB" value={brl(ppbTot)}/>
+                  <DR label="Produção + BRL" value={brl(d.producao+d.garantia+d.outrosBRL)}/>
+                  <DR label="BKP" value={brl(c.bkpV)}/>
+                  <DR label="CMV Total" value={brl(c.cmvTotal)} bold sep accent="blue"/>
+                </Sec>
+              </div>
+            </div>
+          </>}
+
+          {tab==="indices"&&<>
+            <div className="form-grid">
+              <div className="form-col">
+                <Sec title="Índices Gerais" tag="% s/ preço">
+                  <Box t="gray">Calculados por dentro do preço de venda.</Box>
+                  {[["P&D","pd"],["Scrap","scrap"],["Royalties / Qualcomm","royal"],["Frete venda","frete"]
+                  ].map(([l,k])=>(
+                    <Field key={k} label={l} value={d[k]} onChange={S(k)} sfx="%" hint={`≈ ${brl(c.pSI*(d[k]/100))}`}/>
+                  ))}
+                </Sec>
+                <Sec title="Índices Comerciais" tag="% s/ preço">
+                  <Field label="CF Venda" sfx="%" value={d.cfVenda}
+                    onChange={calcs.cfVenda.applied?undefined:S("cfVenda")}
+                    locked={calcs.cfVenda.applied} onUnlock={()=>SC("cfVenda")({applied:false})}
+                    hint={calcs.cfVenda.applied?`${calcs.cfVenda.prazo}d @ ${calcs.cfVenda.taxa}%`:`≈ ${brl(c.cfnV)}`}
+                    action={<button className={`cbtn ${calcs.cfVenda.applied?"cactive":""}`}
+                      title="Calcular CF venda" onClick={()=>setModal("cfVenda")}>%</button>}/>
+                  {[["Comissão","comis"],["Marketing","mkt"],["Rebate","rebate"]
+                  ].map(([l,k])=>(
+                    <Field key={k} label={l} value={d[k]} onChange={S(k)} sfx="%" hint={`≈ ${brl(c.pSI*(d[k]/100))}`}/>
+                  ))}
+                  <div style={{display:"flex",alignItems:"flex-start",gap:8,justifyContent:"space-between"}}>
+                    <div style={{flex:1}}>
+                      <span style={{fontSize:12,fontWeight:600,color:"#dce7f7"}}>Encargos s/ comissões</span>
+                      <div style={{fontSize:10,color:"#7a90b0",fontFamily:"'DM Mono',monospace"}}>= {pct(c.comisXPct)} (auto)</div>
+                    </div>
+                    <div className="fw fro" style={{minWidth:100}}>
+                      <span className="fpre">%</span>
+                      <input readOnly value={String(+(c.comisXPct||0).toFixed(3)).replace(".",",")}
+                        style={{background:"none",border:"none",outline:"none",fontFamily:"'DM Mono',monospace",fontSize:11,color:"#94a3b8",padding:"5px 8px",width:70,textAlign:"right"}}/>
+                    </div>
+                  </div>
+                  <DR label="Total Índices" value={pct(c.indPct)} bold sep accent="blue"/>
+                </Sec>
+              </div>
+              <div className="form-col">
+                <Sec title="Custo Fixo" tag="% s/ preço">
+                  <Box t="gray">CF compõe a MC junto com a ML.&#10;MC = ML + CF</Box>
+                  <Field label="Custo Fixo" value={d.cfixo} onChange={S("cfixo")} sfx="%" hint={`≈ ${brl(c.cfxV)}`}/>
+                </Sec>
+                <Sec title="Margem Líquida (ML)" hl>
+                  <Field label="Margem Líquida desejada" value={d.margem} onChange={S("margem")} sfx="%" hint="% por dentro do preço"/>
+                  <DR label="MC = ML + Custo Fixo" value={pct(c.mc)} bold accent="blue"/>
+                  <DR label="Markup s/ CMV" value={`${n3(c.mkp)}x`} accent="blue"/>
+                </Sec>
+              </div>
+            </div>
+          </>}
+
+          {tab==="venda"&&<>
+            <Sec title="Impostos de Venda" tag="PLAN_TRIB auto">
+              <Box t="blue">Aliquotas carregadas do catalogo PLAN_TRIB 09/02/2026.</Box>
+              <div className="txgrid">
+                {[
+                  ["IPI Saida",pct(prod.ipi),prod.ipi===0],
+                  ["P/C Debito",c.pcLabel,false],
+                  ["P/C Ef. (base liq.)",pct(c.pcEf),false],
+                  ["ICMS Destacado NF",pct(c.aliqInter),false],
+                  ["Cred. Presumido",pct(prod.cred),true],
+                  ["ICMS Custo Efetivo",pct(c.icmsEfPct),c.icmsEfPct===0],
+                  ["DIFAL",c.difal>0?pct(c.difal):"0% — N/A",c.difal===0],
+                ].map(([l,v,ok])=>(
+                  <div key={l} className={`txc ${ok?"txok":"txon"}`}>
+                    <div className="txl">{l}</div><div className="txv">{v}</div>
+                  </div>
+                ))}
+                {c.ftiPct>0&&<div className="txc txon"><div className="txl">FTI/UEA-AM</div><div className="txv">{pct(c.ftiPct)}</div></div>}
+                {c.fcpPct>0&&<div className="txc txwn"><div className="txl">Fundo Pobreza {d.ufDestino}</div><div className="txv">{pct(c.fcpPct)}</div></div>}
+              </div>
+            </Sec>
+            <Sec title="P/C — Subvencao / Credito Estimulo" hl>
+              <Box t="blue">{"P/C incide sobre o preco liquido de ICMS (base reduzida) E tambem sobre o credito presumido recebido (subvencao = receita tributavel por P/C).\nFormula: P/C ef. = P/C nominal x (1 - ICMS efetivo%) onde ICMS ef. = ICMS destacado - credito"}</Box>
+              <DR label="P/C nominal (debito)" value={pct(c.pcPct)}/>
+              <DR label={`(-) Reducao base — ICMS incidente NF (${pct(c.aliqInter)})`} value={`(${pct(c.pcBaseRedPct)})`} accent="green"/>
+              {c.pcSubvPct>0.001&&<DR label={`(+) P/C sobre subvencao — credito (${pct(prod.cred)})`} value={pct(c.pcSubvPct)} accent="red"/>}
+              {c.difal>0&&<DR label={`(-) Reducao base — DIFAL (${pct(c.difal)})`} value={`(${pct(c.pcPct*c.difal/100)})`} accent="green"/>}
+              <DR label="P/C efetivo no preco" value={pct(c.pcEf)} bold accent="blue" sep/>
+              {c.pcSubvPct>0.001&&<Box t="warn">{`P/C subvencao: ${pct(c.pcSubvPct)} e um CUSTO — o credito presumido (${pct(prod.cred)}) recebido e tratado como receita de subvencao, sobre a qual P/C incide.`}</Box>}
+              {c.pcSubvPct<0.001&&prod.cred===0&&<Box t="gray">Sem credito presumido cadastrado — P/C incide apenas sobre base reduzida pelo ICMS.</Box>}
+            </Sec>
+            <Sec title="ICMS: Destacado x Efetivo (custo)">
+              <DR label={`ICMS destacado NF (${c.ufO}->${d.ufDestino})`} value={pct(c.aliqInter)}/>
+              <DR label="(-) Credito presumido / estimulo" value={`(${pct(prod.cred)})`} accent="green"/>
+              <DR label="ICMS custo efetivo" value={pct(c.icmsEfPct)} bold accent={c.icmsEfPct===0?"green":"warn"} sep/>
+              <Box t={c.icmsEfPct===0?"ok":"warn"}>
+                {c.icmsEfPct===0
+                  ?`Credito presumido (${pct(prod.cred)}) absorve os ${pct(c.aliqInter)} de ICMS. Custo = 0%.\nMas os ${pct(c.aliqInter)} ainda reduzem a base do P/C (subvencao).`
+                  :`Custo residual de ICMS apos credito: ${pct(c.icmsEfPct)}.\nObs: os ${pct(c.aliqInter)} cheios reduzem a base do P/C.`}
+              </Box>
+            </Sec>
+          </>}
+
+          {tab==="st"&&<>
+            <Sec title="Substituicao Tributaria" tag="ICMS-ST">
+              <Tog label="Aplicar ICMS-ST" val={d.stAtivo} onChange={S("stAtivo")}/>
+              <Box t="gray">{"ST aplica para Notebooks, Smartphones, etc.\nBase ST = Preco c/IPI x (1+MVA) | ST = Base x aliq.dest - ICMS proprio"}</Box>
+              {d.stAtivo&&<>
+                <Field label="MVA Original" value={d.mva} onChange={S("mva")} sfx="%" hint="Protocolo/Convenio ICMS"/>
+                <Field label="Aliq. Interna Destino (ST)" value={d.icmsDestST} onChange={S("icmsDestST")} sfx="%"/>
+                <DR label="Base ST" value={brl(c.stBase)}/>
+                <DR label="ICMS-ST" value={brl(c.stV)} bold accent="blue"/>
+              </>}
+            </Sec>
+          </>}
+
+          </div>
+        </main>
+      </div>
+    </div>
+    </>
+  );
+}
+
+function RevCalc({precoAlvo,onChange,c,margem}){
+  const [raw,setRaw]=useState(precoAlvo===0?"":String(precoAlvo).replace(".",","));
+  const mr=c.margemAlvo;
+  return(
+    <div className="rcard">
+      <div className="rlbl">PRECO ALVO -> MARGEM</div>
+      <div className="rbody">
+        <div className="riw">
+          <span className="rpfx">R$</span>
+          <input type="text" inputMode="decimal" className="ri" placeholder="Preco alvo (c/ IPI)"
+            value={raw}
+            onChange={e=>{const v=e.target.value;if(/^\d*[,.]?\d{0,3}$/.test(v)||v===""){setRaw(v);onChange(parse(v));}}}
+            onBlur={()=>{const n=parse(raw);if(n===0)setRaw("");else setRaw(String(n).replace(".",","));}}
+          />
+          {precoAlvo>0&&<button className="rcl" onClick={()=>{setRaw("");onChange(0);}}>x</button>}
+        </div>
+        {precoAlvo>0&&mr!==null&&(
+          <div className={`rres ${mr<0?"rneg":"rpos"}`}>
+            <div className="rrmain"><span>Margem resultante</span><span className="rrv">{pct(mr)}</span></div>
+            <div className="rrsub">
+              <span>Preco s/ IPI: {brl(precoAlvo/(1+c.ipi/100))}</span>
+              <span style={{color:mr>=margem?"#4ade80":"#f87171"}}>{pct(Math.abs(mr-margem))} vs. margem atual ({pct(margem)})</span>
+              {mr<0&&<span style={{color:"#f87171"}}>Abaixo do custo total</span>}
+            </div>
+          </div>
+        )}
+        {precoAlvo===0&&<span style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:"#334155"}}>Informe um preco alvo (c/ IPI) para ver a margem resultante</span>}
+      </div>
+    </div>
+  );
+}
+
+// ── APP INTEGRADO ─────────────────────────────────────────────────────────────
+export default function App() {
+  const [user, setUser] = useState(() => loadSession());
+
+  const handleLogin = (u) => setUser(u);
+  const handleLogout = () => { saveSession(null); setUser(null); };
+
+  if (!user) return <AuthScreen onLogin={handleLogin}/>;
+
+  const perfisMap = getPerfisMap(loadPerfis());
+  const p = perfisMap[user.perfil] || { label: user.perfil, cor:"#0047BB", icone:"?" };
+  const isAdmin = user.perfil === "admin";
+
+  return (
+    <>
+      <style>{CSS_AUTH}</style>
+      <div className="dash">
+        <div className="topbar">
+          <div className="topbar-logo">
+            <div className="topbar-mark">PT</div>
+            <span className="topbar-name">POSITEC</span>
+          </div>
+          <div className="topbar-divider"/>
+          <span className="topbar-title">
+            {isAdmin
+              ? (typeof window !== "undefined" && document.title, "Painel Administrativo")
+              : "Calculadora Tributária · PLAN_TRIB"}
+          </span>
+          {!isAdmin && <div style={{display:"flex",gap:5,alignItems:"center",flexShrink:0}}/>}
+          <div className="topbar-spacer"/>
+          <div className="topbar-user">
+            <div className="topbar-avatar" style={{ background: p.cor || "#0047BB" }}>{initials(user.nome)}</div>
+            <div>
+              <div className="topbar-uname">{user.nome.split(" ")[0]} {user.nome.split(" ").slice(-1)[0]}</div>
+              <div className="topbar-uperfil">{p.icone} {p.label}</div>
+            </div>
+            <button className="btn-logout" onClick={handleLogout}>Sair</button>
+          </div>
+        </div>
+
+        <div className="dash-body">
+          <Calculadora user={user} isAdmin={isAdmin}/>
+        </div>
+      </div>
+    </>
   );
 }
