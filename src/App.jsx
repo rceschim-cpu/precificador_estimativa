@@ -111,6 +111,11 @@ const CALC_DEF={
   cfVenda:{prazo:30,taxa:1.14,applied:false},
 };
 
+// ── Storage de Registros ──────────────────────────────────────────────────────
+const STORAGE_KEY = "positec_calc_registros";
+const loadRegistros = () => { try { return JSON.parse(localStorage.getItem(STORAGE_KEY)||"[]"); } catch { return []; } };
+const saveRegistros = (list) => localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+
 // ── NInput ────────────────────────────────────────────────────────────────────
 function NInput({value,onChange,readOnly,width=80}){
   const [raw,setRaw]=useState(String(value).replace(".",","));
@@ -344,6 +349,102 @@ function ModalCFVenda({onClose,onApply,data,setData}){
           </div>
           <div className="pres"><span>CF Venda (% sobre preco)</span><span>{pct(cfPct)}</span></div>
           <button className="mapp" onClick={()=>onApply(parseFloat(cfPct.toFixed(3)))}>Aplicar ao indice CF Venda</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Modal Registros ───────────────────────────────────────────────────────────
+function ModalRegistros({onClose, onLoad, currentD, currentCalcs, prodNome}){
+  const [registros, setRegistros] = useState(loadRegistros);
+  const [nome, setNome] = useState("");
+  const [confirmDel, setConfirmDel] = useState(null);
+
+  const handleSave = () => {
+    const label = nome.trim() || prodNome;
+    const novo = {
+      id: Date.now(),
+      nome: label,
+      data: new Date().toLocaleString("pt-BR"),
+      d: currentD,
+      calcs: currentCalcs,
+    };
+    const updated = [novo, ...registros];
+    saveRegistros(updated);
+    setRegistros(updated);
+    setNome("");
+  };
+
+  const handleDelete = (id) => {
+    const updated = registros.filter(r => r.id !== id);
+    saveRegistros(updated);
+    setRegistros(updated);
+    setConfirmDel(null);
+  };
+
+  return (
+    <div className="ov">
+      <div className="mb" style={{maxWidth:520}} onClick={e=>e.stopPropagation()}>
+        <div className="mh">
+          <span className="mt">Registros Salvos</span>
+          <button className="mc" onClick={onClose}>×</button>
+        </div>
+        <div className="mbody">
+
+          {/* Salvar atual */}
+          <div style={{background:"rgba(0,71,187,.08)",border:"1px solid rgba(0,71,187,.25)",padding:"12px 14px",borderRadius:4}}>
+            <div style={{fontSize:11,fontWeight:700,color:"#93c5fd",marginBottom:8,letterSpacing:.5,textTransform:"uppercase"}}>Salvar precificação atual</div>
+            <div style={{display:"flex",gap:8}}>
+              <div className="fw" style={{flex:1,minWidth:0}}>
+                <input
+                  type="text"
+                  placeholder={prodNome}
+                  value={nome}
+                  onChange={e=>setNome(e.target.value)}
+                  onKeyDown={e=>e.key==="Enter"&&handleSave()}
+                  style={{background:"none",border:"none",outline:"none",fontFamily:"'IBM Plex Sans',sans-serif",fontSize:12,color:"#dce7f7",padding:"7px 10px",width:"100%"}}
+                />
+              </div>
+              <button className="mapp" style={{padding:"7px 18px",borderRadius:4,fontSize:12}} onClick={handleSave}>
+                💾 Salvar
+              </button>
+            </div>
+          </div>
+
+          {/* Lista */}
+          {registros.length === 0
+            ? <div style={{textAlign:"center",padding:"24px 0",fontFamily:"'DM Mono',monospace",fontSize:11,color:"#5a6a84"}}>Nenhum registro salvo ainda.</div>
+            : <div style={{display:"flex",flexDirection:"column",gap:4,maxHeight:380,overflowY:"auto"}}>
+                {registros.map(r=>(
+                  <div key={r.id} style={{display:"flex",alignItems:"center",gap:8,padding:"10px 12px",background:"#2a3550",border:"1px solid rgba(255,255,255,.08)",borderRadius:4}}>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:13,fontWeight:700,color:"#dce7f7",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{r.nome}</div>
+                      <div style={{fontSize:10,fontFamily:"'DM Mono',monospace",color:"#5a6a84",marginTop:2}}>
+                        {r.data} · {PRODUTOS.find(p=>p.id===r.d.prodId)?.uf||""} → {r.d.ufDestino} · M {r.d.margem}%
+                      </div>
+                    </div>
+                    {confirmDel===r.id
+                      ? <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                          <span style={{fontSize:11,color:"#f87171"}}>Excluir?</span>
+                          <button onClick={()=>handleDelete(r.id)} style={{padding:"4px 10px",background:"#dc2626",border:"none",color:"#fff",fontSize:11,fontWeight:700,cursor:"pointer",borderRadius:3}}>Sim</button>
+                          <button onClick={()=>setConfirmDel(null)} style={{padding:"4px 10px",background:"#2a3550",border:"1px solid rgba(255,255,255,.15)",color:"#94a3b8",fontSize:11,cursor:"pointer",borderRadius:3}}>Não</button>
+                        </div>
+                      : <div style={{display:"flex",gap:6}}>
+                          <button onClick={()=>{onLoad(r.d, r.calcs);onClose();}}
+                            style={{padding:"6px 14px",background:"#0047BB",border:"none",color:"#fff",fontSize:12,fontWeight:700,cursor:"pointer",borderRadius:3,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:.5}}>
+                            ↩ Carregar
+                          </button>
+                          <button onClick={()=>setConfirmDel(r.id)}
+                            style={{padding:"6px 10px",background:"rgba(220,38,38,.1)",border:"1px solid rgba(220,38,38,.25)",color:"#f87171",fontSize:12,cursor:"pointer",borderRadius:3}}>
+                            ✕
+                          </button>
+                        </div>
+                    }
+                  </div>
+                ))}
+              </div>
+          }
         </div>
       </div>
     </div>
@@ -594,6 +695,11 @@ export default function App(){
     {modal==="cfVenda"&&<ModalCFVenda onClose={()=>setModal(null)}
       data={calcs.cfVenda} setData={v=>SC("cfVenda")(v)}
       onApply={v=>{setD(p=>({...p,cfVenda:v}));SC("cfVenda")({applied:true});setModal(null);}}/>}
+    {modal==="registros"&&<ModalRegistros
+      onClose={()=>setModal(null)}
+      currentD={d} currentCalcs={calcs}
+      prodNome={prod.nome}
+      onLoad={(savedD, savedCalcs)=>{setD(savedD);setCalcs(savedCalcs);}}/>}
 
     <div className="app">
       <header className="hdr">
@@ -614,6 +720,10 @@ export default function App(){
           {prod.uf==="PR"&&<span className="buf cwb">CWB / PR</span>}
           <span className="brt">{c.ufO} -> {d.ufDestino}</span>
           <span className="bdf">{c.difal>0?`DIFAL ${pct(c.difal)}`:"DIFAL 0%"}</span>
+          <button onClick={()=>setModal("registros")}
+            style={{padding:"5px 13px",background:"rgba(0,71,187,.2)",border:"1px solid rgba(0,71,187,.45)",color:"#93c5fd",fontFamily:"'Barlow Condensed',sans-serif",fontSize:12,fontWeight:700,letterSpacing:.5,cursor:"pointer",borderRadius:20,display:"flex",alignItems:"center",gap:5}}>
+            💾 <span>Registros</span>
+          </button>
         </div>
       </header>
 
