@@ -2064,9 +2064,7 @@ function Calculadora({user:currentUser, isAdmin=false}){
           <div className="pscroll">
 
           {tab==="perfil"&&<>
-            <div className="form-grid">
-              <div className="form-col">
-                <Sec title="Produto" tag="NCM / PLAN_TRIB">
+            <Sec title="Produto" tag="NCM / PLAN_TRIB">
               <select className="psel" value={d.prodId} onChange={e=>setProd(e.target.value)}>
                 {PRODUTOS.map(p=><option key={p.id} value={p.id}>{p.ncm} -- {p.nome}</option>)}
               </select>
@@ -2116,12 +2114,12 @@ function Calculadora({user:currentUser, isAdmin=false}){
                   opts={[{v:"revenda",l:"Revenda"},{v:"imobilizado",l:"Ativo Imobilizado"}]}/>
               )}
               <Box t={c.difal>0?"warn":"ok"}>
-                {d.tipoComprador==="naocontrib"?"Nao-contribuinte: vendedor recolhe DIFAL (EC 87/2015). Incluido no preco."
-                  :d.destinacaoCliente==="imobilizado"?"Ativo imobilizado: vendedor recolhe DIFAL. Incluido no preco."
+                {d.tipoComprador==="naocontrib"?"Nao-contribuinte: vendedor recolhe DIFAL (EC 87/2015)."
+                  :d.destinacaoCliente==="imobilizado"?"Ativo imobilizado: vendedor recolhe DIFAL."
                   :"Revenda para contribuinte: DIFAL e responsabilidade do destinatario."}
               </Box>
               <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}>
-                <span style={{fontSize:11,fontWeight:600,color:"#94a3b8"}}>UF Destino</span>
+                <span style={{fontSize:12,fontWeight:600,color:"#dce7f7"}}>UF Destino</span>
                 <select className="fsel" value={d.ufDestino} onChange={e=>S("ufDestino")(e.target.value)}>
                   {UFS.map(u=><option key={u} value={u}>{u}</option>)}
                 </select>
@@ -2130,16 +2128,14 @@ function Calculadora({user:currentUser, isAdmin=false}){
               <DR label={`ICMS interna ${d.ufDestino}`} value={pct(c.aliqDest)}/>
               {c.difal>0&&<DR label={`DIFAL (${c.ufO}->${d.ufDestino})`} value={pct(c.difal)} accent="red" bold/>}
               {c.deveDifal&&prod.aliqST>0&&c.difal===0&&(
-                <Box t="ok">DIFAL zerado: diff. ({pct(c.aliqDest-c.aliqInter)}) menor que ICMS-ST ({pct(prod.aliqST)}) — ST cobre.</Box>
+                <Box t="ok">DIFAL zerado: ST cobre.</Box>
               )}
             </Sec>
-              </div>
-            </div>
           </>}
 
           {tab==="importacao"&&<>
-            <div className="form-grid">
-              <div className="form-col">
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+              <div style={{display:"flex",flexDirection:"column",gap:10}}>
                 <Sec title="FOB + Frete" tag="USD → BRL">
                   <Box t="blue">CFR = FOB + Frete. Conversão pela PTAX.</Box>
                   <Field label="FOB" sfx="USD" value={d.fobUSD} onChange={S("fobUSD")}/>
@@ -2147,10 +2143,11 @@ function Calculadora({user:currentUser, isAdmin=false}){
                     onChange={calcs.frete.applied?undefined:S("freteUSD")}
                     locked={calcs.frete.applied} onUnlock={()=>SC("frete")({applied:false})}
                     action={<button className={`cbtn ${calcs.frete.applied?"cactive":""}`}
-                      title="Calcular frete ponderado" onClick={()=>setModal("frete")}>+/-</button>}/>
-                  <DR label="CFR (FOB + Frete)" value={usd(c.cfrUSD)} bold/>
+                      title="Frete ponderado" onClick={()=>setModal("frete")}>+/-</button>}/>
+                  <DR label="CFR (FOB+Frete)" value={usd(c.cfrUSD)} bold/>
                   <Field label="PTAX" sfx="R$/USD" value={d.ptax} onChange={S("ptax")} hint="Cotação do dia anterior ao DI"/>
-                  <div className="cvres"><span>CFR em BRL</span>
+                  <div className="cvres">
+                    <span>CFR em BRL</span>
                     <span style={{fontFamily:"'DM Mono',monospace",fontSize:16,fontWeight:700,color:"#93c5fd"}}>{brl(c.cfrBRL)}</span>
                   </div>
                 </Sec>
@@ -2158,7 +2155,7 @@ function Calculadora({user:currentUser, isAdmin=false}){
                   <Box t="ok">{"IPI = 0% · ICMS = 0% · PIS/COFINS Suspenso"}</Box>
                 </Sec>}
               </div>
-              <div className="form-col">
+              <div style={{display:"flex",flexDirection:"column",gap:10}}>
                 <Sec title="Encargos de Importação" tag="II + Despesas">
                   <Field label="Alíquota II (TEC)" sfx="%" value={d.aliqII} onChange={S("aliqII")}
                     note={isZFM?"II incide mesmo na ZFM":undefined}/>
@@ -2174,10 +2171,10 @@ function Calculadora({user:currentUser, isAdmin=false}){
                   {d.despesasModo==="pct"
                     ?<><Field label="% sobre CFR" sfx="%" value={d.despesasPct} onChange={S("despesasPct")} hint="SISCOMEX+Despachante+Armazenagem"/>
                        <div className="pbase"><span>Despesas</span><span>{brl(c.despesas)}</span></div></>
-                    :<Field label={`Despesas (${sfxM})`} sfx={sfxM} value={toDisp(d.despesas)} onChange={v=>S("despesas")(toStore(v))} hint="SISCOMEX+Despachante+Armazenagem"/>
+                    :<Field label={`Despesas (${sfxM})`} sfx={sfxM} value={toDisp(d.despesas)} onChange={v=>S("despesas")(toStore(v))} hint="SISCOMEX+Despachante"/>
                   }
                 </Sec>
-                <Sec title="Custo Financeiro + CRA" tag="VPL">
+                <Sec title="CF Importação + CRA" tag="→ VPL">
                   <Field label={`CF Importação (${sfxM})`} sfx={sfxM} value={toDisp(d.cfImp)}
                     onChange={calcs.cfImp.applied?undefined:v=>S("cfImp")(toStore(v))}
                     locked={calcs.cfImp.applied} onUnlock={()=>SC("cfImp")({applied:false})}
@@ -2194,7 +2191,7 @@ function Calculadora({user:currentUser, isAdmin=false}){
 
           {tab==="ppb"&&<>
             <Sec title="Itens de PPB" tag="Processo Produtivo Basico">
-              <Box t="blue">Marque os itens do PPB. Os valores sao incorporados ao CMV e ao VPL (base do BKP).</Box>
+              <Box t="blue">Marque os itens do PPB. Os valores sao incorporados ao CMV e ao VPL.</Box>
               {PPB_ITEMS.map(item=>(
                 <div key={item.id} className="ppbi">
                   <label className="ppbc">
@@ -2205,9 +2202,9 @@ function Calculadora({user:currentUser, isAdmin=false}){
                     {item.id==="placa"&&<button className="cbtn" onClick={e=>{e.preventDefault();setModal("pcb");}}>PCB</button>}
                   </label>
                   {d.ppbAtivos[item.id]&&(
-                    <div style={{padding:"6px 10px",borderTop:"1px solid #1a2233",background:"#111827"}}>
-                      <Field label="Custo unitario" sfx="R$" value={d.ppbVals[item.id]||0}
-                        onChange={v=>setD(p=>({...p,ppbVals:{...p.ppbVals,[item.id]:v}}))}/>
+                    <div style={{padding:"6px 10px",borderTop:"1px solid rgba(255,255,255,.08)",background:"#1a2030"}}>
+                      <Field label="Custo unitario" sfx={sfxM} value={toDisp(d.ppbVals[item.id]||0)}
+                        onChange={v=>setD(p=>({...p,ppbVals:{...p.ppbVals,[item.id]:toStore(v)}}))}/>
                     </div>
                   )}
                 </div>
@@ -2222,25 +2219,25 @@ function Calculadora({user:currentUser, isAdmin=false}){
           </>}
 
           {tab==="producao"&&<>
-            <div className="form-grid">
-              <div className="form-col">
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+              <div style={{display:"flex",flexDirection:"column",gap:10}}>
                 <Sec title="Custos de Produção" tag="sempre R$">
-                  <Box t="gray">Produção, Garantia e Outros sempre em R$ — independente da moeda de importação.</Box>
+                  <Box t="gray">Produção, Garantia e Outros sempre em R$.</Box>
                   <Field label="Produção / Montagem" sfx="R$" value={d.producao} onChange={S("producao")}/>
                   <Field label="Garantia" sfx="R$" value={d.garantia} onChange={S("garantia")}/>
                   <Field label="Outros Custos BRL" sfx="R$" value={d.outrosBRL} onChange={S("outrosBRL")}/>
                 </Sec>
               </div>
-              <div className="form-col">
+              <div style={{display:"flex",flexDirection:"column",gap:10}}>
                 <Sec title="BKP — Backup de Custódia" tag="% sobre VPL" hl>
-                  <Box t="blue">BKP = % sobre VPL (CFR+II+Desp+Seguro+CF+PPB+CRA).</Box>
+                  <Box t="blue">BKP = % sobre VPL.</Box>
                   <DR label="VPL (base)" value={brl(c.vpl)} bold accent="blue"/>
                   <Field label="BKP (%)" sfx="%" value={d.bkpPct} onChange={S("bkpPct")} hint={`= ${brl(c.bkpV)}`}/>
                   <DR label="BKP (R$)" value={brl(c.bkpV)} accent="blue"/>
                 </Sec>
                 <Sec title="Resumo Custos" hl>
                   <DR label="CMV Importação" value={brl(c.cmvImp)}/>
-                  <DR label="PPB" value={brl(ppbTot)}/>
+                  {ppbTot>0&&<DR label="PPB" value={brl(ppbTot)}/>}
                   <DR label="Produção + BRL" value={brl(d.producao+d.garantia+d.outrosBRL)}/>
                   <DR label="BKP" value={brl(c.bkpV)}/>
                   <DR label="CMV Total" value={brl(c.cmvTotal)} bold sep accent="blue"/>
@@ -2250,8 +2247,8 @@ function Calculadora({user:currentUser, isAdmin=false}){
           </>}
 
           {tab==="indices"&&<>
-            <div className="form-grid">
-              <div className="form-col">
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+              <div style={{display:"flex",flexDirection:"column",gap:10}}>
                 <Sec title="Índices Gerais" tag="% s/ preço">
                   <Box t="gray">Calculados por dentro do preço de venda.</Box>
                   {[["P&D","pd"],["Scrap","scrap"],["Royalties / Qualcomm","royal"],["Frete venda","frete"]
@@ -2273,7 +2270,7 @@ function Calculadora({user:currentUser, isAdmin=false}){
                   <div style={{display:"flex",alignItems:"flex-start",gap:8,justifyContent:"space-between"}}>
                     <div style={{flex:1}}>
                       <span style={{fontSize:12,fontWeight:600,color:"#dce7f7"}}>Encargos s/ comissões</span>
-                      <div style={{fontSize:10,color:"#7a90b0",fontFamily:"'DM Mono',monospace"}}>= {pct(c.comisXPct)} (auto)</div>
+                      <div style={{fontSize:10,color:"#7a90b0",fontFamily:"'DM Mono',monospace"}}>{pct(c.comisXPct)} (auto)</div>
                     </div>
                     <div className="fw fro" style={{minWidth:100}}>
                       <span className="fpre">%</span>
@@ -2284,9 +2281,9 @@ function Calculadora({user:currentUser, isAdmin=false}){
                   <DR label="Total Índices" value={pct(c.indPct)} bold sep accent="blue"/>
                 </Sec>
               </div>
-              <div className="form-col">
+              <div style={{display:"flex",flexDirection:"column",gap:10}}>
                 <Sec title="Custo Fixo" tag="% s/ preço">
-                  <Box t="gray">CF compõe a MC junto com a ML.&#10;MC = ML + CF</Box>
+                  <Box t="gray">CF compõe a MC junto com a ML. MC = ML + CF</Box>
                   <Field label="Custo Fixo" value={d.cfixo} onChange={S("cfixo")} sfx="%" hint={`≈ ${brl(c.cfxV)}`}/>
                 </Sec>
                 <Sec title="Margem Líquida (ML)" hl>
@@ -2319,24 +2316,25 @@ function Calculadora({user:currentUser, isAdmin=false}){
                 {c.fcpPct>0&&<div className="txc txwn"><div className="txl">Fundo Pobreza {d.ufDestino}</div><div className="txv">{pct(c.fcpPct)}</div></div>}
               </div>
             </Sec>
-            <Sec title="P/C — Subvencao / Credito Estimulo" hl>
-              <Box t="blue">{"P/C incide sobre o preco liquido de ICMS (base reduzida) E tambem sobre o credito presumido recebido (subvencao = receita tributavel por P/C).\nFormula: P/C ef. = P/C nominal x (1 - ICMS efetivo%) onde ICMS ef. = ICMS destacado - credito"}</Box>
+            <Sec title="P/C — Cálculo Efetivo" hl>
+              <Box t="blue">{"P/C efetivo = P/C nominal × (1 − ICMS destacado% − DIFAL%)"}</Box>
               <DR label="P/C nominal (debito)" value={pct(c.pcPct)}/>
-              <DR label={`(-) Reducao base — ICMS incidente NF (${pct(c.aliqInter)})`} value={`(${pct(c.pcBaseRedPct)})`} accent="green"/>
-              {c.pcSubvPct>0.001&&<DR label={`(+) P/C sobre subvencao — credito (${pct(prod.cred)})`} value={pct(c.pcSubvPct)} accent="red"/>}
-              {c.difal>0&&<DR label={`(-) Reducao base — DIFAL (${pct(c.difal)})`} value={`(${pct(c.pcPct*c.difal/100)})`} accent="green"/>}
-              <DR label="P/C efetivo no preco" value={pct(c.pcEf)} bold accent="blue" sep/>
-              {c.pcSubvPct>0.001&&<Box t="warn">{`P/C subvencao: ${pct(c.pcSubvPct)} e um CUSTO — o credito presumido (${pct(prod.cred)}) recebido e tratado como receita de subvencao, sobre a qual P/C incide.`}</Box>}
-              {c.pcSubvPct<0.001&&prod.cred===0&&<Box t="gray">Sem credito presumido cadastrado — P/C incide apenas sobre base reduzida pelo ICMS.</Box>}
+              <DR label={`(-) ICMS destacado NF — ${pct(c.aliqInter)}`} value={`(${pct(c.pcBaseRedPct)})`} accent="green"/>
+              {c.difal>0&&<DR label={`(-) DIFAL — ${pct(c.difal)}`} value={`(${pct(c.pcPct*c.difal/100)})`} accent="green"/>}
+              <DR label={`P/C efetivo (${pct(c.pcEf)})`} value={brl(c.pcV)} bold accent="blue" sep/>
+              {c.pcSubvPct>0.001&&<>
+                <DR label={`P/C subvenção: 9,25% × cred. ${pct(prod.cred)}`} value={pct(c.pcSubvPct)} accent="red"/>
+                <Box t="warn">{`P/C subvenção (${pct(c.pcSubvPct)}) = CUSTO sobre o crédito presumido.`}</Box>
+              </>}
             </Sec>
-            <Sec title="ICMS: Destacado x Efetivo (custo)">
+            <Sec title="ICMS: Destacado x Efetivo">
               <DR label={`ICMS destacado NF (${c.ufO}->${d.ufDestino})`} value={pct(c.aliqInter)}/>
-              <DR label="(-) Credito presumido / estimulo" value={`(${pct(prod.cred)})`} accent="green"/>
+              <DR label="(-) Crédito presumido / estímulo" value={`(${pct(prod.cred)})`} accent="green"/>
               <DR label="ICMS custo efetivo" value={pct(c.icmsEfPct)} bold accent={c.icmsEfPct===0?"green":"warn"} sep/>
               <Box t={c.icmsEfPct===0?"ok":"warn"}>
                 {c.icmsEfPct===0
-                  ?`Credito presumido (${pct(prod.cred)}) absorve os ${pct(c.aliqInter)} de ICMS. Custo = 0%.\nMas os ${pct(c.aliqInter)} ainda reduzem a base do P/C (subvencao).`
-                  :`Custo residual de ICMS apos credito: ${pct(c.icmsEfPct)}.\nObs: os ${pct(c.aliqInter)} cheios reduzem a base do P/C.`}
+                  ?`Crédito presumido absorve o ICMS. Custo = 0%.`
+                  :`Custo residual: ${pct(c.icmsEfPct)}.`}
               </Box>
             </Sec>
           </>}
@@ -2344,7 +2342,7 @@ function Calculadora({user:currentUser, isAdmin=false}){
           {tab==="st"&&<>
             <Sec title="Substituicao Tributaria" tag="ICMS-ST">
               <Tog label="Aplicar ICMS-ST" val={d.stAtivo} onChange={S("stAtivo")}/>
-              <Box t="gray">{"ST aplica para Notebooks, Smartphones, etc.\nBase ST = Preco c/IPI x (1+MVA) | ST = Base x aliq.dest - ICMS proprio"}</Box>
+              <Box t="gray">{"Base ST = Preco c/IPI x (1+MVA) | ST = Base x aliq.dest - ICMS proprio"}</Box>
               {d.stAtivo&&<>
                 <Field label="MVA Original" value={d.mva} onChange={S("mva")} sfx="%" hint="Protocolo/Convenio ICMS"/>
                 <Field label="Aliq. Interna Destino (ST)" value={d.icmsDestST} onChange={S("icmsDestST")} sfx="%"/>
@@ -2354,8 +2352,6 @@ function Calculadora({user:currentUser, isAdmin=false}){
             </Sec>
           </>}
 
-          </div>
-          </div>
           </div>
         </main>
       </div>
