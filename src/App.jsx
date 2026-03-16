@@ -1962,21 +1962,23 @@ function Calculadora({user:currentUser, isAdmin=false}){
     const deveDifal=d.tipoComprador==="naocontrib"||(d.tipoComprador==="contrib"&&d.destinacaoCliente==="imobilizado");
     if(!intra&&deveDifal){const delta=aliqDest-aliqInter;if(delta>0)difal=(prod.aliqST>0&&delta<prod.aliqST)?0:delta;}
 
-    const pcEf=pcPct*(1-(icmsEfPct+difal)/100);  // líquido: base reduzida por ICMS − P/C sobre crédito
+    // pcEf: usa aliqInter (incidência cheia) — a base do P/C é reduzida pelo ICMS destacado na NF, não pelo líquido
+    const pcEf=pcPct*(1-(aliqInter+difal)/100);  // ex: 3,65% × (1-12%-6%) = 2,993%
+    // pcSubvPct: sempre 9,25% sobre o crédito presumido (P/C sobre receita de subvenção) — é um custo
+    const pcSubvPct=prod.cred>0?+(9.25*(prod.cred/100)).toFixed(6):0;  // ex: 9,25% × 12% = 1,11%
     const ftiPct=(isZFM&&d.ftiAtivo)?prod.fti:0;
     const fcpPct=FCP[ufD]||0;
     const ipi=prod.ipi;
     const comisXPct=d.comis*(2/3);
     const indPct=d.pd+d.cfixo+d.scrap+d.royal+d.cfVenda+d.frete+d.comis+comisXPct+d.mkt+d.rebate;
-    const soma=(pcEf+icmsEfPct+difal+ftiPct+fcpPct+indPct+d.margem)/100;
+    // soma: pcEf + pcSubvPct + icmsEfPct + difal + demais índices + margem
+    const soma=(pcEf+pcSubvPct+icmsEfPct+difal+ftiPct+fcpPct+indPct+d.margem)/100;
     const pSI=soma<1?cmvTotal/(1-soma):cmvTotal*99;
     const ipiV=pSI*(ipi/100),pCI=pSI+ipiV;
     const pcV=pSI*(pcEf/100),icmsV=pSI*(aliqInter/100);
     const icmsEfV=pSI*(icmsEfPct/100),difalV=pSI*(difal/100);
-    // P/C subvenção: P/C que incide sobre o crédito presumido recebido (custo adicional, não economia)
-    const pcSubvPct=pcPct*(prod.cred/100);   // ex: 9,25% × 12% = 1,11%
     const pcSubvV=pSI*(pcSubvPct/100);
-    // P/C base (só redução por incidência ICMS, sem o custo subvenção)
+    // pcBaseRedPct: redução da base do P/C pelo ICMS destacado (para exibição)
     const pcBaseRedPct=pcPct*(aliqInter/100);
     const ftiV=pSI*(ftiPct/100),fcpV=pSI*(fcpPct/100);
     const margV=pSI*(d.margem/100);
@@ -1997,7 +1999,7 @@ function Calculadora({user:currentUser, isAdmin=false}){
     let margemAlvo=null;
     if(d.precoAlvo>0){
       const pSIa=d.precoAlvo/(1+ipi/100);
-      const sf=(pcEf+icmsEfPct+difal+ftiPct+fcpPct+indPct)/100;
+      const sf=(pcEf+pcSubvPct+icmsEfPct+difal+ftiPct+fcpPct+indPct)/100;
       margemAlvo=pSIa>0?(1-cmvTotal/pSIa)*100-sf*100:null;
     }
     return{cfrUSD,cfrBRL,iiV,vpl,bkpV,cfrImp,cmvImp,cmvTotal,ppbTot,despesas,
