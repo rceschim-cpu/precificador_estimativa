@@ -2133,6 +2133,8 @@ function Calculadora({user:currentUser, isAdmin=false}){
                 <Box t="ok">DIFAL zerado: diff. ({pct(c.aliqDest-c.aliqInter)}) menor que ICMS-ST ({pct(prod.aliqST)}) — ST cobre.</Box>
               )}
             </Sec>
+              </div>
+            </div>
           </>}
 
           {tab==="importacao"&&<>
@@ -2352,6 +2354,8 @@ function Calculadora({user:currentUser, isAdmin=false}){
             </Sec>
           </>}
 
+          </div>
+          </div>
           </div>
         </main>
       </div>
