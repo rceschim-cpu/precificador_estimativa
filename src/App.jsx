@@ -537,7 +537,7 @@ export default function App(){
     const deveDifal=d.tipoComprador==="naocontrib"||(d.tipoComprador==="contrib"&&d.destinacaoCliente==="imobilizado");
     if(!intra&&deveDifal){const delta=aliqDest-aliqInter;if(delta>0)difal=(prod.aliqST>0&&delta<prod.aliqST)?0:delta;}
 
-    const pcEf=pcPct*(1-(icmsEfPct+difal)/100);
+    const pcEf=pcPct*(1-(aliqInter+difal)/100);
     const ftiPct=(isZFM&&d.ftiAtivo)?prod.fti:0;
     const fcpPct=FCP[ufD]||0;
     const ipi=prod.ipi;
@@ -868,7 +868,7 @@ export default function App(){
                   ["P/C Ef. (base liq.)",pct(c.pcEf),false],
                   ["ICMS Destacado NF",pct(c.aliqInter),false],
                   ["Cred. Presumido",pct(prod.cred),true],
-                  ["ICMS Efetivo (custo)",pct(c.icmsEfPct),c.icmsEfPct===0],
+                  ["ICMS Custo Efetivo",pct(c.icmsEfPct),c.icmsEfPct===0],
                   ["DIFAL",c.difal>0?pct(c.difal):"0% — N/A",c.difal===0],
                 ].map(([l,v,ok])=>(
                   <div key={l} className={`txc ${ok?"txok":"txon"}`}>
@@ -879,20 +879,24 @@ export default function App(){
                 {c.fcpPct>0&&<div className="txc txwn"><div className="txl">Fundo Pobreza {d.ufDestino}</div><div className="txv">{pct(c.fcpPct)}</div></div>}
               </div>
             </Sec>
-            <Sec title="P/C — Subvencao / Credito Estimulo">
-              <Box t="blue">{"P/C efetivo = P/C nominal x (1 - ICMS efetivo% - DIFAL%)\nO credito presumido/estimulo reduz a base do P/C (subvencao fiscal ZFM)."}</Box>
+            <Sec title="P/C — Subvencao / Credito Estimulo" hl>
+              <Box t="blue">{"A incidencia do ICMS (aliq. destacada na NF) reduz a base de calculo do P/C — independente do credito presumido.\nFormula: P/C efetivo = P/C nominal x (1 - ICMS incidente% - DIFAL%)"}</Box>
               <DR label="P/C nominal (debito)" value={pct(c.pcPct)}/>
-              <DR label="(-) ICMS efetivo (reduz P/C)" value={pct(c.icmsEfPct)} accent="red"/>
-              {c.difal>0&&<DR label="(-) DIFAL (reduz P/C)" value={pct(c.difal)} accent="red"/>}
-              <DR label="P/C efetivo no preco" value={pct(c.pcEf)} bold accent="blue"/>
+              <DR label={`(-) ICMS incidente NF (${c.ufO}->${d.ufDestino})`} value={pct(c.aliqInter)} accent="red"/>
+              {c.difal>0&&<DR label={`(-) DIFAL`} value={pct(c.difal)} accent="red"/>}
+              <DR label="P/C efetivo no preco" value={pct(c.pcEf)} bold accent="blue" sep/>
+              <DR label="Reducao de base P/C" value={pct(c.pcPct-c.pcEf)} accent="green"/>
+              <DR label="Economia em R$ (vs. sem subvencao)" value={brl(c.pSI*(c.pcPct-c.pcEf)/100)} accent="green" bold/>
+              <Box t={prod.cred>0?"ok":"gray"}>{prod.cred>0?`Credito presumido/estimulo: ${pct(prod.cred)} — reduz custo do ICMS, mas NAO altera a base do P/C.`:"Produto sem credito presumido cadastrado."}</Box>
             </Sec>
-            <Sec title="ICMS: Destacado x Efetivo">
+            <Sec title="ICMS: Destacado x Efetivo (custo)">
               <DR label={`ICMS destacado NF (${c.ufO}->${d.ufDestino})`} value={pct(c.aliqInter)}/>
-              <DR label="Credito presumido / estimulo" value={`(${pct(prod.cred)})`} accent="green"/>
-              <DR label="ICMS efetivo no preco" value={pct(c.icmsEfPct)} bold accent={c.icmsEfPct===0?"green":"warn"}/>
+              <DR label="(-) Credito presumido / estimulo" value={`(${pct(prod.cred)})`} accent="green"/>
+              <DR label="ICMS custo efetivo" value={pct(c.icmsEfPct)} bold accent={c.icmsEfPct===0?"green":"warn"} sep/>
               <Box t={c.icmsEfPct===0?"ok":"warn"}>
-                {c.icmsEfPct===0?"Credito presumido absorve o ICMS. Custo efetivo = 0%."
-                  :`Custo residual apos credito: ${pct(c.icmsEfPct)}.`}
+                {c.icmsEfPct===0
+                  ?`Credito presumido (${pct(prod.cred)}) absorve os ${pct(c.aliqInter)} de ICMS. Custo = 0%.\nMas os ${pct(c.aliqInter)} ainda reduzem a base do P/C (subvencao).`
+                  :`Custo residual de ICMS apos credito: ${pct(c.icmsEfPct)}.\nObs: os ${pct(c.aliqInter)} cheios reduzem a base do P/C.`}
               </Box>
             </Sec>
           </>}
