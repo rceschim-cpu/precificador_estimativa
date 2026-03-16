@@ -145,11 +145,11 @@ input,select,textarea,button{font-family:inherit}
 .auth-msg.warn{background:rgba(217,119,6,.1);border-color:#d97706;color:#fbbf24}
 
 /* ── DASHBOARD ── */
-.dash{display:flex;flex-direction:column;min-height:100vh;height:100vh;overflow:hidden}
+.dash{display:flex;flex-direction:column;height:100vh;overflow:hidden}
 .topbar{
   background:var(--surface);border-bottom:1px solid var(--border);
   padding:0 28px;height:58px;display:flex;align-items:center;gap:16px;
-  position:relative;z-index:100;flex-shrink:0;
+  position:sticky;top:0;z-index:100;flex-shrink:0;
 }
 .topbar-logo{display:flex;align-items:center;gap:9px;flex-shrink:0}
 .topbar-mark{width:30px;height:30px;background:#0047BB;display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-size:14px;font-weight:800;color:#fff;flex-shrink:0}
@@ -165,14 +165,14 @@ input,select,textarea,button{font-family:inherit}
 .btn-logout:hover{border-color:var(--border2);color:var(--text)}
 
 .dash-body{display:flex;flex:1;min-height:0;overflow:hidden}
-.sidebar{width:220px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);padding:16px 0;display:flex;flex-direction:column;gap:2px}
+.sidebar{width:220px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);padding:16px 0;display:flex;flex-direction:column;gap:2px;overflow-y:auto}
 .snav-item{display:flex;align-items:center;gap:11px;padding:10px 20px;cursor:pointer;color:var(--muted);font-size:13px;font-weight:500;transition:.15s;border-left:3px solid transparent}
 .snav-item:hover{background:rgba(255,255,255,.03);color:var(--text)}
 .snav-item.on{border-left-color:#0047BB;background:rgba(0,71,187,.1);color:#fff;font-weight:600}
 .snav-icon{font-size:16px;flex-shrink:0;width:22px;text-align:center}
 .snav-sep{height:1px;background:var(--border);margin:8px 16px}
 
-.main-content{flex:1;padding:28px;overflow-y:auto;background:var(--bg)}
+.main-content{flex:1;padding:28px;overflow-y:auto;background:var(--bg);min-height:0}
 
 /* ── CARDS ── */
 .page-title{font-family:'Syne',sans-serif;font-size:24px;font-weight:800;color:#fff;margin-bottom:6px}
@@ -849,7 +849,7 @@ function PainelAdmin({ currentUser }) {
             </div>
           ))}
         </div>
-        <div style={{flex:1,display:"flex",flexDirection:"column",minHeight:0,overflow:"hidden"}}>
+        <div style={{flex:1,display:"flex",overflow:"hidden"}}>
           <Calculadora user={currentUser}/>
         </div>
       </>
@@ -1524,19 +1524,19 @@ const CSS=`
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 body{background:#1c2333;color:#dce7f7;font-family:'IBM Plex Sans',sans-serif;min-height:100vh}
 input::-webkit-inner-spin-button,input::-webkit-outer-spin-button{-webkit-appearance:none}
-.app{display:flex;flex-direction:column;flex:1;min-height:0}
+.app{display:flex;flex-direction:column;flex:1;overflow:hidden}
 .hdr{background:#232c3d;color:#fff;padding:0 20px;display:flex;align-items:center;gap:16px;min-height:58px;border-bottom:3px solid #0047BB;flex-wrap:wrap}
 .buf{padding:4px 10px;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:.5px;border-radius:20px}
 .buf.zmf{background:rgba(0,71,187,.35);color:#93c5fd;border:1px solid rgba(0,71,187,.5)}.buf.ios{background:rgba(26,101,212,.35);color:#93c5fd;border:1px solid rgba(26,101,212,.5)}.buf.cwb{background:rgba(100,116,139,.2);color:#94a3b8;border:1px solid rgba(100,116,139,.3)}
 .brt{padding:3px 9px;font-family:'DM Mono',monospace;font-size:9px;border:1px solid rgba(255,255,255,.12);color:#7a90b0;border-radius:20px}
 .bdf{padding:3px 9px;font-family:'DM Mono',monospace;font-size:9px;border-radius:20px;background:rgba(220,38,38,.12);border:1px solid rgba(220,38,38,.25);color:#f87171}
-.layout{display:grid;grid-template-columns:340px 1fr;flex:1;min-height:0;overflow:hidden}
-.pleft{background:#1e2a3d;border-right:1px solid rgba(255,255,255,.08);display:flex;flex-direction:column;overflow:hidden;min-height:0}
+.layout{display:grid;grid-template-columns:340px 1fr;grid-template-rows:1fr;flex:1;min-height:0;overflow:hidden}
+.pleft{background:#1e2a3d;border-right:1px solid rgba(255,255,255,.08);display:flex;flex-direction:column;overflow:hidden}
 .tnav{display:flex;flex-wrap:nowrap;border-bottom:1px solid rgba(255,255,255,.08);background:#161e2c;flex-shrink:0;overflow-x:auto;scrollbar-width:none}.tnav::-webkit-scrollbar{display:none}
 .tbtn{flex:0 0 auto;padding:9px 7px;background:none;border:none;border-bottom:2px solid transparent;color:#7a90b0;font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;cursor:pointer;transition:.15s;white-space:nowrap}
 .tbtn.on{color:#f0f4ff;border-bottom-color:#0047BB;background:rgba(0,71,187,.15)}
 .tbtn:hover:not(.on){color:#c4d4e8;background:rgba(255,255,255,.04)}
-.pscroll{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:10px;min-height:0}
+.pscroll{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:10px}
 .sec{border:1px solid rgba(255,255,255,.08);overflow:hidden;background:#232c3d;border-radius:6px}
 .sec.hl{border-color:rgba(0,71,187,.6)}
 .sech{padding:9px 13px;background:#2a3550;border-bottom:1px solid rgba(255,255,255,.08);display:flex;align-items:center;justify-content:space-between;min-height:34px}
@@ -1599,7 +1599,7 @@ input::-webkit-inner-spin-button,input::-webkit-outer-spin-button{-webkit-appear
 .txl{font-size:9px;color:#5a6a84;text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px;font-family:'DM Mono',monospace;line-height:1.3}
 .txv{font-family:'DM Mono',monospace;font-size:14px;font-weight:700;color:#dce7f7}
 .txon .txv{color:#f87171}.txok .txv{color:#4ade80}
-.pright{padding:16px 18px;overflow-y:auto;display:flex;flex-direction:column;gap:13px;background:#1c2333;min-height:0}
+.pright{padding:16px 18px;overflow-y:auto;display:flex;flex-direction:column;gap:13px;background:#1c2333}
 .hero{background:linear-gradient(135deg,#0f2a6e,#0a1a45);padding:18px 22px;display:flex;align-items:flex-end;justify-content:space-between;gap:14px;flex-wrap:wrap;border:1px solid rgba(0,71,187,.2);border-bottom:3px solid #0047BB;border-radius:6px}
 .kpi{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);padding:9px 14px;text-align:center;min-width:80px;border-radius:5px}
 .kpi-red{border-color:rgba(248,113,113,.2);background:rgba(220,38,38,.06)}.kpi-green{border-color:rgba(74,222,128,.2);background:rgba(22,163,74,.06)}.kpi-blue{border-color:rgba(96,165,250,.2);background:rgba(0,71,187,.07)}
@@ -1801,11 +1801,11 @@ function Calculadora({user:currentUser}){
       prodNome={prod.nome}
       onLoad={(savedD, savedCalcs)=>{setD(savedD);setCalcs(savedCalcs);}}/>}
 
-    <div className="app" style={{display:"flex",flexDirection:"column",flex:1,minHeight:0}}>
+    <div className="app">
     <style>{CSS}</style>
 
       {/* sub-header: badges de contexto + botão Registros */}
-      <div style={{display:"flex",alignItems:"center",gap:6,padding:"6px 16px",background:"#1e2a3d",borderBottom:"1px solid rgba(255,255,255,.07)",flexWrap:"wrap",flexShrink:0}}>
+      <div style={{display:"flex",alignItems:"center",gap:6,padding:"6px 16px",background:"#1e2a3d",borderBottom:"1px solid rgba(255,255,255,.07)",flexWrap:"wrap",flexShrink:0,flexBasis:"auto"}}>
         {isZFM&&<span className="buf zmf">ZFM / MAO</span>}
         {prod.uf==="BA"&&<span className="buf ios">IOS / BA</span>}
         {prod.uf==="PR"&&<span className="buf cwb">CWB / PR</span>}
@@ -1818,7 +1818,7 @@ function Calculadora({user:currentUser}){
         </button>
       </div>
 
-      <div className="layout" style={{flex:1,minHeight:0,overflow:"hidden"}}>
+      <div className="layout">
         <aside className="pleft">
           <nav className="tnav">
             {TABS.map((t,i)=><button key={t} className={`tbtn ${tab===t?"on":""}`} onClick={()=>setTab(t)}>{TLBL[i]}</button>)}
@@ -2230,7 +2230,7 @@ export default function App() {
           </div>
         </div>
 
-        <div className="dash-body" style={isAdmin ? {} : {flexDirection:"column",overflow:"hidden"}}>
+        <div className="dash-body">
           {isAdmin
             ? <PainelAdmin currentUser={user}/>
             : <Calculadora user={user}/>
