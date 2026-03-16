@@ -1518,6 +1518,194 @@ function BreakdownPanel({c,d,prod,ppbTot,calcs}){
   );
 }
 
+// ── Modal Gestão de Usuários ─────────────────────────────────────────────────
+function ModalGestaoUsers({ onClose, currentUser }) {
+  const [aba, setAba] = useState("pendentes");
+  const [users, setUsers] = useState(getAllUsers);
+  const [search, setSearch] = useState("");
+  const [modal, setModal] = useState(null);
+  const [perfisLista, setPerfisLista] = useState(loadPerfis);
+  const [modalPerfil, setModalPerfil] = useState(null);
+  const [confirmDel, setConfirmDel] = useState(null);
+
+  const refresh = () => setUsers(getAllUsers());
+
+  const saveUser = (updated) => {
+    const stored = loadUsers().filter(u => u.id !== "master");
+    if (updated.id !== "master") {
+      const idx = stored.findIndex(u => u.id === updated.id);
+      if (idx >= 0) stored[idx] = updated; else stored.push(updated);
+      saveUsers(stored);
+    }
+    refresh(); setModal(null);
+  };
+
+  const salvarPerfil = (p) => {
+    const nova = perfisLista.find(x=>x.id===p.id)
+      ? perfisLista.map(x=>x.id===p.id?p:x) : [...perfisLista, p];
+    savePerfis(nova); setPerfisLista(nova); setModalPerfil(null);
+  };
+  const deletarPerfil = (id) => {
+    const nova = perfisLista.filter(p=>p.id!==id);
+    savePerfis(nova); setPerfisLista(nova); setConfirmDel(null);
+  };
+
+  const pendentes = users.filter(u => u.status === "pendente");
+  const todos = users.filter(u => {
+    const q = search.toLowerCase();
+    return !q || u.nome.toLowerCase().includes(q) || u.email.toLowerCase().includes(q);
+  });
+
+  const btnStyle = (on) => ({
+    padding:"7px 16px", background: on?"#0047BB":"rgba(255,255,255,.05)",
+    border:`1px solid ${on?"#0047BB":"rgba(255,255,255,.1)"}`,
+    color: on?"#fff":"var(--muted)", fontSize:12, fontWeight:700,
+    cursor:"pointer", borderRadius:3, transition:".15s", letterSpacing:".3px"
+  });
+
+  return (
+    <div className="modal-ov" onClick={onClose}>
+      <div className="modal-box" style={{maxWidth:760,width:"95vw"}} onClick={e=>e.stopPropagation()}>
+        <div className="modal-head">
+          <span className="modal-title">👥 Gestão de Usuários e Perfis</span>
+          <button className="modal-close" onClick={onClose}>×</button>
+        </div>
+
+        {/* Tabs */}
+        <div style={{display:"flex",gap:4,padding:"10px 16px",borderBottom:"1px solid var(--border)",background:"rgba(255,255,255,.02)"}}>
+          <button style={btnStyle(aba==="pendentes")} onClick={()=>setAba("pendentes")}>
+            ⏳ Pendentes {pendentes.length>0&&<span style={{marginLeft:4,background:"#d97706",color:"#fff",borderRadius:20,padding:"0 6px",fontSize:10}}>{pendentes.length}</span>}
+          </button>
+          <button style={btnStyle(aba==="usuarios")} onClick={()=>setAba("usuarios")}>👥 Usuários</button>
+          <button style={btnStyle(aba==="perfis")} onClick={()=>setAba("perfis")}>🔐 Perfis</button>
+        </div>
+
+        <div style={{padding:16,maxHeight:"70vh",overflowY:"auto"}}>
+
+          {/* ABA PENDENTES */}
+          {aba==="pendentes"&&(pendentes.length===0
+            ? <div className="empty"><div className="empty-icon">✓</div><div className="empty-text">Nenhuma pendência</div></div>
+            : <table style={{width:"100%",borderCollapse:"collapse"}}>
+                <thead><tr>
+                  {["Usuário","Perfil Solicitado","Data","Ação"].map(h=>(
+                    <th key={h} style={{padding:"8px 12px",textAlign:"left",fontSize:11,fontWeight:700,color:"var(--muted)",textTransform:"uppercase",letterSpacing:".8px",borderBottom:"1px solid var(--border)"}}>{h}</th>
+                  ))}
+                </tr></thead>
+                <tbody>
+                  {pendentes.map(u=>(
+                    <tr key={u.id} style={{background:"rgba(217,119,6,.04)"}}>
+                      <td style={{padding:"10px 12px"}}>
+                        <div style={{fontWeight:600,color:"#fff"}}>{u.nome}</div>
+                        <div style={{fontSize:11,color:"var(--muted)"}}>{u.email}</div>
+                      </td>
+                      <td style={{padding:"10px 12px"}}><PerfilBadge perfil={u.perfil}/></td>
+                      <td style={{padding:"10px 12px",fontFamily:"JetBrains Mono",fontSize:11,color:"var(--muted)"}}>{fmtDate(u.criadoEm)}</td>
+                      <td style={{padding:"10px 12px"}}>
+                        <button className="btn-sm btn-approve" onClick={()=>setModal({type:"aprovar",user:u})}>✓ Analisar</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+          )}
+
+          {/* ABA USUARIOS */}
+          {aba==="usuarios"&&(
+            <>
+              <input className="tbl-search" placeholder="Buscar por nome ou e-mail..."
+                value={search} onChange={e=>setSearch(e.target.value)}
+                style={{width:"100%",marginBottom:12}}/>
+              <table style={{width:"100%",borderCollapse:"collapse"}}>
+                <thead><tr>
+                  {["Usuário","Perfil","Status","Ações"].map(h=>(
+                    <th key={h} style={{padding:"8px 12px",textAlign:"left",fontSize:11,fontWeight:700,color:"var(--muted)",textTransform:"uppercase",letterSpacing:".8px",borderBottom:"1px solid var(--border)"}}>{h}</th>
+                  ))}
+                </tr></thead>
+                <tbody>
+                  {todos.map(u=>{
+                    const pm=getPerfisMap(loadPerfis());
+                    return(
+                    <tr key={u.id} style={{borderBottom:"1px solid rgba(255,255,255,.04)"}}>
+                      <td style={{padding:"10px 12px"}}>
+                        <div style={{display:"flex",alignItems:"center",gap:8}}>
+                          <div style={{width:28,height:28,borderRadius:"50%",background:pm[u.perfil]?.cor||"#7a7f96",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,color:"#fff",flexShrink:0}}>{initials(u.nome)}</div>
+                          <div>
+                            <div style={{fontWeight:600,color:"#fff",fontSize:13}}>{u.nome}</div>
+                            <div style={{fontSize:11,color:"var(--muted)"}}>{u.email}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td style={{padding:"10px 12px"}}><PerfilBadge perfil={u.perfil}/></td>
+                      <td style={{padding:"10px 12px"}}><StatusBadge status={u.status}/></td>
+                      <td style={{padding:"10px 12px"}}>
+                        <div style={{display:"flex",gap:5}}>
+                          {u.id!=="master"&&<button className="btn-sm btn-edit" onClick={()=>setModal({type:"edit",user:u})}>✎</button>}
+                          {u.id!=="master"&&u.status==="ativo"&&<button className="btn-sm btn-disable" onClick={()=>saveUser({...u,status:"inativo"})}>Desativar</button>}
+                          {u.id!=="master"&&u.status==="inativo"&&<button className="btn-sm btn-approve" onClick={()=>saveUser({...u,status:"ativo"})}>Reativar</button>}
+                          {u.id!=="master"&&u.status==="pendente"&&<button className="btn-sm btn-approve" onClick={()=>setModal({type:"aprovar",user:u})}>Analisar</button>}
+                          {u.id==="master"&&<span style={{fontSize:11,color:"var(--muted)",fontStyle:"italic"}}>master</span>}
+                        </div>
+                      </td>
+                    </tr>
+                  )})}
+                </tbody>
+              </table>
+            </>
+          )}
+
+          {/* ABA PERFIS */}
+          {aba==="perfis"&&(
+            <div style={{display:"flex",flexDirection:"column",gap:10}}>
+              <div style={{display:"flex",justifyContent:"flex-end"}}>
+                <button className="btn-confirm" style={{padding:"7px 16px",borderRadius:3}}
+                  onClick={()=>setModalPerfil("novo")}>+ Novo Perfil</button>
+              </div>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))",gap:10}}>
+                {perfisLista.map(p=>{
+                  const count=users.filter(u=>u.perfil===p.id&&u.status==="ativo").length;
+                  const isAdminP=p.id==="admin";
+                  return(
+                    <div key={p.id} className="pfcard" style={{borderColor:p.cor+"33"}}>
+                      <div className="pfcard-head">
+                        <span className="pfcard-icon">{p.icone}</span>
+                        <div style={{flex:1}}>
+                          <div className="pfcard-name">{p.label}</div>
+                          <div className="pfcard-count" style={{color:p.cor}}>{count} ativo{count!==1?"s":""}</div>
+                        </div>
+                        <div className="pfcard-actions">
+                          {!isAdminP&&<button className="btn-sm btn-edit" onClick={()=>setModalPerfil(p)}>✎</button>}
+                          {!isAdminP&&(confirmDel===p.id
+                            ? <><button className="btn-sm btn-reject" onClick={()=>deletarPerfil(p.id)}>Sim</button>
+                                <button className="btn-sm btn-disable" onClick={()=>setConfirmDel(null)}>Não</button></>
+                            : <button className="btn-sm btn-reject" style={{opacity:count>0?.4:1}}
+                                onClick={()=>count===0&&setConfirmDel(p.id)}>✕</button>
+                          )}
+                          {isAdminP&&<span style={{fontSize:10,color:"var(--muted)",fontStyle:"italic"}}>sistema</span>}
+                        </div>
+                      </div>
+                      <div className="pfcard-mods">
+                        {MODULOS.map(m=>(
+                          <span key={m.id} className={`mod-chip ${p.modulos?.includes(m.id)?"on":"off"}`}>
+                            {m.icone} {m.label}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              {modalPerfil&&<ModalPerfil perfil={modalPerfil==="novo"?null:modalPerfil}
+                users={users} onClose={()=>setModalPerfil(null)} onSave={salvarPerfil}/>}
+            </div>
+          )}
+        </div>
+      </div>
+      {modal?.type==="edit"&&<ModalEditUser user={modal.user} onClose={()=>setModal(null)} onSave={saveUser}/>}
+      {modal?.type==="aprovar"&&<ModalAprovar user={modal.user} currentUser={currentUser} onClose={()=>setModal(null)} onSave={saveUser}/>}
+    </div>
+  );
+}
+
 // ── CSS ───────────────────────────────────────────────────────────────────────
 const CSS=`
 @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=DM+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
@@ -1530,8 +1718,8 @@ input::-webkit-inner-spin-button,input::-webkit-outer-spin-button{-webkit-appear
 .buf.zmf{background:rgba(0,71,187,.35);color:#93c5fd;border:1px solid rgba(0,71,187,.5)}.buf.ios{background:rgba(26,101,212,.35);color:#93c5fd;border:1px solid rgba(26,101,212,.5)}.buf.cwb{background:rgba(100,116,139,.2);color:#94a3b8;border:1px solid rgba(100,116,139,.3)}
 .brt{padding:3px 9px;font-family:'DM Mono',monospace;font-size:9px;border:1px solid rgba(255,255,255,.12);color:#7a90b0;border-radius:20px}
 .bdf{padding:3px 9px;font-family:'DM Mono',monospace;font-size:9px;border-radius:20px;background:rgba(220,38,38,.12);border:1px solid rgba(220,38,38,.25);color:#f87171}
-.layout{display:grid;grid-template-columns:340px 1fr;grid-template-rows:1fr;flex:1;min-height:0;overflow:hidden}
-.pleft{background:#1e2a3d;border-right:1px solid rgba(255,255,255,.08);display:flex;flex-direction:column;overflow:hidden}
+.layout{display:grid;grid-template-columns:320px 1fr;grid-template-rows:1fr;flex:1;min-height:0;overflow:hidden}
+.pleft{background:#1a2030;border-right:1px solid rgba(255,255,255,.08);display:flex;flex-direction:column;overflow:hidden}
 .tnav{display:flex;flex-wrap:nowrap;border-bottom:1px solid rgba(255,255,255,.08);background:#161e2c;flex-shrink:0;overflow-x:auto;scrollbar-width:none}.tnav::-webkit-scrollbar{display:none}
 .tbtn{flex:0 0 auto;padding:9px 7px;background:none;border:none;border-bottom:2px solid transparent;color:#7a90b0;font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;cursor:pointer;transition:.15s;white-space:nowrap}
 .tbtn.on{color:#f0f4ff;border-bottom-color:#0047BB;background:rgba(0,71,187,.15)}
@@ -1599,7 +1787,13 @@ input::-webkit-inner-spin-button,input::-webkit-outer-spin-button{-webkit-appear
 .txl{font-size:9px;color:#5a6a84;text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px;font-family:'DM Mono',monospace;line-height:1.3}
 .txv{font-family:'DM Mono',monospace;font-size:14px;font-weight:700;color:#dce7f7}
 .txon .txv{color:#f87171}.txok .txv{color:#4ade80}
-.pright{padding:16px 18px;overflow-y:auto;display:flex;flex-direction:column;gap:13px;background:#1c2333}
+.pright{display:flex;flex-direction:column;overflow:hidden;background:#1c2333}
+.form-topbar{display:flex;align-items:center;border-bottom:1px solid rgba(255,255,255,.08);background:#161e2c;flex-shrink:0;min-height:40px}
+.form-topbar .tnav{border-bottom:none;background:transparent}
+.price-hero{background:linear-gradient(150deg,#0f2a6e 0%,#0a1a45 100%);padding:14px 16px;border:1px solid rgba(37,99,235,.2);border-bottom:3px solid #0047BB;border-radius:6px;margin-bottom:4px}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.form-grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+.form-col{display:flex;flex-direction:column;gap:10px}
 .hero{background:linear-gradient(135deg,#0f2a6e,#0a1a45);padding:18px 22px;display:flex;align-items:flex-end;justify-content:space-between;gap:14px;flex-wrap:wrap;border:1px solid rgba(0,71,187,.2);border-bottom:3px solid #0047BB;border-radius:6px}
 .kpi{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);padding:9px 14px;text-align:center;min-width:80px;border-radius:5px}
 .kpi-red{border-color:rgba(248,113,113,.2);background:rgba(220,38,38,.06)}.kpi-green{border-color:rgba(74,222,128,.2);background:rgba(22,163,74,.06)}.kpi-blue{border-color:rgba(96,165,250,.2);background:rgba(0,71,187,.07)}
@@ -1689,7 +1883,7 @@ input::-webkit-inner-spin-button,input::-webkit-outer-spin-button{-webkit-appear
 `;
 
 // ── APP ────────────────────────────────────────────────────────────────────────
-function Calculadora({user:currentUser}){
+function Calculadora({user:currentUser, isAdmin=false}){
   const [d,setD]=useState(DEF);
   const [calcs,setCalcs]=useState(CALC_DEF);
   const [tab,setTab]=useState("perfil");
@@ -1800,6 +1994,7 @@ function Calculadora({user:currentUser}){
       currentD={d} currentCalcs={calcs}
       prodNome={prod.nome}
       onLoad={(savedD, savedCalcs)=>{setD(savedD);setCalcs(savedCalcs);}}/>}
+    {modal==="gestao"&&<ModalGestaoUsers onClose={()=>setModal(null)} currentUser={currentUser}/> }
 
     <div className="app">
     <style>{CSS}</style>
@@ -1816,23 +2011,62 @@ function Calculadora({user:currentUser}){
           style={{padding:"4px 12px",background:"rgba(0,71,187,.2)",border:"1px solid rgba(0,71,187,.45)",color:"#93c5fd",fontFamily:"'Barlow Condensed',sans-serif",fontSize:11,fontWeight:700,letterSpacing:.5,cursor:"pointer",borderRadius:20,display:"flex",alignItems:"center",gap:5}}>
           💾 Registros
         </button>
+        {isAdmin&&<button onClick={()=>setModal("gestao")}
+          style={{padding:"4px 12px",background:"rgba(5,150,105,.15)",border:"1px solid rgba(5,150,105,.4)",color:"#34d399",fontFamily:"'Barlow Condensed',sans-serif",fontSize:11,fontWeight:700,letterSpacing:.5,cursor:"pointer",borderRadius:20,display:"flex",alignItems:"center",gap:5}}>
+          👥 Gestão de Usuários
+        </button>}
       </div>
 
       <div className="layout">
         <aside className="pleft">
-          <nav className="tnav">
-            {TABS.map((t,i)=><button key={t} className={`tbtn ${tab===t?"on":""}`} onClick={()=>setTab(t)}>{TLBL[i]}</button>)}
-          </nav>
-          <div className="moeda-toggle">
-            <span>Moeda de custo</span>
-            <button className={`rgb ${isBRL?"on":""}`} onClick={()=>S("moedaCusto")("BRL")}>BRL</button>
-            <button className={`rgb ${!isBRL?"on":""}`} onClick={()=>S("moedaCusto")("USD")}>USD</button>
-            {!isBRL&&<span style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:"#7a90b0",marginLeft:4}}>× {d.ptax} = BRL</span>}
+          <div className="pscroll">
+            <div className="price-hero">
+              <div>
+                <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:9,fontWeight:700,letterSpacing:2,color:"#7a90b0",marginBottom:4}}>PREÇO DE VENDA FINAL</div>
+                <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:44,fontWeight:800,color:"#f1f5f9",letterSpacing:-1.5,lineHeight:1,display:"flex",alignItems:"flex-start",gap:4}}>
+                  <span style={{fontSize:18,fontWeight:400,color:"#0047BB",marginTop:6}}>R$</span>{n3(c.pF)}
+                </div>
+                <div style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:"#5a6a84",marginTop:4,lineHeight:1.6}}>
+                  {c.ipi>0&&`s/IPI ${brl(c.pSI)} · IPI ${brl(c.ipiV)} · `}
+                  {c.stV>0&&`ST ${brl(c.stV)} · `}
+                  {c.difal>0&&`DIFAL ${brl(c.difalV)} · `}
+                  {d.ptax>0&&<span style={{color:"#0047BB"}}>{usd(c.pUSD)}</span>}
+                </div>
+              </div>
+              <div style={{display:"flex",gap:5,flexWrap:"wrap",marginTop:8}}>
+                {[["CARGA","kpi-red",pct(c.cargaPct)],["ML","kpi-green",pct(c.margPct)],["MC","kpi-blue",pct(c.mc)],["MKP","",n3(c.mkp)+"x"]].map(([l,cls,v])=>(
+                  <div key={l} className={`kpi ${cls}`} style={{minWidth:60}}>
+                    <span style={{display:"block",fontFamily:"'Barlow Condensed',sans-serif",fontSize:7,fontWeight:700,letterSpacing:1,color:"#475569",marginBottom:2}}>{l}</span>
+                    <span style={{fontFamily:"'DM Mono',monospace",fontSize:13,fontWeight:700}}>{v}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <RevCalc precoAlvo={d.precoAlvo} onChange={S("precoAlvo")} c={c} margem={d.margem}/>
+
+            <BreakdownPanel c={c} d={d} prod={prod} ppbTot={ppbTot} calcs={calcs}/>
+          </div>
+        </aside>
+
+        <main className="pright">
+          <div className="form-topbar">
+            <nav className="tnav" style={{flex:1,background:"transparent",borderBottom:"none"}}>
+              {TABS.map((t,i)=><button key={t} className={`tbtn ${tab===t?"on":""}`} onClick={()=>setTab(t)}>{TLBL[i]}</button>)}
+            </nav>
+            <div style={{display:"flex",alignItems:"center",gap:6,padding:"0 12px",flexShrink:0}}>
+              <span style={{fontSize:10,fontWeight:700,color:"#5a6a84",letterSpacing:".4px",textTransform:"uppercase"}}>Moeda</span>
+              <button className={`rgb ${isBRL?"on":""}`} style={{padding:"3px 10px",fontSize:10}} onClick={()=>S("moedaCusto")("BRL")}>BRL</button>
+              <button className={`rgb ${!isBRL?"on":""}`} style={{padding:"3px 10px",fontSize:10}} onClick={()=>S("moedaCusto")("USD")}>USD</button>
+              {!isBRL&&<span style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:"#7a90b0"}}>×{n3(d.ptax)}</span>}
+            </div>
           </div>
           <div className="pscroll">
 
           {tab==="perfil"&&<>
-            <Sec title="Produto" tag="NCM / PLAN_TRIB">
+            <div className="form-grid">
+              <div className="form-col">
+                <Sec title="Produto" tag="NCM / PLAN_TRIB">
               <select className="psel" value={d.prodId} onChange={e=>setProd(e.target.value)}>
                 {PRODUTOS.map(p=><option key={p.id} value={p.id}>{p.ncm} -- {p.nome}</option>)}
               </select>
@@ -1902,74 +2136,58 @@ function Calculadora({user:currentUser}){
           </>}
 
           {tab==="importacao"&&<>
-            <Sec title="FOB + Frete em USD" tag="Conversao apos CFR">
-              <Box t="blue">Conversao BRL ocorre sobre o CFR (FOB+Frete). Frete em USD antes do PTAX.</Box>
-              <Field label="FOB" sfx="USD" value={d.fobUSD} onChange={S("fobUSD")}/>
-              <Field label="Frete Internacional" sfx="USD" value={d.freteUSD}
-                onChange={calcs.frete.applied?undefined:S("freteUSD")}
-                locked={calcs.frete.applied}
-                onUnlock={()=>SC("frete")({applied:false})}
-                action={<button className={`cbtn ${calcs.frete.applied?"cactive":""}`}
-                  title={calcs.frete.applied?"Recalcular frete ponderado":"Calcular frete ponderado por modal"}
-                  onClick={()=>setModal("frete")}>+/-</button>}/>
-              <DR label="CFR (FOB + Frete)" value={`${usd(c.cfrUSD)}`} bold/>
-              <Field label="PTAX (cotacao venda BC)" sfx="R$/USD" value={d.ptax} onChange={S("ptax")} hint="Cotacao do dia anterior ao Registro DI"/>
-              <div className="cvres">
-                <span>CFR convertido (BRL)</span>
-                <span style={{fontFamily:"'DM Mono',monospace",fontSize:18,fontWeight:700,color:"#93c5fd"}}>{brl(c.cfrBRL)}</span>
-              </div>
-            </Sec>
-
-            <Sec title="Encargos de Importacao" tag="II + Despesas">
-              <Field label="Aliquota II (TEC)" sfx="%" value={d.aliqII} onChange={S("aliqII")}
-                note={isZFM?"II incide mesmo na ZFM — verificar portaria MDIC/SUFRAMA":undefined}/>
-              <DR label="II sobre CFR" value={brl(c.iiV)} accent="red"/>
-              <Field label="Seguro" sfx={sfxM} value={toDisp(d.seguroBRL)} onChange={v=>S("seguroBRL")(toStore(v))}/>
-
-              {/* Despesas — toggle modo */}
-              <div style={{display:"flex",flexDirection:"column",gap:5}}>
-                <div className="desp-row">
-                  <span style={{fontSize:11,fontWeight:600,color:"#94a3b8"}}>Despesas de Importacao</span>
-                  <div className="desp-modes">
-                    <button className={`rgb ${d.despesasModo==="pct"?"on":""}`} style={{padding:"3px 8px",fontSize:9}}
-                      onClick={()=>S("despesasModo")("pct")}>% CFR</button>
-                    <button className={`rgb ${d.despesasModo==="manual"?"on":""}`} style={{padding:"3px 8px",fontSize:9}}
-                      onClick={()=>S("despesasModo")("manual")}>R$</button>
+            <div className="form-grid">
+              <div className="form-col">
+                <Sec title="FOB + Frete" tag="USD → BRL">
+                  <Box t="blue">CFR = FOB + Frete. Conversão pela PTAX.</Box>
+                  <Field label="FOB" sfx="USD" value={d.fobUSD} onChange={S("fobUSD")}/>
+                  <Field label="Frete Internacional" sfx="USD" value={d.freteUSD}
+                    onChange={calcs.frete.applied?undefined:S("freteUSD")}
+                    locked={calcs.frete.applied} onUnlock={()=>SC("frete")({applied:false})}
+                    action={<button className={`cbtn ${calcs.frete.applied?"cactive":""}`}
+                      title="Calcular frete ponderado" onClick={()=>setModal("frete")}>+/-</button>}/>
+                  <DR label="CFR (FOB + Frete)" value={usd(c.cfrUSD)} bold/>
+                  <Field label="PTAX" sfx="R$/USD" value={d.ptax} onChange={S("ptax")} hint="Cotação do dia anterior ao DI"/>
+                  <div className="cvres"><span>CFR em BRL</span>
+                    <span style={{fontFamily:"'DM Mono',monospace",fontSize:16,fontWeight:700,color:"#93c5fd"}}>{brl(c.cfrBRL)}</span>
                   </div>
-                </div>
-                {d.despesasModo==="pct"?(
-                  <>
-                    <Field label="% sobre CFR (BRL)" sfx="%" value={d.despesasPct} onChange={S("despesasPct")} hint="SISCOMEX + Despachante + Armazenagem"/>
-                    <div className="pbase"><span>Despesas calculadas</span><span>{brl(c.despesas)}</span></div>
-                  </>
-                ):(
-                  <Field label="Despesas (manual)" sfx={sfxM} value={toDisp(d.despesas)} onChange={v=>S("despesas")(toStore(v))} hint="SISCOMEX + Despachante + Armazenagem"/>
-                )}
+                </Sec>
+                {isZFM&&<Sec title="Isenções ZFM" tag="Lei 8.387/91">
+                  <Box t="ok">{"IPI = 0% · ICMS = 0% · PIS/COFINS Suspenso"}</Box>
+                </Sec>}
               </div>
-
-              <Field label="Custo Financeiro de Importacao" sfx={sfxM} value={toDisp(d.cfImp)}
-                onChange={calcs.cfImp.applied?undefined:v=>S("cfImp")(toStore(v))}
-                locked={calcs.cfImp.applied}
-                onUnlock={()=>SC("cfImp")({applied:false})}
-                hint="Juros/IOF — entra no VPL"
-                action={<button className={`cbtn ${calcs.cfImp.applied?"cactive":""}`}
-                  title={calcs.cfImp.applied?"Recalcular custo financeiro":"Calcular custo financeiro"}
-                  onClick={()=>setModal("cfImp")}>$</button>}/>
-              <Field label="CRA / Creditos Fiscais" sfx={sfxM} value={toDisp(d.cra)} onChange={v=>S("cra")(toStore(v))} hint="Certificados / creditos — entram no VPL"/>
-            </Sec>
-
-            <Sec title="Resumo" hl>
-              <DR label="CFR (USD->BRL)" value={brl(c.cfrBRL)}/>
-              <DR label="(+) II" value={brl(c.iiV)} accent="red"/>
-              <DR label="(+) Seguro" value={brl(d.seguroBRL)}/>
-              <DR label={`(+) Despesas (${d.despesasModo==="pct"?pct(d.despesasPct)+" CFR":"manual"})`} value={brl(c.despesas)}/>
-              <DR label="CMV Importacao" value={brl(c.cmvImp)} bold sep/>
-              <DR label="VPL (base BKP)" value={brl(c.vpl)} bold accent="blue"/>
-            </Sec>
-
-            {isZFM&&<Sec title="Isencoes ZFM na Entrada" tag="Lei 8.387/91">
-              <Box t="ok">{"IPI importacao = 0% (Lei 8.387/91)\nICMS importacao = 0% (Conv. ICMS 65/88)\nPIS/COFINS importacao = Suspenso (Lei 10.996/04)\n-> Sem credito nem custo na entrada ZFM"}</Box>
-            </Sec>}
+              <div className="form-col">
+                <Sec title="Encargos de Importação" tag="II + Despesas">
+                  <Field label="Alíquota II (TEC)" sfx="%" value={d.aliqII} onChange={S("aliqII")}
+                    note={isZFM?"II incide mesmo na ZFM":undefined}/>
+                  <DR label="II sobre CFR" value={brl(c.iiV)} accent="red"/>
+                  <Field label={`Seguro (${sfxM})`} sfx={sfxM} value={toDisp(d.seguroBRL)} onChange={v=>S("seguroBRL")(toStore(v))}/>
+                  <div className="desp-row">
+                    <span style={{fontSize:11,fontWeight:600,color:"#dce7f7"}}>Despesas Imp.</span>
+                    <div className="desp-modes">
+                      <button className={`rgb ${d.despesasModo==="pct"?"on":""}`} style={{padding:"3px 8px",fontSize:9}} onClick={()=>S("despesasModo")("pct")}>% CFR</button>
+                      <button className={`rgb ${d.despesasModo==="manual"?"on":""}`} style={{padding:"3px 8px",fontSize:9}} onClick={()=>S("despesasModo")("manual")}>{sfxM}</button>
+                    </div>
+                  </div>
+                  {d.despesasModo==="pct"
+                    ?<><Field label="% sobre CFR" sfx="%" value={d.despesasPct} onChange={S("despesasPct")} hint="SISCOMEX+Despachante+Armazenagem"/>
+                       <div className="pbase"><span>Despesas</span><span>{brl(c.despesas)}</span></div></>
+                    :<Field label={`Despesas (${sfxM})`} sfx={sfxM} value={toDisp(d.despesas)} onChange={v=>S("despesas")(toStore(v))} hint="SISCOMEX+Despachante+Armazenagem"/>
+                  }
+                </Sec>
+                <Sec title="Custo Financeiro + CRA" tag="VPL">
+                  <Field label={`CF Importação (${sfxM})`} sfx={sfxM} value={toDisp(d.cfImp)}
+                    onChange={calcs.cfImp.applied?undefined:v=>S("cfImp")(toStore(v))}
+                    locked={calcs.cfImp.applied} onUnlock={()=>SC("cfImp")({applied:false})}
+                    hint="Juros/IOF — entra no VPL"
+                    action={<button className={`cbtn ${calcs.cfImp.applied?"cactive":""}`}
+                      title="Calcular CF" onClick={()=>setModal("cfImp")}>$</button>}/>
+                  <Field label={`CRA / Créditos (${sfxM})`} sfx={sfxM} value={toDisp(d.cra)} onChange={v=>S("cra")(toStore(v))} hint="Entram no VPL"/>
+                  <DR label="CMV Importação" value={brl(c.cmvImp)} bold sep/>
+                  <DR label="VPL" value={brl(c.vpl)} bold accent="blue"/>
+                </Sec>
+              </div>
+            </div>
           </>}
 
           {tab==="ppb"&&<>
@@ -2002,67 +2220,80 @@ function Calculadora({user:currentUser}){
           </>}
 
           {tab==="producao"&&<>
-            <Sec title="Custos de Producao" tag="BRL">
-              <Field label="Producao / Montagem" sfx={sfxM} value={toDisp(d.producao)} onChange={v=>S("producao")(toStore(v))}/>
-              <Field label="Garantia" sfx={sfxM} value={toDisp(d.garantia)} onChange={v=>S("garantia")(toStore(v))}/>
-              <Field label="Outros Custos BRL" sfx={sfxM} value={toDisp(d.outrosBRL)} onChange={v=>S("outrosBRL")(toStore(v))}/>
-            </Sec>
-            <Sec title="BKP — Backup de Custodia" tag="% sobre VPL" hl>
-              <Box t="blue">BKP = % sobre o VPL (CFR+II+Desp+Seguro+CF+PPB+CRA).</Box>
-              <DR label="VPL (base)" value={brl(c.vpl)} bold accent="blue"/>
-              <Field label="BKP (%)" sfx="%" value={d.bkpPct} onChange={S("bkpPct")} hint={`= ${brl(c.bkpV)}`}/>
-              <DR label="BKP (R$)" value={brl(c.bkpV)} accent="blue"/>
-            </Sec>
-            <Sec title="Resumo Custos" hl>
-              <DR label="CMV Importacao" value={brl(c.cmvImp)}/>
-              <DR label="PPB" value={brl(ppbTot)}/>
-              <DR label="Producao + BRL" value={brl(d.producao+d.garantia+d.outrosBRL)}/>
-              <DR label="BKP" value={brl(c.bkpV)}/>
-              <DR label="CMV Total" value={brl(c.cmvTotal)} bold sep accent="blue"/>
-            </Sec>
+            <div className="form-grid">
+              <div className="form-col">
+                <Sec title="Custos de Produção" tag="sempre R$">
+                  <Box t="gray">Produção, Garantia e Outros sempre em R$ — independente da moeda de importação.</Box>
+                  <Field label="Produção / Montagem" sfx="R$" value={d.producao} onChange={S("producao")}/>
+                  <Field label="Garantia" sfx="R$" value={d.garantia} onChange={S("garantia")}/>
+                  <Field label="Outros Custos BRL" sfx="R$" value={d.outrosBRL} onChange={S("outrosBRL")}/>
+                </Sec>
+              </div>
+              <div className="form-col">
+                <Sec title="BKP — Backup de Custódia" tag="% sobre VPL" hl>
+                  <Box t="blue">BKP = % sobre VPL (CFR+II+Desp+Seguro+CF+PPB+CRA).</Box>
+                  <DR label="VPL (base)" value={brl(c.vpl)} bold accent="blue"/>
+                  <Field label="BKP (%)" sfx="%" value={d.bkpPct} onChange={S("bkpPct")} hint={`= ${brl(c.bkpV)}`}/>
+                  <DR label="BKP (R$)" value={brl(c.bkpV)} accent="blue"/>
+                </Sec>
+                <Sec title="Resumo Custos" hl>
+                  <DR label="CMV Importação" value={brl(c.cmvImp)}/>
+                  <DR label="PPB" value={brl(ppbTot)}/>
+                  <DR label="Produção + BRL" value={brl(d.producao+d.garantia+d.outrosBRL)}/>
+                  <DR label="BKP" value={brl(c.bkpV)}/>
+                  <DR label="CMV Total" value={brl(c.cmvTotal)} bold sep accent="blue"/>
+                </Sec>
+              </div>
+            </div>
           </>}
 
           {tab==="indices"&&<>
-            <Sec title="Indices Comerciais" tag="% sobre preco venda">
-              <Box t="gray">Todos os percentuais sao calculados por dentro do preco de venda.</Box>
-              {[["P&D","pd"],["Scrap","scrap"],["Royalties / Qualcomm","royal"],
-              ].map(([l,k])=>(
-                <Field key={k} label={l} value={d[k]} onChange={S(k)} sfx="%" hint={`aprox. ${brl(c.pSI*(d[k]/100))}`}/>
-              ))}
-              <Field label="Custo Financeiro (venda)" sfx="%" value={d.cfVenda}
-                onChange={calcs.cfVenda.applied?undefined:S("cfVenda")}
-                locked={calcs.cfVenda.applied}
-                onUnlock={()=>SC("cfVenda")({applied:false})}
-                hint={calcs.cfVenda.applied?`prazo ${calcs.cfVenda.prazo}d taxa ${calcs.cfVenda.taxa}% — ${brl(c.cfnV)}`:`aprox. ${brl(c.cfnV)}`}
-                action={<button className={`cbtn ${calcs.cfVenda.applied?"cactive":""}`}
-                  title="Calcular CF venda por prazo e taxa" onClick={()=>setModal("cfVenda")}>%</button>}/>
-              {[["Frete","frete"],["Comissao","comis"],
-                ["Marketing","mkt"],["Rebate","rebate"],
-              ].map(([l,k])=>(
-                <Field key={k} label={l} value={d[k]} onChange={S(k)} sfx="%" hint={`aprox. ${brl(c.pSI*(d[k]/100))}`}/>
-              ))}
-              {/* Encargos sobre comissoes = comis / 3 x 2 — fechado, calculado automaticamente */}
-              <div style={{display:"flex",alignItems:"flex-start",gap:8,justifyContent:"space-between"}}>
-                <div style={{flex:1,display:"flex",flexDirection:"column",gap:2}}>
-                  <span style={{fontSize:12,fontWeight:600,color:"#dce7f7",letterSpacing:".3px"}}>Encargos sobre comissoes</span>
-                  <span style={{fontSize:10,color:"#7a90b0",fontFamily:"'DM Mono',monospace"}}>= Comissao / 3 x 2 = {pct(c.comisXPct)} — calculado automaticamente</span>
-                </div>
-                <div className="fw fro" style={{minWidth:115}}>
-                  <span className="fpre">%</span>
-                  <input type="text" readOnly value={String(+(c.comisXPct||0).toFixed(3)).replace(".",",")}
-                    style={{background:"none",border:"none",outline:"none",fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:500,color:"#94a3b8",padding:"5px 8px",width:80,textAlign:"right"}}/>
-                </div>
+            <div className="form-grid">
+              <div className="form-col">
+                <Sec title="Índices Gerais" tag="% s/ preço">
+                  <Box t="gray">Calculados por dentro do preço de venda.</Box>
+                  {[["P&D","pd"],["Scrap","scrap"],["Royalties / Qualcomm","royal"],["Frete venda","frete"]
+                  ].map(([l,k])=>(
+                    <Field key={k} label={l} value={d[k]} onChange={S(k)} sfx="%" hint={`≈ ${brl(c.pSI*(d[k]/100))}`}/>
+                  ))}
+                </Sec>
+                <Sec title="Índices Comerciais" tag="% s/ preço">
+                  <Field label="CF Venda" sfx="%" value={d.cfVenda}
+                    onChange={calcs.cfVenda.applied?undefined:S("cfVenda")}
+                    locked={calcs.cfVenda.applied} onUnlock={()=>SC("cfVenda")({applied:false})}
+                    hint={calcs.cfVenda.applied?`${calcs.cfVenda.prazo}d @ ${calcs.cfVenda.taxa}%`:`≈ ${brl(c.cfnV)}`}
+                    action={<button className={`cbtn ${calcs.cfVenda.applied?"cactive":""}`}
+                      title="Calcular CF venda" onClick={()=>setModal("cfVenda")}>%</button>}/>
+                  {[["Comissão","comis"],["Marketing","mkt"],["Rebate","rebate"]
+                  ].map(([l,k])=>(
+                    <Field key={k} label={l} value={d[k]} onChange={S(k)} sfx="%" hint={`≈ ${brl(c.pSI*(d[k]/100))}`}/>
+                  ))}
+                  <div style={{display:"flex",alignItems:"flex-start",gap:8,justifyContent:"space-between"}}>
+                    <div style={{flex:1}}>
+                      <span style={{fontSize:12,fontWeight:600,color:"#dce7f7"}}>Encargos s/ comissões</span>
+                      <div style={{fontSize:10,color:"#7a90b0",fontFamily:"'DM Mono',monospace"}}>= {pct(c.comisXPct)} (auto)</div>
+                    </div>
+                    <div className="fw fro" style={{minWidth:100}}>
+                      <span className="fpre">%</span>
+                      <input readOnly value={String(+(c.comisXPct||0).toFixed(3)).replace(".",",")}
+                        style={{background:"none",border:"none",outline:"none",fontFamily:"'DM Mono',monospace",fontSize:11,color:"#94a3b8",padding:"5px 8px",width:70,textAlign:"right"}}/>
+                    </div>
+                  </div>
+                  <DR label="Total Índices" value={pct(c.indPct)} bold sep accent="blue"/>
+                </Sec>
               </div>
-              <DR label="Total indices" value={pct(c.indPct)} bold sep accent="blue"/>
-            </Sec>
-            <Sec title="Custo Fixo" tag="% sobre preco venda">
-              <Box t="gray">{"Custo Fixo esta separado dos demais indices pois compoe a MC junto com a Margem Liquida.\nMC = ML + CF  |  MC = Margem de Contribuicao  |  ML = Margem Liquida"}</Box>
-              <Field label="Custo Fixo" value={d.cfixo} onChange={S("cfixo")} sfx="%" hint={`aprox. ${brl(c.cfxV)}`}/>
-            </Sec>
-            <Sec title="Margem Liquida (ML)" hl>
-              <Field label="Margem Liquida desejada" value={d.margem} onChange={S("margem")} sfx="%" hint="% sobre preco de venda (por dentro)"/>
-              <DR label="MC = ML + Custo Fixo" value={pct(c.mc)} bold accent="blue"/>
-            </Sec>
+              <div className="form-col">
+                <Sec title="Custo Fixo" tag="% s/ preço">
+                  <Box t="gray">CF compõe a MC junto com a ML.&#10;MC = ML + CF</Box>
+                  <Field label="Custo Fixo" value={d.cfixo} onChange={S("cfixo")} sfx="%" hint={`≈ ${brl(c.cfxV)}`}/>
+                </Sec>
+                <Sec title="Margem Líquida (ML)" hl>
+                  <Field label="Margem Líquida desejada" value={d.margem} onChange={S("margem")} sfx="%" hint="% por dentro do preço"/>
+                  <DR label="MC = ML + Custo Fixo" value={pct(c.mc)} bold accent="blue"/>
+                  <DR label="Markup s/ CMV" value={`${n3(c.mkp)}x`} accent="blue"/>
+                </Sec>
+              </div>
+            </div>
           </>}
 
           {tab==="venda"&&<>
@@ -2122,35 +2353,6 @@ function Calculadora({user:currentUser}){
           </>}
 
           </div>
-        </aside>
-
-        <main className="pright">
-          <div className="hero">
-            <div>
-              <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:9,fontWeight:700,letterSpacing:2,color:"#475569",marginBottom:5}}>PRECO DE VENDA FINAL</div>
-              <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:52,fontWeight:800,color:"#f1f5f9",letterSpacing:-2,lineHeight:1,display:"flex",alignItems:"flex-start",gap:5}}>
-                <span style={{fontSize:22,fontWeight:400,color:"#0047BB",marginTop:8}}>R$</span>{n3(c.pF)}
-              </div>
-              <div style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:"#475569",marginTop:5,lineHeight:1.7}}>
-                Sem IPI: {brl(c.pSI)}{c.ipi>0?` — IPI: ${brl(c.ipiV)}`:""}
-                {c.stV>0?` — ST: ${brl(c.stV)}`:""}
-                {c.difal>0?` — DIFAL: ${brl(c.difalV)}`:""}
-                {d.ptax>0?<span style={{color:"#0047BB"}}> — {usd(c.pUSD)}</span>:""}
-              </div>
-            </div>
-            <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
-              {[["CARGA TRIB.",pct(c.cargaPct),"kpi-red"],["ML (Margem Liq.)",pct(c.margPct),"kpi-green"],["MC = ML+CF",pct(c.mc),""],["MARKUP",n3(c.mkp)+"x","kpi-blue"]].map(([l,v,cls])=>(
-                <div key={l} className={`kpi ${cls}`}>
-                  <span style={{display:"block",fontFamily:"'Barlow Condensed',sans-serif",fontSize:8,fontWeight:700,letterSpacing:1,color:"#475569",marginBottom:3}}>{l}</span>
-                  <span style={{fontFamily:"'DM Mono',monospace",fontSize:15,fontWeight:700}}>{v}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <RevCalc precoAlvo={d.precoAlvo} onChange={S("precoAlvo")} c={c} margem={d.margem}/>
-
-          <BreakdownPanel c={c} d={d} prod={prod} ppbTot={ppbTot} calcs={calcs}/>
         </main>
       </div>
     </div>
@@ -2231,10 +2433,7 @@ export default function App() {
         </div>
 
         <div className="dash-body">
-          {isAdmin
-            ? <PainelAdmin currentUser={user}/>
-            : <Calculadora user={user}/>
-          }
+          <Calculadora user={user} isAdmin={isAdmin}/>
         </div>
       </div>
     </>
