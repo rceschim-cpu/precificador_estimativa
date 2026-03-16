@@ -460,8 +460,6 @@ function BreakdownPanel({c,d,prod,ppbTot,calcs}){
   const vplDisp=cmvImpTotal+ppbTot+(d.cra||0);
   const garantiaBkp=d.garantia+c.bkpV;
   const custosLocais=d.producao+d.outrosBRL;
-  const pcVNominal=c.pSI*(c.pcPct/100);
-  const pcSubvSaving=pcVNominal-c.pcV;
   const totalImp=c.cargaTot+(c.ftiPct>0?c.ftiV:0);
   const totalIndGerPct=d.pd+d.scrap+d.royal+d.frete;
   const totalIndGerV=c.pdV+c.scV+c.ryV+c.frV;
@@ -518,9 +516,11 @@ function BreakdownPanel({c,d,prod,ppbTot,calcs}){
 
       {/* ── IMPOSTOS DE VENDA ── */}
       <GH t="IMPOSTOS DE VENDA"/>
-      <R l={`P/C nominal (${pct(c.pcPct)})`} v={pcVNominal} p={c.pcPct} acc="red"/>
-      {pcSubvSaving>0.001&&<R l={`(-) Subvenção ICMS destacado (${pct(c.aliqInter)})`} v={-pcSubvSaving} p={-(c.pcPct-c.pcEf)} indent acc="green"/>}
-      <R l={`P/C efetivo (${pct(c.pcEf)})`} v={c.pcV} p={c.pcEf} indent bold/>
+      <R l={`P/C nominal (${pct(c.pcPct)})`} v={c.pSI*(c.pcPct/100)} p={c.pcPct} acc="red"/>
+      {c.pcBaseRedPct>0.001&&<R l={`(-) Redução base — ICMS incidente NF (${pct(c.aliqInter)})`} v={-c.pSI*(c.pcBaseRedPct/100)} p={-c.pcBaseRedPct} indent acc="green"/>}
+      {c.pcSubvPct>0.001&&<R l={`(+) P/C sobre subvenção — crédito (${pct(c.pcSubvPct)})`} v={c.pcSubvV} p={c.pcSubvPct} indent acc="red"/>}
+      {c.difal>0&&<R l={`(-) Redução base — DIFAL (${pct(c.difal)})`} v={-c.pSI*(c.pcPct*c.difal/100/100)} p={-(c.pcPct*c.difal/100)} indent acc="green"/>}
+      <R l={`P/C efetivo no preço (${pct(c.pcEf)})`} v={c.pcV} p={c.pcEf} bold sep/>
       {c.icmsEfPct>0&&<R l={`ICMS efetivo (${pct(c.icmsEfPct)})`} v={c.icmsEfV} p={c.icmsEfPct} acc="red"/>}
       {c.difal>0&&<R l={`DIFAL (${pct(c.difal)})`} v={c.difalV} p={c.difal} acc="red"/>}
       {c.ipi>0&&<R l={`IPI (${pct(c.ipi)})`} v={c.ipiV} p={c.ipi} acc="red"/>}
@@ -769,7 +769,7 @@ export default function App(){
     const deveDifal=d.tipoComprador==="naocontrib"||(d.tipoComprador==="contrib"&&d.destinacaoCliente==="imobilizado");
     if(!intra&&deveDifal){const delta=aliqDest-aliqInter;if(delta>0)difal=(prod.aliqST>0&&delta<prod.aliqST)?0:delta;}
 
-    const pcEf=pcPct*(1-(aliqInter+difal)/100);
+    const pcEf=pcPct*(1-(icmsEfPct+difal)/100);  // líquido: base reduzida por ICMS − P/C sobre crédito
     const ftiPct=(isZFM&&d.ftiAtivo)?prod.fti:0;
     const fcpPct=FCP[ufD]||0;
     const ipi=prod.ipi;
@@ -780,6 +780,11 @@ export default function App(){
     const ipiV=pSI*(ipi/100),pCI=pSI+ipiV;
     const pcV=pSI*(pcEf/100),icmsV=pSI*(aliqInter/100);
     const icmsEfV=pSI*(icmsEfPct/100),difalV=pSI*(difal/100);
+    // P/C subvenção: P/C que incide sobre o crédito presumido recebido (custo adicional, não economia)
+    const pcSubvPct=pcPct*(prod.cred/100);   // ex: 9,25% × 12% = 1,11%
+    const pcSubvV=pSI*(pcSubvPct/100);
+    // P/C base (só redução por incidência ICMS, sem o custo subvenção)
+    const pcBaseRedPct=pcPct*(aliqInter/100);
     const ftiV=pSI*(ftiPct/100),fcpV=pSI*(fcpPct/100);
     const margV=pSI*(d.margem/100);
     const pdV=pSI*(d.pd/100),cfxV=pSI*(d.cfixo/100);
@@ -803,7 +808,7 @@ export default function App(){
       margemAlvo=pSIa>0?(1-cmvTotal/pSIa)*100-sf*100:null;
     }
     return{cfrUSD,cfrBRL,iiV,vpl,bkpV,cfrImp,cmvImp,cmvTotal,ppbTot,despesas,
-      pcPct,pcEf,pcLabel,pcV,aliqInter,aliqDest,icmsEfPct,icmsV,icmsEfV,
+      pcPct,pcEf,pcLabel,pcV,pcSubvPct,pcSubvV,pcBaseRedPct,aliqInter,aliqDest,icmsEfPct,icmsV,icmsEfV,
       difal,difalV,ftiPct,ftiV,fcpPct,fcpV,ipi,ipiV,pSI,pCI,
       margV,indPct,pdV,cfxV,scV,ryV,cfnV,frV,cmV,mktV,rebateV,stV,stBase,pF,pUSD,
       cargaTot,cargaPct,margPct,mc,mkp,ufO,intra,deveDifal,margemAlvo,comisXPct};
@@ -1128,14 +1133,14 @@ export default function App(){
               </div>
             </Sec>
             <Sec title="P/C — Subvencao / Credito Estimulo" hl>
-              <Box t="blue">{"A incidencia do ICMS (aliq. destacada na NF) reduz a base de calculo do P/C — independente do credito presumido.\nFormula: P/C efetivo = P/C nominal x (1 - ICMS incidente% - DIFAL%)"}</Box>
+              <Box t="blue">{"P/C incide sobre o preco liquido de ICMS (base reduzida) E tambem sobre o credito presumido recebido (subvencao = receita tributavel por P/C).\nFormula: P/C ef. = P/C nominal x (1 - ICMS efetivo%) onde ICMS ef. = ICMS destacado - credito"}</Box>
               <DR label="P/C nominal (debito)" value={pct(c.pcPct)}/>
-              <DR label={`(-) ICMS incidente NF (${c.ufO}->${d.ufDestino})`} value={pct(c.aliqInter)} accent="red"/>
-              {c.difal>0&&<DR label={`(-) DIFAL`} value={pct(c.difal)} accent="red"/>}
+              <DR label={`(-) Reducao base — ICMS incidente NF (${pct(c.aliqInter)})`} value={`(${pct(c.pcBaseRedPct)})`} accent="green"/>
+              {c.pcSubvPct>0.001&&<DR label={`(+) P/C sobre subvencao — credito (${pct(prod.cred)})`} value={pct(c.pcSubvPct)} accent="red"/>}
+              {c.difal>0&&<DR label={`(-) Reducao base — DIFAL (${pct(c.difal)})`} value={`(${pct(c.pcPct*c.difal/100)})`} accent="green"/>}
               <DR label="P/C efetivo no preco" value={pct(c.pcEf)} bold accent="blue" sep/>
-              <DR label="Reducao de base P/C" value={pct(c.pcPct-c.pcEf)} accent="green"/>
-              <DR label="Economia em R$ (vs. sem subvencao)" value={brl(c.pSI*(c.pcPct-c.pcEf)/100)} accent="green" bold/>
-              <Box t={prod.cred>0?"ok":"gray"}>{prod.cred>0?`Credito presumido/estimulo: ${pct(prod.cred)} — reduz custo do ICMS, mas NAO altera a base do P/C.`:"Produto sem credito presumido cadastrado."}</Box>
+              {c.pcSubvPct>0.001&&<Box t="warn">{`P/C subvencao: ${pct(c.pcSubvPct)} e um CUSTO — o credito presumido (${pct(prod.cred)}) recebido e tratado como receita de subvencao, sobre a qual P/C incide.`}</Box>}
+              {c.pcSubvPct<0.001&&prod.cred===0&&<Box t="gray">Sem credito presumido cadastrado — P/C incide apenas sobre base reduzida pelo ICMS.</Box>}
             </Sec>
             <Sec title="ICMS: Destacado x Efetivo (custo)">
               <DR label={`ICMS destacado NF (${c.ufO}->${d.ufDestino})`} value={pct(c.aliqInter)}/>
