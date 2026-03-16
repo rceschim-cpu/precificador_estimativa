@@ -1,4 +1,698 @@
-import { useState, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
+
+// ── STORAGE ──────────────────────────────────────────────────────────────────
+const KEYS = { users: "ptc_users", session: "ptc_session" };
+
+const MASTER = {
+  id: "master",
+  nome: "Administrador",
+  email: "admin@positec.com.br",
+  senha: "Positec@2026",
+  perfil: "admin",
+  status: "ativo",
+  criadoEm: new Date("2026-01-01").toISOString(),
+  aprovadoEm: new Date("2026-01-01").toISOString(),
+  aprovadoPor: "sistema",
+};
+
+const PERFIS = {
+  admin:     { label: "Administrador",      cor: "#0047BB", icone: "⚙️",  desc: "Acesso total. Aprova usuários, configura parâmetros." },
+  custos:    { label: "Depto. de Custos",   cor: "#059669", icone: "📦", desc: "Acesso completo à calculadora. Edita VPL, fábricas, PPB." },
+  comercial: { label: "Depto. Comercial",   cor: "#7c3aed", icone: "📊", desc: "Visualiza CMV. Edita canal, margem e descontos." },
+  proposta:  { label: "Criação de Proposta",cor: "#d97706", icone: "🏷️",  desc: "Formulário simplificado de precificação por produto." },
+  vpl:       { label: "Atualização de VPL", cor: "#dc2626", icone: "🔄", desc: "Acesso restrito ao módulo VPL real." },
+};
+
+const loadUsers  = () => { try { return JSON.parse(localStorage.getItem(KEYS.users) || "[]"); } catch { return []; } };
+const saveUsers  = (u) => localStorage.setItem(KEYS.users, JSON.stringify(u));
+const loadSession = () => { try { return JSON.parse(localStorage.getItem(KEYS.session) || "null"); } catch { return null; } };
+const saveSession = (s) => s ? localStorage.setItem(KEYS.session, JSON.stringify(s)) : localStorage.removeItem(KEYS.session);
+
+const getAllUsers = () => {
+  const stored = loadUsers();
+  const hasMaster = stored.find(u => u.id === "master");
+  return hasMaster ? stored : [MASTER, ...stored];
+};
+
+// ── HELPERS ──────────────────────────────────────────────────────────────────
+const fmtDate = (iso) => iso ? new Date(iso).toLocaleString("pt-BR", { day:"2-digit", month:"2-digit", year:"numeric", hour:"2-digit", minute:"2-digit" }) : "—";
+const initials = (nome) => nome ? nome.split(" ").slice(0,2).map(w=>w[0]).join("").toUpperCase() : "?";
+
+// ── CSS ──────────────────────────────────────────────────────────────────────
+const CSS_AUTH = `
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Instrument+Sans:wght@400;500;600&display=swap');
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:#0c0e14;color:#e8eaf0;font-family:'Instrument Sans',sans-serif;min-height:100vh;overflow-x:hidden}
+input,select,textarea,button{font-family:inherit}
+
+/* ── TOKENS ── */
+:root{
+  --bg:       #0c0e14;
+  --surface:  #13161f;
+  --card:     #191c27;
+  --border:   rgba(255,255,255,.08);
+  --border2:  rgba(255,255,255,.13);
+  --text:     #e8eaf0;
+  --muted:    #7a7f96;
+  --blue:     #0047BB;
+  --blue2:    #1a65d4;
+  --blue-glow:rgba(0,71,187,.25);
+}
+
+/* ── LAYOUT ── */
+.root{min-height:100vh;display:flex;flex-direction:column}
+
+/* ── AUTH SCREEN ── */
+.auth-wrap{
+  min-height:100vh;display:flex;align-items:center;justify-content:center;
+  background:radial-gradient(ellipse 80% 60% at 50% 0%, rgba(0,71,187,.18) 0%, transparent 70%),
+             radial-gradient(ellipse 40% 40% at 80% 80%, rgba(0,71,187,.08) 0%, transparent 60%),
+             #0c0e14;
+  padding:24px;
+}
+.auth-box{
+  width:100%;max-width:420px;
+  background:rgba(19,22,31,.9);
+  border:1px solid var(--border2);
+  backdrop-filter:blur(20px);
+  padding:0;
+  position:relative;
+  overflow:hidden;
+  animation:fadeUp .4s ease;
+}
+.auth-box::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:3px;
+  background:linear-gradient(90deg,#0047BB,#1a65d4,#0047BB);
+}
+@keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+
+.auth-head{padding:32px 32px 0;display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center}
+.auth-logo{display:flex;align-items:center;gap:10px}
+.auth-mark{width:36px;height:36px;background:#0047BB;display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-size:18px;font-weight:800;color:#fff}
+.auth-brand{font-family:'Syne',sans-serif;font-size:20px;font-weight:800;color:#fff;letter-spacing:.5px}
+.auth-title{font-family:'Syne',sans-serif;font-size:22px;font-weight:700;color:#fff;margin-top:8px}
+.auth-sub{font-size:13px;color:var(--muted);line-height:1.5}
+
+.auth-body{padding:28px 32px 32px;display:flex;flex-direction:column;gap:16px}
+.auth-tabs{display:flex;border:1px solid var(--border);background:rgba(255,255,255,.03);margin-bottom:4px}
+.auth-tab{flex:1;padding:10px;background:none;border:none;color:var(--muted);font-size:13px;font-weight:600;cursor:pointer;transition:.15s;letter-spacing:.3px}
+.auth-tab.on{background:var(--blue);color:#fff}
+.auth-tab:hover:not(.on){color:var(--text);background:rgba(255,255,255,.04)}
+
+.fld{display:flex;flex-direction:column;gap:6px}
+.fld label{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.8px}
+.fld input,.fld select{
+  background:#0c0e14;border:1px solid var(--border2);color:var(--text);
+  padding:11px 14px;font-size:14px;outline:none;transition:.15s;
+  font-family:'Instrument Sans',sans-serif;
+}
+.fld input:focus,.fld select:focus{border-color:#0047BB;box-shadow:0 0 0 3px var(--blue-glow)}
+.fld input::placeholder{color:#3a3f55}
+
+.btn-primary{
+  width:100%;padding:13px;background:#0047BB;border:none;color:#fff;
+  font-family:'Syne',sans-serif;font-size:14px;font-weight:700;letter-spacing:.5px;
+  cursor:pointer;transition:.15s;text-transform:uppercase;
+}
+.btn-primary:hover{background:#1a65d4}
+.btn-primary:disabled{opacity:.45;cursor:not-allowed}
+
+.auth-msg{padding:10px 14px;font-size:13px;line-height:1.5;border-left:3px solid}
+.auth-msg.err{background:rgba(220,38,38,.1);border-color:#dc2626;color:#f87171}
+.auth-msg.ok{background:rgba(5,150,105,.1);border-color:#059669;color:#34d399}
+.auth-msg.warn{background:rgba(217,119,6,.1);border-color:#d97706;color:#fbbf24}
+
+/* ── DASHBOARD ── */
+.dash{display:flex;flex-direction:column;min-height:100vh;height:100vh;overflow:hidden}
+.topbar{
+  background:var(--surface);border-bottom:1px solid var(--border);
+  padding:0 28px;height:58px;display:flex;align-items:center;gap:16px;
+  position:relative;z-index:100;flex-shrink:0;
+}
+.topbar-logo{display:flex;align-items:center;gap:9px;flex-shrink:0}
+.topbar-mark{width:30px;height:30px;background:#0047BB;display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-size:14px;font-weight:800;color:#fff;flex-shrink:0}
+.topbar-name{font-family:'Syne',sans-serif;font-size:15px;font-weight:700;color:#fff}
+.topbar-divider{width:1px;height:24px;background:var(--border);flex-shrink:0}
+.topbar-title{font-size:13px;color:var(--muted);font-weight:500}
+.topbar-spacer{flex:1}
+.topbar-user{display:flex;align-items:center;gap:10px}
+.topbar-avatar{width:32px;height:32px;border-radius:50%;background:#0047BB;display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-size:12px;font-weight:700;color:#fff;flex-shrink:0}
+.topbar-uname{font-size:13px;font-weight:600;color:var(--text)}
+.topbar-uperfil{font-size:11px;color:var(--muted)}
+.btn-logout{padding:7px 14px;background:rgba(255,255,255,.05);border:1px solid var(--border);color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;transition:.15s;letter-spacing:.3px}
+.btn-logout:hover{border-color:var(--border2);color:var(--text)}
+
+.dash-body{display:flex;flex:1;min-height:0;overflow:hidden}
+.sidebar{width:220px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);padding:16px 0;display:flex;flex-direction:column;gap:2px}
+.snav-item{display:flex;align-items:center;gap:11px;padding:10px 20px;cursor:pointer;color:var(--muted);font-size:13px;font-weight:500;transition:.15s;border-left:3px solid transparent}
+.snav-item:hover{background:rgba(255,255,255,.03);color:var(--text)}
+.snav-item.on{border-left-color:#0047BB;background:rgba(0,71,187,.1);color:#fff;font-weight:600}
+.snav-icon{font-size:16px;flex-shrink:0;width:22px;text-align:center}
+.snav-sep{height:1px;background:var(--border);margin:8px 16px}
+
+.main-content{flex:1;padding:28px;overflow-y:auto;background:var(--bg)}
+
+/* ── CARDS ── */
+.page-title{font-family:'Syne',sans-serif;font-size:24px;font-weight:800;color:#fff;margin-bottom:6px}
+.page-sub{font-size:13px;color:var(--muted);margin-bottom:24px}
+
+.stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:24px}
+.stat-card{background:var(--card);border:1px solid var(--border);padding:18px;display:flex;flex-direction:column;gap:6px}
+.stat-label{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.8px}
+.stat-val{font-family:'Syne',sans-serif;font-size:30px;font-weight:800;color:#fff;line-height:1}
+.stat-sub{font-size:11px;color:var(--muted)}
+.stat-card.blue{border-color:rgba(0,71,187,.3);background:rgba(0,71,187,.08)}
+.stat-card.blue .stat-val{color:#93c5fd}
+.stat-card.green{border-color:rgba(5,150,105,.3);background:rgba(5,150,105,.08)}
+.stat-card.green .stat-val{color:#34d399}
+.stat-card.amber{border-color:rgba(217,119,6,.3);background:rgba(217,119,6,.08)}
+.stat-card.amber .stat-val{color:#fbbf24}
+.stat-card.red{border-color:rgba(220,38,38,.3);background:rgba(220,38,38,.08)}
+.stat-card.red .stat-val{color:#f87171}
+
+/* ── TABLE ── */
+.tbl-wrap{background:var(--card);border:1px solid var(--border);overflow:hidden}
+.tbl-head{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px}
+.tbl-head-title{font-family:'Syne',sans-serif;font-size:14px;font-weight:700;color:#fff}
+.tbl-search{background:#0c0e14;border:1px solid var(--border);color:var(--text);padding:7px 12px;font-size:13px;outline:none;min-width:200px;transition:.15s}
+.tbl-search:focus{border-color:#0047BB}
+.tbl-search::placeholder{color:#3a3f55}
+table{width:100%;border-collapse:collapse}
+th{padding:10px 18px;text-align:left;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;border-bottom:1px solid var(--border);background:rgba(255,255,255,.02)}
+td{padding:13px 18px;font-size:13px;color:var(--text);border-bottom:1px solid rgba(255,255,255,.04)}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:rgba(255,255,255,.02)}
+
+/* ── BADGES ── */
+.badge{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;font-size:11px;font-weight:700;letter-spacing:.4px;border-radius:20px}
+.badge-ativo{background:rgba(5,150,105,.15);color:#34d399;border:1px solid rgba(5,150,105,.3)}
+.badge-pendente{background:rgba(217,119,6,.15);color:#fbbf24;border:1px solid rgba(217,119,6,.3)}
+.badge-rejeitado{background:rgba(220,38,38,.15);color:#f87171;border:1px solid rgba(220,38,38,.3)}
+.badge-inativo{background:rgba(122,127,150,.15);color:#7a7f96;border:1px solid rgba(122,127,150,.3)}
+
+/* ── PERFIL BADGE ── */
+.perfil-badge{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;font-size:11px;font-weight:600;border:1px solid;border-radius:2px;opacity:.9}
+
+/* ── ACTIONS ── */
+.act-row{display:flex;gap:6px;align-items:center}
+.btn-sm{padding:5px 12px;font-size:12px;font-weight:600;border:1px solid;cursor:pointer;transition:.15s;letter-spacing:.2px}
+.btn-approve{background:rgba(5,150,105,.1);border-color:rgba(5,150,105,.4);color:#34d399}
+.btn-approve:hover{background:rgba(5,150,105,.2)}
+.btn-reject{background:rgba(220,38,38,.1);border-color:rgba(220,38,38,.4);color:#f87171}
+.btn-reject:hover{background:rgba(220,38,38,.2)}
+.btn-edit{background:rgba(0,71,187,.1);border-color:rgba(0,71,187,.4);color:#93c5fd}
+.btn-edit:hover{background:rgba(0,71,187,.2)}
+.btn-disable{background:rgba(122,127,150,.1);border-color:rgba(122,127,150,.3);color:#7a7f96}
+.btn-disable:hover{background:rgba(122,127,150,.2);color:var(--text)}
+
+/* ── AVATAR TABLE ── */
+.usr-cell{display:flex;align-items:center;gap:10px}
+.usr-av{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-size:11px;font-weight:700;color:#fff;flex-shrink:0}
+.usr-nome{font-weight:600;color:#fff}
+.usr-email{font-size:11px;color:var(--muted)}
+
+/* ── MODAL ── */
+.modal-ov{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:500;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(4px)}
+.modal-box{background:var(--card);border:1px solid var(--border2);width:100%;max-width:460px;max-height:90vh;overflow-y:auto;animation:fadeUp .25s ease}
+.modal-head{padding:18px 22px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:var(--card);z-index:1}
+.modal-title{font-family:'Syne',sans-serif;font-size:16px;font-weight:700;color:#fff}
+.modal-close{background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;padding:2px 6px;line-height:1;transition:.15s}
+.modal-close:hover{color:var(--text)}
+.modal-body{padding:22px;display:flex;flex-direction:column;gap:14px}
+.modal-foot{padding:14px 22px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end}
+.btn-cancel{padding:9px 18px;background:rgba(255,255,255,.05);border:1px solid var(--border);color:var(--muted);font-size:13px;font-weight:600;cursor:pointer;transition:.15s}
+.btn-cancel:hover{color:var(--text);border-color:var(--border2)}
+.btn-confirm{padding:9px 20px;background:#0047BB;border:none;color:#fff;font-family:'Syne',sans-serif;font-size:13px;font-weight:700;cursor:pointer;transition:.15s;letter-spacing:.3px}
+.btn-confirm:hover{background:#1a65d4}
+.btn-confirm.danger{background:#dc2626}
+.btn-confirm.danger:hover{background:#b91c1c}
+
+/* ── PERFIL SELECT ── */
+.perfil-grid{display:flex;flex-direction:column;gap:8px}
+.perfil-opt{display:flex;align-items:center;gap:12px;padding:12px 14px;border:2px solid var(--border);cursor:pointer;transition:.15s;background:rgba(255,255,255,.02)}
+.perfil-opt:hover{border-color:var(--border2)}
+.perfil-opt.sel{border-color:#0047BB;background:rgba(0,71,187,.1)}
+.perfil-opt-icon{font-size:18px;width:28px;text-align:center}
+.perfil-opt-info{flex:1}
+.perfil-opt-label{font-size:13px;font-weight:600;color:#fff}
+.perfil-opt-desc{font-size:11px;color:var(--muted);margin-top:2px}
+.perfil-opt-radio{width:16px;height:16px;border:2px solid var(--border2);border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:.15s}
+.perfil-opt.sel .perfil-opt-radio{border-color:#0047BB;background:#0047BB}
+.perfil-opt.sel .perfil-opt-radio::after{content:'';width:6px;height:6px;border-radius:50%;background:#fff}
+
+/* ── EMPTY STATE ── */
+.empty{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:52px 20px;gap:10px;color:var(--muted)}
+.empty-icon{font-size:36px;opacity:.4}
+.empty-text{font-size:14px;font-weight:500}
+.empty-sub{font-size:12px}
+
+/* ── WELCOME ── */
+.welcome-card{background:linear-gradient(135deg,rgba(0,71,187,.2),rgba(0,71,187,.05));border:1px solid rgba(0,71,187,.25);padding:24px;margin-bottom:24px}
+.welcome-greeting{font-family:'Syne',sans-serif;font-size:22px;font-weight:800;color:#fff;margin-bottom:4px}
+.welcome-sub{font-size:13px;color:#93c5fd}
+
+/* ── PENDING ROW ── */
+.pending-row{background:rgba(217,119,6,.04);border-left:3px solid rgba(217,119,6,.5)}
+.pending-row td:first-child{padding-left:15px}
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar{width:5px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:#0047BB}
+`;
+
+// ── COMPONENTS ───────────────────────────────────────────────────────────────
+
+function PerfilBadge({ perfil }) {
+  const p = PERFIS[perfil] || { label: perfil, cor: "#7a7f96", icone: "?" };
+  return (
+    <span className="perfil-badge" style={{ borderColor: p.cor + "55", color: p.cor, background: p.cor + "15" }}>
+      {p.icone} {p.label}
+    </span>
+  );
+}
+
+function StatusBadge({ status }) {
+  const map = { ativo: ["badge-ativo","● Ativo"], pendente: ["badge-pendente","◉ Pendente"], rejeitado: ["badge-rejeitado","✕ Rejeitado"], inativo: ["badge-inativo","○ Inativo"] };
+  const [cls, label] = map[status] || ["badge-inativo", status];
+  return <span className={`badge ${cls}`}>{label}</span>;
+}
+
+// ── LOGIN / REGISTRO ──────────────────────────────────────────────────────────
+
+function AuthScreen({ onLogin }) {
+  const [aba, setAba] = useState("login");
+  const [form, setForm] = useState({ email: "", senha: "", nome: "", confirma: "", perfil: "comercial" });
+  const [msg, setMsg] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  const F = k => v => setForm(p => ({ ...p, [k]: v }));
+
+  const handleLogin = () => {
+    setMsg(null);
+    const users = getAllUsers();
+    const user = users.find(u => u.email.toLowerCase() === form.email.toLowerCase().trim());
+    if (!user) return setMsg({ type: "err", text: "E-mail não encontrado." });
+    if (user.senha !== form.senha) return setMsg({ type: "err", text: "Senha incorreta." });
+    if (user.status === "pendente") return setMsg({ type: "warn", text: "Sua conta ainda não foi aprovada pelo administrador." });
+    if (user.status === "rejeitado") return setMsg({ type: "err", text: "Acesso negado. Conta rejeitada. Entre em contato com o administrador." });
+    if (user.status === "inativo") return setMsg({ type: "err", text: "Conta inativa. Entre em contato com o administrador." });
+    saveSession(user);
+    onLogin(user);
+  };
+
+  const handleRegister = () => {
+    setMsg(null);
+    if (!form.nome.trim()) return setMsg({ type: "err", text: "Informe seu nome completo." });
+    if (!form.email.includes("@")) return setMsg({ type: "err", text: "Informe um e-mail válido." });
+    if (form.senha.length < 6) return setMsg({ type: "err", text: "Senha deve ter ao menos 6 caracteres." });
+    if (form.senha !== form.confirma) return setMsg({ type: "err", text: "As senhas não conferem." });
+    const users = getAllUsers();
+    if (users.find(u => u.email.toLowerCase() === form.email.toLowerCase().trim()))
+      return setMsg({ type: "err", text: "Este e-mail já está cadastrado." });
+    const novo = {
+      id: Date.now().toString(),
+      nome: form.nome.trim(),
+      email: form.email.toLowerCase().trim(),
+      senha: form.senha,
+      perfil: form.perfil,
+      status: "pendente",
+      criadoEm: new Date().toISOString(),
+      aprovadoEm: null,
+      aprovadoPor: null,
+    };
+    const stored = loadUsers().filter(u => u.id !== "master");
+    saveUsers([...stored, novo]);
+    setMsg({ type: "ok", text: "Cadastro realizado! Aguarde aprovação do administrador para acessar o sistema." });
+    setForm({ email: novo.email, senha: "", nome: "", confirma: "", perfil: "comercial" });
+    setTimeout(() => setAba("login"), 2500);
+  };
+
+  return (
+    <div className="auth-wrap">
+      <style>{CSS_AUTH}</style>
+      <div className="auth-box">
+        <div className="auth-head">
+          <div className="auth-logo">
+            <div className="auth-mark">PT</div>
+            <span className="auth-brand">POSITEC</span>
+          </div>
+          <div>
+            <div className="auth-title">Calculadora Tributária</div>
+            <div className="auth-sub">Sistema de precificação industrial</div>
+          </div>
+        </div>
+
+        <div className="auth-body">
+          <div className="auth-tabs">
+            <button className={`auth-tab ${aba === "login" ? "on" : ""}`} onClick={() => { setAba("login"); setMsg(null); }}>Entrar</button>
+            <button className={`auth-tab ${aba === "reg" ? "on" : ""}`} onClick={() => { setAba("reg"); setMsg(null); }}>Solicitar Acesso</button>
+          </div>
+
+          {msg && <div className={`auth-msg ${msg.type}`}>{msg.text}</div>}
+
+          {aba === "login" ? <>
+            <div className="fld">
+              <label>E-mail</label>
+              <input placeholder="seu@email.com.br" value={form.email} onChange={e => F("email")(e.target.value)} onKeyDown={e => e.key === "Enter" && handleLogin()} autoComplete="username"/>
+            </div>
+            <div className="fld">
+              <label>Senha</label>
+              <input type="password" placeholder="••••••••" value={form.senha} onChange={e => F("senha")(e.target.value)} onKeyDown={e => e.key === "Enter" && handleLogin()} autoComplete="current-password"/>
+            </div>
+            <button className="btn-primary" onClick={handleLogin}>Entrar</button>
+            <div style={{ textAlign: "center", fontSize: 11, color: "var(--muted)" }}>
+              Acesso inicial: admin@positec.com.br / Positec@2026
+            </div>
+          </> : <>
+            <div className="fld">
+              <label>Nome completo</label>
+              <input placeholder="João Silva" value={form.nome} onChange={e => F("nome")(e.target.value)}/>
+            </div>
+            <div className="fld">
+              <label>E-mail corporativo</label>
+              <input placeholder="joao@positec.com.br" value={form.email} onChange={e => F("email")(e.target.value)} autoComplete="username"/>
+            </div>
+            <div className="fld">
+              <label>Perfil solicitado</label>
+              <select value={form.perfil} onChange={e => F("perfil")(e.target.value)}>
+                {Object.entries(PERFIS).filter(([k]) => k !== "admin").map(([k, v]) =>
+                  <option key={k} value={k}>{v.icone} {v.label}</option>
+                )}
+              </select>
+            </div>
+            <div className="fld">
+              <label>Senha</label>
+              <input type="password" placeholder="Mínimo 6 caracteres" value={form.senha} onChange={e => F("senha")(e.target.value)} autoComplete="new-password"/>
+            </div>
+            <div className="fld">
+              <label>Confirmar senha</label>
+              <input type="password" placeholder="Repita a senha" value={form.confirma} onChange={e => F("confirma")(e.target.value)}/>
+            </div>
+            <button className="btn-primary" onClick={handleRegister}>Solicitar Acesso</button>
+            <div style={{ textAlign: "center", fontSize: 11, color: "var(--muted)", lineHeight: 1.5 }}>
+              Seu cadastro será analisado pelo administrador.<br/>Você receberá confirmação após aprovação.
+            </div>
+          </>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── MODAL EDITAR USUÁRIO ──────────────────────────────────────────────────────
+
+function ModalEditUser({ user, onClose, onSave }) {
+  const [perfil, setPerfil] = useState(user.perfil);
+  const [status, setStatus] = useState(user.status);
+
+  return (
+    <div className="modal-ov" onClick={onClose}>
+      <div className="modal-box" onClick={e => e.stopPropagation()}>
+        <div className="modal-head">
+          <span className="modal-title">Editar usuário</span>
+          <button className="modal-close" onClick={onClose}>×</button>
+        </div>
+        <div className="modal-body">
+          <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", background: "rgba(255,255,255,.03)", border: "1px solid var(--border)" }}>
+            <div className="usr-av" style={{ background: PERFIS[user.perfil]?.cor || "#0047BB", width: 38, height: 38, fontSize: 14 }}>{initials(user.nome)}</div>
+            <div>
+              <div style={{ fontWeight: 600, color: "#fff", fontSize: 14 }}>{user.nome}</div>
+              <div style={{ fontSize: 12, color: "var(--muted)" }}>{user.email}</div>
+            </div>
+          </div>
+
+          <div className="fld">
+            <label>Status da conta</label>
+            <select value={status} onChange={e => setStatus(e.target.value)}>
+              <option value="ativo">Ativo</option>
+              <option value="inativo">Inativo</option>
+              <option value="rejeitado">Rejeitado</option>
+            </select>
+          </div>
+
+          <div style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)", textTransform: "uppercase", letterSpacing: ".8px" }}>Perfil de acesso</div>
+          <div className="perfil-grid">
+            {Object.entries(PERFIS).filter(([k]) => user.id !== "master" || k === "admin").map(([k, v]) => (
+              <div key={k} className={`perfil-opt ${perfil === k ? "sel" : ""}`} onClick={() => setPerfil(k)}>
+                <span className="perfil-opt-icon">{v.icone}</span>
+                <div className="perfil-opt-info">
+                  <div className="perfil-opt-label">{v.label}</div>
+                  <div className="perfil-opt-desc">{v.desc}</div>
+                </div>
+                <div className="perfil-opt-radio"></div>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="modal-foot">
+          <button className="btn-cancel" onClick={onClose}>Cancelar</button>
+          <button className="btn-confirm" onClick={() => onSave({ ...user, perfil, status })}>Salvar alterações</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── MODAL APROVAR ──────────────────────────────────────────────────────────────
+
+function ModalAprovar({ user, currentUser, onClose, onSave }) {
+  const [perfil, setPerfil] = useState(user.perfil);
+  const [action, setAction] = useState("aprovar");
+
+  const handleConfirm = () => {
+    if (action === "aprovar") {
+      onSave({ ...user, perfil, status: "ativo", aprovadoEm: new Date().toISOString(), aprovadoPor: currentUser.nome });
+    } else {
+      onSave({ ...user, status: "rejeitado", aprovadoEm: new Date().toISOString(), aprovadoPor: currentUser.nome });
+    }
+  };
+
+  return (
+    <div className="modal-ov" onClick={onClose}>
+      <div className="modal-box" onClick={e => e.stopPropagation()}>
+        <div className="modal-head">
+          <span className="modal-title">Analisar solicitação</span>
+          <button className="modal-close" onClick={onClose}>×</button>
+        </div>
+        <div className="modal-body">
+          <div style={{ padding: "12px 14px", background: "rgba(217,119,6,.08)", border: "1px solid rgba(217,119,6,.25)" }}>
+            <div style={{ fontSize: 11, color: "#fbbf24", fontWeight: 700, textTransform: "uppercase", letterSpacing: ".8px", marginBottom: 8 }}>Solicitação pendente</div>
+            <div style={{ fontWeight: 600, color: "#fff", marginBottom: 2 }}>{user.nome}</div>
+            <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 6 }}>{user.email}</div>
+            <div style={{ fontSize: 12, color: "var(--muted)" }}>Solicitado em: {fmtDate(user.criadoEm)}</div>
+            <div style={{ fontSize: 12, color: "var(--muted)" }}>Perfil solicitado: <PerfilBadge perfil={user.perfil}/></div>
+          </div>
+
+          <div className="fld">
+            <label>Decisão</label>
+            <select value={action} onChange={e => setAction(e.target.value)}>
+              <option value="aprovar">✓ Aprovar acesso</option>
+              <option value="rejeitar">✕ Rejeitar solicitação</option>
+            </select>
+          </div>
+
+          {action === "aprovar" && <>
+            <div style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)", textTransform: "uppercase", letterSpacing: ".8px" }}>Confirmar perfil de acesso</div>
+            <div className="perfil-grid">
+              {Object.entries(PERFIS).filter(([k]) => k !== "admin").map(([k, v]) => (
+                <div key={k} className={`perfil-opt ${perfil === k ? "sel" : ""}`} onClick={() => setPerfil(k)}>
+                  <span className="perfil-opt-icon">{v.icone}</span>
+                  <div className="perfil-opt-info">
+                    <div className="perfil-opt-label">{v.label}</div>
+                    <div className="perfil-opt-desc">{v.desc}</div>
+                  </div>
+                  <div className="perfil-opt-radio"></div>
+                </div>
+              ))}
+            </div>
+          </>}
+
+          {action === "rejeitar" && (
+            <div className="auth-msg err">O usuário será notificado de que o acesso foi negado e não poderá fazer login.</div>
+          )}
+        </div>
+        <div className="modal-foot">
+          <button className="btn-cancel" onClick={onClose}>Cancelar</button>
+          <button className={`btn-confirm ${action === "rejeitar" ? "danger" : ""}`} onClick={handleConfirm}>
+            {action === "aprovar" ? "✓ Aprovar acesso" : "✕ Rejeitar"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── PAINEL ADMIN ──────────────────────────────────────────────────────────────
+
+function PainelAdmin({ currentUser }) {
+  const [view, setView] = useState("pendentes");
+  const [users, setUsers] = useState(getAllUsers);
+  const [search, setSearch] = useState("");
+  const [modal, setModal] = useState(null); // { type: "edit"|"aprovar", user }
+
+  const refresh = () => setUsers(getAllUsers());
+
+  const saveUser = (updated) => {
+    const stored = loadUsers().filter(u => u.id !== "master");
+    const isMaster = updated.id === "master";
+    if (!isMaster) {
+      const idx = stored.findIndex(u => u.id === updated.id);
+      if (idx >= 0) stored[idx] = updated;
+      else stored.push(updated);
+      saveUsers(stored);
+    }
+    refresh();
+    setModal(null);
+  };
+
+  const pendentes = users.filter(u => u.status === "pendente");
+  const todos = users.filter(u => {
+    const q = search.toLowerCase();
+    return !q || u.nome.toLowerCase().includes(q) || u.email.toLowerCase().includes(q);
+  });
+
+  const stats = {
+    total: users.length,
+    ativos: users.filter(u => u.status === "ativo").length,
+    pendentes: pendentes.length,
+    inativos: users.filter(u => u.status === "inativo" || u.status === "rejeitado").length,
+  };
+
+  const NAV = [
+    { id: "pendentes", icon: "⏳", label: "Pendentes", badge: pendentes.length },
+    { id: "usuarios",  icon: "👥", label: "Usuários" },
+    { id: "perfis",    icon: "🔐", label: "Perfis" },
+  ];
+
+  return (
+    <>
+      <div className="sidebar">
+        {NAV.map(n => (
+          <div key={n.id} className={`snav-item ${view === n.id ? "on" : ""}`} onClick={() => setView(n.id)}>
+            <span className="snav-icon">{n.icon}</span>
+            <span style={{ flex: 1 }}>{n.label}</span>
+            {n.badge > 0 && <span style={{ background: "#d97706", color: "#fff", borderRadius: 20, fontSize: 10, fontWeight: 700, padding: "1px 7px" }}>{n.badge}</span>}
+          </div>
+        ))}
+      </div>
+
+      <div className="main-content">
+        {/* STATS */}
+        <div className="stats-row">
+          <div className="stat-card blue"><div className="stat-label">Total</div><div className="stat-val">{stats.total}</div><div className="stat-sub">usuários cadastrados</div></div>
+          <div className="stat-card green"><div className="stat-label">Ativos</div><div className="stat-val">{stats.ativos}</div><div className="stat-sub">com acesso liberado</div></div>
+          <div className="stat-card amber"><div className="stat-label">Pendentes</div><div className="stat-val">{stats.pendentes}</div><div className="stat-sub">aguardando aprovação</div></div>
+          <div className="stat-card red"><div className="stat-label">Inativos</div><div className="stat-val">{stats.inativos}</div><div className="stat-sub">sem acesso</div></div>
+        </div>
+
+        {/* PENDENTES */}
+        {view === "pendentes" && (
+          <div className="tbl-wrap">
+            <div className="tbl-head">
+              <span className="tbl-head-title">⏳ Solicitações Pendentes</span>
+              <span style={{ fontSize: 12, color: "var(--muted)" }}>{pendentes.length} aguardando análise</span>
+            </div>
+            {pendentes.length === 0
+              ? <div className="empty"><div className="empty-icon">✓</div><div className="empty-text">Nenhuma pendência</div><div className="empty-sub">Todas as solicitações foram analisadas</div></div>
+              : <table>
+                  <thead><tr>
+                    <th>Usuário</th><th>Perfil Solicitado</th><th>Solicitado em</th><th>Ações</th>
+                  </tr></thead>
+                  <tbody>
+                    {pendentes.map(u => (
+                      <tr key={u.id} className="pending-row">
+                        <td><div className="usr-cell">
+                          <div className="usr-av" style={{ background: PERFIS[u.perfil]?.cor || "#7a7f96" }}>{initials(u.nome)}</div>
+                          <div><div className="usr-nome">{u.nome}</div><div className="usr-email">{u.email}</div></div>
+                        </div></td>
+                        <td><PerfilBadge perfil={u.perfil}/></td>
+                        <td style={{ fontFamily: "JetBrains Mono", fontSize: 12, color: "var(--muted)" }}>{fmtDate(u.criadoEm)}</td>
+                        <td><div className="act-row">
+                          <button className="btn-sm btn-approve" onClick={() => setModal({ type: "aprovar", user: u })}>✓ Analisar</button>
+                        </div></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+            }
+          </div>
+        )}
+
+        {/* TODOS USUÁRIOS */}
+        {view === "usuarios" && (
+          <div className="tbl-wrap">
+            <div className="tbl-head">
+              <span className="tbl-head-title">👥 Todos os Usuários</span>
+              <input className="tbl-search" placeholder="Buscar por nome ou e-mail..." value={search} onChange={e => setSearch(e.target.value)}/>
+            </div>
+            <table>
+              <thead><tr>
+                <th>Usuário</th><th>Perfil</th><th>Status</th><th>Criado em</th><th>Aprovado por</th><th>Ações</th>
+              </tr></thead>
+              <tbody>
+                {todos.map(u => (
+                  <tr key={u.id}>
+                    <td><div className="usr-cell">
+                      <div className="usr-av" style={{ background: PERFIS[u.perfil]?.cor || "#7a7f96" }}>{initials(u.nome)}</div>
+                      <div><div className="usr-nome">{u.nome}</div><div className="usr-email">{u.email}</div></div>
+                    </div></td>
+                    <td><PerfilBadge perfil={u.perfil}/></td>
+                    <td><StatusBadge status={u.status}/></td>
+                    <td style={{ fontFamily: "JetBrains Mono", fontSize: 11, color: "var(--muted)" }}>{fmtDate(u.criadoEm)}</td>
+                    <td style={{ fontSize: 12, color: "var(--muted)" }}>{u.aprovadoPor || "—"}</td>
+                    <td><div className="act-row">
+                      {u.id !== "master" && <>
+                        <button className="btn-sm btn-edit" onClick={() => setModal({ type: "edit", user: u })}>✎ Editar</button>
+                        {u.status === "ativo" && <button className="btn-sm btn-disable" onClick={() => saveUser({ ...u, status: "inativo" })}>Desativar</button>}
+                        {u.status === "inativo" && <button className="btn-sm btn-approve" onClick={() => saveUser({ ...u, status: "ativo" })}>Reativar</button>}
+                        {u.status === "pendente" && <button className="btn-sm btn-approve" onClick={() => setModal({ type: "aprovar", user: u })}>Analisar</button>}
+                      </>}
+                      {u.id === "master" && <span style={{ fontSize: 11, color: "var(--muted)", fontStyle: "italic" }}>master</span>}
+                    </div></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* PERFIS */}
+        {view === "perfis" && (
+          <div>
+            <div className="page-title">Perfis de Acesso</div>
+            <div className="page-sub">Definição de cada nível de permissão do sistema</div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(320px,1fr))", gap: 12 }}>
+              {Object.entries(PERFIS).map(([k, v]) => {
+                const count = users.filter(u => u.perfil === k && u.status === "ativo").length;
+                return (
+                  <div key={k} style={{ background: "var(--card)", border: `1px solid ${v.cor}33`, padding: 20 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+                      <span style={{ fontSize: 22 }}>{v.icone}</span>
+                      <div>
+                        <div style={{ fontFamily: "Syne", fontWeight: 700, color: "#fff", fontSize: 15 }}>{v.label}</div>
+                        <div style={{ fontSize: 11, color: v.cor, fontWeight: 600 }}>{count} usuário{count !== 1 ? "s" : ""} ativo{count !== 1 ? "s" : ""}</div>
+                      </div>
+                    </div>
+                    <div style={{ fontSize: 13, color: "var(--muted)", lineHeight: 1.6 }}>{v.desc}</div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {modal?.type === "edit" && <ModalEditUser user={modal.user} onClose={() => setModal(null)} onSave={saveUser}/>}
+      {modal?.type === "aprovar" && <ModalAprovar user={modal.user} currentUser={currentUser} onClose={() => setModal(null)} onSave={saveUser}/>}
+    </>
+  );
+}
+
+// ── DASHBOARD USUÁRIO ─────────────────────────────────────────────────────────
+
 
 const PRODUTOS = [
   {id:"pos-mao", ncm:"8470.50.10",nome:"Terminal de Pagamento - MAO",   uf:"AM",ipi:0,    pcBase:"zmf", icms:12,cred:12,mva:0,  aliqST:0,  fti:0  },
@@ -566,8 +1260,8 @@ input::-webkit-inner-spin-button,input::-webkit-outer-spin-button{-webkit-appear
 .buf.zmf{background:rgba(0,71,187,.35);color:#93c5fd;border:1px solid rgba(0,71,187,.5)}.buf.ios{background:rgba(26,101,212,.35);color:#93c5fd;border:1px solid rgba(26,101,212,.5)}.buf.cwb{background:rgba(100,116,139,.2);color:#94a3b8;border:1px solid rgba(100,116,139,.3)}
 .brt{padding:3px 9px;font-family:'DM Mono',monospace;font-size:9px;border:1px solid rgba(255,255,255,.12);color:#7a90b0;border-radius:20px}
 .bdf{padding:3px 9px;font-family:'DM Mono',monospace;font-size:9px;border-radius:20px;background:rgba(220,38,38,.12);border:1px solid rgba(220,38,38,.25);color:#f87171}
-.layout{display:grid;grid-template-columns:385px 1fr;flex:1;min-height:calc(100vh - 61px)}
-.pleft{background:#1e2a3d;border-right:1px solid rgba(255,255,255,.08);display:flex;flex-direction:column}
+.layout{display:grid;grid-template-columns:385px 1fr;flex:1;height:100%;overflow:hidden}
+.pleft{background:#1e2a3d;border-right:1px solid rgba(255,255,255,.08);display:flex;flex-direction:column;overflow:hidden;height:100%}
 .tnav{display:flex;border-bottom:1px solid rgba(255,255,255,.08);background:#1c2333}
 .tbtn{flex:1;padding:11px 4px;background:none;border:none;border-bottom:2px solid transparent;color:#7a90b0;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;cursor:pointer;transition:.15s}
 .tbtn.on{color:#f0f4ff;border-bottom-color:#0047BB;background:rgba(0,71,187,.15)}
@@ -635,7 +1329,7 @@ input::-webkit-inner-spin-button,input::-webkit-outer-spin-button{-webkit-appear
 .txl{font-size:9px;color:#5a6a84;text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px;font-family:'DM Mono',monospace;line-height:1.3}
 .txv{font-family:'DM Mono',monospace;font-size:14px;font-weight:700;color:#dce7f7}
 .txon .txv{color:#f87171}.txok .txv{color:#4ade80}
-.pright{padding:18px 22px;overflow-y:auto;display:flex;flex-direction:column;gap:13px;background:#1c2333}
+.pright{padding:18px 22px;overflow-y:auto;display:flex;flex-direction:column;gap:13px;background:#1c2333;height:100%}
 .hero{background:linear-gradient(135deg,#0f2a6e,#0a1a45);padding:18px 22px;display:flex;align-items:flex-end;justify-content:space-between;gap:14px;flex-wrap:wrap;border:1px solid rgba(0,71,187,.2);border-bottom:3px solid #0047BB;border-radius:6px}
 .kpi{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);padding:9px 14px;text-align:center;min-width:80px;border-radius:5px}
 .kpi-red{border-color:rgba(248,113,113,.2);background:rgba(220,38,38,.06)}.kpi-green{border-color:rgba(74,222,128,.2);background:rgba(22,163,74,.06)}.kpi-blue{border-color:rgba(96,165,250,.2);background:rgba(0,71,187,.07)}
@@ -725,7 +1419,7 @@ input::-webkit-inner-spin-button,input::-webkit-outer-spin-button{-webkit-appear
 `;
 
 // ── APP ────────────────────────────────────────────────────────────────────────
-export default function App(){
+function Calculadora({user:currentUser}){
   const [d,setD]=useState(DEF);
   const [calcs,setCalcs]=useState(CALC_DEF);
   const [tab,setTab]=useState("perfil");
@@ -819,7 +1513,6 @@ export default function App(){
 
   return(
     <>
-    <style>{CSS}</style>
     {modal==="cfImp"&&<ModalCF onClose={()=>setModal(null)} fobUSD={d.fobUSD} ptax={d.ptax}
       data={calcs.cfImp} setData={v=>SC("cfImp")(v)}
       onApply={v=>{setD(p=>({...p,cfImp:v}));SC("cfImp")({applied:true});setModal(null);}}/>}
@@ -838,33 +1531,24 @@ export default function App(){
       prodNome={prod.nome}
       onLoad={(savedD, savedCalcs)=>{setD(savedD);setCalcs(savedCalcs);}}/>}
 
-    <div className="app">
-      <header className="hdr">
-        <div style={{display:"flex",alignItems:"center",gap:10,flexShrink:0}}>
-          <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:30,fontWeight:800,color:"#0047BB",lineHeight:1}}>+</span>
-          <div>
-            <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,fontWeight:800,letterSpacing:1,color:"#fff"}}>POSITIVO</div>
-            <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:9,fontWeight:600,letterSpacing:2,color:"#555"}}>TECNOLOG<span style={{color:"#0047BB"}}>IA</span></div>
-          </div>
-        </div>
-        <div style={{flex:1,display:"flex",flexDirection:"column",gap:1}}>
-          <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:13,fontWeight:700,letterSpacing:1,color:"#e2e8f0"}}>CALCULADORA TRIBUTARIA</span>
-          <span style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:"#444"}}>PLAN_TRIB · 09/02/2026 · v8</span>
-        </div>
-        <div style={{display:"flex",gap:5,flexWrap:"wrap",alignItems:"center"}}>
-          {isZFM&&<span className="buf zmf">ZFM / MAO</span>}
-          {prod.uf==="BA"&&<span className="buf ios">IOS / BA</span>}
-          {prod.uf==="PR"&&<span className="buf cwb">CWB / PR</span>}
-          <span className="brt">{c.ufO} -> {d.ufDestino}</span>
-          <span className="bdf">{c.difal>0?`DIFAL ${pct(c.difal)}`:"DIFAL 0%"}</span>
-          <button onClick={()=>setModal("registros")}
-            style={{padding:"5px 13px",background:"rgba(0,71,187,.2)",border:"1px solid rgba(0,71,187,.45)",color:"#93c5fd",fontFamily:"'Barlow Condensed',sans-serif",fontSize:12,fontWeight:700,letterSpacing:.5,cursor:"pointer",borderRadius:20,display:"flex",alignItems:"center",gap:5}}>
-            💾 <span>Registros</span>
-          </button>
-        </div>
-      </header>
+    <div className="app" style={{display:"flex",flexDirection:"column",flex:1,minHeight:0}}>
+    <style>{CSS}</style>
 
-      <div className="layout">
+      {/* sub-header: badges de contexto + botão Registros */}
+      <div style={{display:"flex",alignItems:"center",gap:6,padding:"6px 16px",background:"#1e2a3d",borderBottom:"1px solid rgba(255,255,255,.07)",flexWrap:"wrap",flexShrink:0}}>
+        {isZFM&&<span className="buf zmf">ZFM / MAO</span>}
+        {prod.uf==="BA"&&<span className="buf ios">IOS / BA</span>}
+        {prod.uf==="PR"&&<span className="buf cwb">CWB / PR</span>}
+        <span className="brt">{c.ufO} → {d.ufDestino}</span>
+        <span className="bdf">{c.difal>0?`DIFAL ${pct(c.difal)}`:"DIFAL 0%"}</span>
+        <div style={{flex:1}}/>
+        <button onClick={()=>setModal("registros")}
+          style={{padding:"4px 12px",background:"rgba(0,71,187,.2)",border:"1px solid rgba(0,71,187,.45)",color:"#93c5fd",fontFamily:"'Barlow Condensed',sans-serif",fontSize:11,fontWeight:700,letterSpacing:.5,cursor:"pointer",borderRadius:20,display:"flex",alignItems:"center",gap:5}}>
+          💾 Registros
+        </button>
+      </div>
+
+      <div className="layout" style={{flex:1,minHeight:0,overflow:"hidden"}}>
         <aside className="pleft">
           <nav className="tnav">
             {TABS.map((t,i)=><button key={t} className={`tbtn ${tab===t?"on":""}`} onClick={()=>setTab(t)}>{TLBL[i]}</button>)}
@@ -1233,5 +1917,53 @@ function RevCalc({precoAlvo,onChange,c,margem}){
         {precoAlvo===0&&<span style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:"#334155"}}>Informe um preco alvo (c/ IPI) para ver a margem resultante</span>}
       </div>
     </div>
+  );
+}
+
+// ── APP INTEGRADO ─────────────────────────────────────────────────────────────
+export default function App() {
+  const [user, setUser] = useState(() => loadSession());
+
+  const handleLogin = (u) => setUser(u);
+  const handleLogout = () => { saveSession(null); setUser(null); };
+
+  if (!user) return <AuthScreen onLogin={handleLogin}/>;
+
+  const p = PERFIS[user.perfil] || {};
+  const isAdmin = user.perfil === "admin";
+
+  return (
+    <>
+      <style>{CSS_AUTH}</style>
+      <div className="dash">
+        <div className="topbar">
+          <div className="topbar-logo">
+            <div className="topbar-mark">PT</div>
+            <span className="topbar-name">POSITEC</span>
+          </div>
+          <div className="topbar-divider"/>
+          <span className="topbar-title">
+            {isAdmin ? "Painel Administrativo" : "Calculadora Tributária · PLAN_TRIB"}
+          </span>
+          {!isAdmin && <div style={{display:"flex",gap:5,alignItems:"center",flexShrink:0}}/>}
+          <div className="topbar-spacer"/>
+          <div className="topbar-user">
+            <div className="topbar-avatar" style={{ background: p.cor || "#0047BB" }}>{initials(user.nome)}</div>
+            <div>
+              <div className="topbar-uname">{user.nome.split(" ")[0]} {user.nome.split(" ").slice(-1)[0]}</div>
+              <div className="topbar-uperfil">{p.icone} {p.label}</div>
+            </div>
+            <button className="btn-logout" onClick={handleLogout}>Sair</button>
+          </div>
+        </div>
+
+        <div className="dash-body" style={isAdmin ? {} : {flexDirection:"column",overflow:"hidden"}}>
+          {isAdmin
+            ? <PainelAdmin currentUser={user}/>
+            : <Calculadora user={user}/>
+          }
+        </div>
+      </div>
+    </>
   );
 }
