@@ -102,11 +102,12 @@ const DEF={
   pd:3.47,cfixo:4.63,scrap:0.91,royal:1.27,cfVenda:2.11,frete:0.80,
   comis:0.15,comisX:0.10,mkt:0,rebate:0,margem:5,
   stAtivo:false,mva:0,icmsDestST:18,precoAlvo:0,
+  moedaCusto:"BRL",
 };
 
 const CALC_DEF={
   frete:{sUSD:0,aUSD:0,saUSD:0,pS:100,pA:0,pSA:0,applied:false},
-  cfImp:{tr:30,pp:-30,tx:12,applied:false},
+  cfImp:{tr:30,pp:-30,tx:0.8,applied:false},
   pcb:{tl:0,vol:1000,tempo:0,pctFob:0},
   cfVenda:{prazo:30,taxa:1.14,applied:false},
 };
@@ -232,8 +233,8 @@ function MI({val,onChange,sfx="USD",width=60}){
 }
 
 // ── Modal CF Importação ───────────────────────────────────────────────────────
-// Formula: FOB * ((1+taxa)^((transit+prazo)/30) - 1)
-// prazo pode ser negativo (antecipacao = melhoria de custo)
+// Formula: FOB * ((1+taxa_mensal)^(dias/30) - 1)
+// taxa em % a.m. (ex: 0,8% a.m.)  |  prazo negativo = antecipacao
 function ModalCF({onClose,onApply,fobUSD,ptax,data,setData}){
   const dias=data.tr+data.pp;
   const cfFactor=Math.pow(1+data.tx/100,dias/30)-1;
@@ -244,11 +245,11 @@ function ModalCF({onClose,onApply,fobUSD,ptax,data,setData}){
       <div className="mb" onClick={e=>e.stopPropagation()}>
         <div className="mh"><span className="mt">Custo Financeiro de Importacao</span><button className="mc" onClick={onClose}>x</button></div>
         <div className="mbody">
-          <Box t="blue">{"Formula: FOB x ((1+taxa)^((transit+prazo)/30) - 1)\nPrazo negativo = antecipacao de pagamento = reducao de custo."}</Box>
+          <Box t="blue">{"Formula: FOB x ((1+taxa_mensal)^(dias/30) - 1)\nTaxa em % a.m. (ex: 0,8% a.m.) | Prazo negativo = antecipacao = reducao de custo."}</Box>
           <div className="pbase"><span>FOB de referencia</span><span>{usd(fobUSD)}</span></div>
           <Field label="Transit Time" sfx="dias" value={data.tr} onChange={v=>setData({...data,tr:v})} hint="Dias embarque ate chegada no porto"/>
           <Field label="Prazo de Pagamento ao Fornecedor" sfx="dias" value={data.pp} onChange={v=>setData({...data,pp:v})} hint="Negativo = antecipacao (ex: -30 dias)"/>
-          <Field label="Taxa Financeira Anual" sfx="%" value={data.tx} onChange={v=>setData({...data,tx:v})} hint="Custo do capital anualizado (ex: 12% a.a.)"/>
+          <Field label="Taxa Financeira Mensal" sfx="%" value={data.tx} onChange={v=>setData({...data,tx:v})} hint="Custo do capital mensal (ex: 0,8% a.m.)"/>
           <div className="pdecomp">
             <div><span>Total dias financiados</span><span style={{color:dias<0?"#4ade80":"#94a3b8"}}>{dias} dias {dias<0?"(credito)":""}</span></div>
             <div><span>Fator total ({n3(dias/30)} meses)</span><span>{n3(cfFactor*100)}%</span></div>
@@ -451,6 +452,108 @@ function ModalRegistros({onClose, onLoad, currentD, currentCalcs, prodNome}){
   );
 }
 
+// ── Breakdown Panel ───────────────────────────────────────────────────────────
+function BreakdownPanel({c,d,prod,ppbTot,calcs}){
+  const fobBRL=d.fobUSD*d.ptax;
+  const freteBRL=d.freteUSD*d.ptax;
+  const cmvImpTotal=c.cmvImp+d.cfImp; // CMV Imp inclui CF
+  const vplDisp=cmvImpTotal+ppbTot+(d.cra||0);
+  const garantiaBkp=d.garantia+c.bkpV;
+  const custosLocais=d.producao+d.outrosBRL;
+  const pcVNominal=c.pSI*(c.pcPct/100);
+  const pcSubvSaving=pcVNominal-c.pcV;
+  const totalImp=c.cargaTot+(c.ftiPct>0?c.ftiV:0);
+  const totalIndGerPct=d.pd+d.scrap+d.royal+d.frete;
+  const totalIndGerV=c.pdV+c.scV+c.ryV+c.frV;
+  const totalIndComPct=d.comis+(d.comis*2/3)+d.mkt+d.rebate+d.cfVenda;
+  const totalIndComV=c.cmV+c.mktV+c.rebateV+c.cfnV;
+  const mcV=c.margV+c.cfxV;
+
+  // row helpers
+  const R=({l,v,p,acc,bold,sep,sub,indent,dual})=>(
+    <div className={`bdr ${bold?"bdb":""} ${sep?"bds":""} ${acc||""} ${sub?"bdsub":""}`}>
+      <span className="bdl" style={indent?{paddingLeft:14}:undefined}>{l}</span>
+      {p!=null&&<span className="bdp">{pct(p)}</span>}
+      <span className="bdv">
+        {dual&&<span className="bdv2">{dual}</span>}
+        {brl(v)}
+      </span>
+    </div>
+  );
+  const Sep=({label,v,p,color})=>(
+    <div className="bdtot" style={color?{borderColor:color}:undefined}>
+      <span>{label}</span>
+      {p!=null&&<span className="bdtotp">{pct(p)}</span>}
+      <span className="bdtotv" style={color?{color}:undefined}>{brl(v)}</span>
+    </div>
+  );
+  const GH=({t})=><div className="bdgh">{t}</div>;
+
+  return(
+    <div className="bdc">
+      {/* ── CUSTO DE IMPORTAÇÃO ── */}
+      <GH t="CUSTO DE IMPORTAÇÃO"/>
+      <R l="FOB" v={fobBRL} dual={usd(d.fobUSD)}/>
+      <R l="(+) Frete Internacional" v={freteBRL} dual={usd(d.freteUSD)} indent/>
+      <R l={`(+) II (${pct(d.aliqII)})`} v={c.iiV} indent acc="red"/>
+      <R l={`(+) Despesas (${d.despesasModo==="pct"?pct(d.despesasPct)+" CFR":"manual"})`} v={c.despesas} indent acc="red"/>
+      <R l="(+) Seguro" v={d.seguroBRL} indent/>
+      {d.cfImp!==0&&<R l="(+) CF Importação" v={d.cfImp} indent acc={d.cfImp<0?"green":""}/>}
+      <Sep label="CMV IMPORTAÇÃO" v={cmvImpTotal}/>
+
+      {/* ── PPB + VPL ── */}
+      {ppbTot>0&&<R l="(+) PPB Total" v={ppbTot}/>}
+      {(d.cra||0)>0&&<R l="(+) CRA / Créditos" v={d.cra}/>}
+      <Sep label="VPL" v={vplDisp} color="#2563eb"/>
+
+      {/* ── CUSTOS LOCAIS ── */}
+      <GH t="CUSTOS LOCAIS"/>
+      <R l="Garantia" v={d.garantia}/>
+      <R l={`BKP (${pct(d.bkpPct)} × VPL)`} v={c.bkpV} indent sub/>
+      <R l="Garantia + BKP" v={garantiaBkp} bold sep/>
+      <R l="Produção / Montagem" v={d.producao}/>
+      <R l="Outros custos BRL" v={d.outrosBRL} indent sub/>
+      <R l="Custos Locais" v={custosLocais} bold sep/>
+      <Sep label="CUSTO TOTAL" v={c.cmvTotal} color="#0047BB"/>
+
+      {/* ── IMPOSTOS DE VENDA ── */}
+      <GH t="IMPOSTOS DE VENDA"/>
+      <R l={`P/C nominal (${pct(c.pcPct)})`} v={pcVNominal} p={c.pcPct} acc="red"/>
+      {pcSubvSaving>0.001&&<R l={`(-) Subvenção ICMS destacado (${pct(c.aliqInter)})`} v={-pcSubvSaving} p={-(c.pcPct-c.pcEf)} indent acc="green"/>}
+      <R l={`P/C efetivo (${pct(c.pcEf)})`} v={c.pcV} p={c.pcEf} indent bold/>
+      {c.icmsEfPct>0&&<R l={`ICMS efetivo (${pct(c.icmsEfPct)})`} v={c.icmsEfV} p={c.icmsEfPct} acc="red"/>}
+      {c.difal>0&&<R l={`DIFAL (${pct(c.difal)})`} v={c.difalV} p={c.difal} acc="red"/>}
+      {c.ipi>0&&<R l={`IPI (${pct(c.ipi)})`} v={c.ipiV} p={c.ipi} acc="red"/>}
+      {c.stV>0&&<R l="ICMS-ST" v={c.stV} acc="warn"/>}
+      {c.ftiPct>0&&<R l={`FTI/UEA-AM (${pct(c.ftiPct)})`} v={c.ftiV} acc="red"/>}
+      {c.fcpPct>0&&<R l={`Fundo Pobreza ${d.ufDestino}`} v={c.fcpV} acc="warn"/>}
+      <R l="Total Impostos" v={totalImp} p={c.cargaPct} bold sep/>
+
+      {/* ── ÍNDICES GERAIS ── */}
+      <GH t="ÍNDICES GERAIS"/>
+      <R l={`P&D (${pct(d.pd)})`} v={c.pdV} p={d.pd}/>
+      <R l={`Scrap (${pct(d.scrap)})`} v={c.scV} p={d.scrap}/>
+      <R l={`Royalties (${pct(d.royal)})`} v={c.ryV} p={d.royal}/>
+      <R l={`Frete venda (${pct(d.frete)})`} v={c.frV} p={d.frete}/>
+      <R l="Subtotal Índices Gerais" v={totalIndGerV} p={totalIndGerPct} bold sep/>
+
+      {/* ── ÍNDICES COMERCIAIS ── */}
+      <GH t="ÍNDICES COMERCIAIS"/>
+      <R l={`Comissão + Encargos (${pct(d.comis+c.comisXPct)})`} v={c.cmV} p={d.comis+c.comisXPct}/>
+      {d.mkt>0&&<R l={`Marketing (${pct(d.mkt)})`} v={c.mktV} p={d.mkt}/>}
+      {d.rebate>0&&<R l={`Rebate (${pct(d.rebate)})`} v={c.rebateV} p={d.rebate}/>}
+      <R l={`CF Venda (${pct(d.cfVenda)})`} v={c.cfnV} p={d.cfVenda}/>
+      <R l="Subtotal Índices Comerciais" v={totalIndComV} p={totalIndComPct} bold sep/>
+
+      {/* ── RESULTADO ── */}
+      <div style={{height:4}}/>
+      <R l={`MC — Margem de Contribuição`} v={mcV} p={c.mc} bold acc="blue" sep/>
+      <R l={`Custo Fixo (${pct(d.cfixo)})`} v={c.cfxV} p={d.cfixo} indent/>
+      <Sep label="ML — MARGEM LÍQUIDA" v={c.margV} p={c.margPct} color="#059669"/>
+    </div>
+  );
+}
+
 // ── CSS ───────────────────────────────────────────────────────────────────────
 const CSS=`
 @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=DM+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
@@ -595,6 +698,29 @@ input::-webkit-inner-spin-button,input::-webkit-outer-spin-button{-webkit-appear
 .ftwarn{background:rgba(217,119,6,.08);border:1px solid rgba(217,119,6,.2);color:#fbbf24}
 .desp-row{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .desp-modes{display:flex;gap:3px}
+.moeda-toggle{display:flex;align-items:center;gap:7px;padding:7px 14px;border-bottom:1px solid rgba(255,255,255,.07);background:#1c2333;flex-shrink:0}
+.moeda-toggle span{font-size:10px;font-weight:700;color:#5a6a84;letter-spacing:.4px;text-transform:uppercase}
+.moeda-toggle .rgb{flex:none;padding:4px 12px;font-size:11px}
+.bdc{background:#232c3d;border:1px solid rgba(255,255,255,.08);border-radius:8px;overflow:hidden}
+.bdgh{padding:9px 14px;background:#2a3550;font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:#f0f4ff;border-bottom:1px solid rgba(255,255,255,.07);margin-top:0}
+.bdgh:not(:first-child){border-top:2px solid rgba(255,255,255,.06);margin-top:4px}
+.bdr{display:flex;align-items:center;padding:5px 14px;gap:6px;border-bottom:1px solid rgba(255,255,255,.03)}
+.bdr:last-child{border-bottom:none}
+.bdr.bdb{font-weight:700}
+.bdr.bds{border-top:1px solid rgba(255,255,255,.08);margin-top:2px;padding-top:7px}
+.bdr.bdsub .bdl{color:#5a6a84}
+.bdr.red .bdv{color:#f87171}.bdr.green .bdv{color:#4ade80!important}.bdr.blue .bdv{color:#93c5fd}.bdr.warn .bdv{color:#fbbf24}
+.bdr.red .bdp{color:#f87171}.bdr.green .bdp{color:#4ade80}.bdr.blue .bdp{color:#93c5fd}
+.bdl{flex:1;font-size:11px;color:#a8b5cc;line-height:1.3}
+.bdb .bdl{color:#dce7f7;font-weight:700}
+.bdp{width:52px;text-align:right;font-family:'DM Mono',monospace;font-size:10px;color:#5a6a84;flex-shrink:0}
+.bdv{width:100px;text-align:right;font-family:'DM Mono',monospace;font-size:11px;font-weight:500;color:#a8b5cc;flex-shrink:0;display:flex;flex-direction:column;align-items:flex-end;gap:1px}
+.bdb .bdv{font-size:12px;font-weight:700;color:#dce7f7}
+.bdv2{font-size:9px;color:#5a6a84;font-weight:400}
+.bdtot{display:flex;align-items:center;padding:9px 14px;gap:6px;border-top:2px solid rgba(255,255,255,.1);background:#1a2030;margin:2px 0 0}
+.bdtot span:first-child{flex:1;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:#dce7f7}
+.bdtotp{width:52px;text-align:right;font-family:'DM Mono',monospace;font-size:11px;color:#7a90b0;flex-shrink:0}
+.bdtotv{width:100px;text-align:right;font-family:'DM Mono',monospace;font-size:14px;font-weight:800;color:#93c5fd;flex-shrink:0}
 ::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:#1c2333}::-webkit-scrollbar-thumb{background:#2a3550;border-radius:3px}::-webkit-scrollbar-thumb:hover{background:#0047BB}
 `;
 
@@ -607,6 +733,11 @@ export default function App(){
 
   const S=k=>v=>setD(p=>({...p,[k]:v}));
   const SC=k=>v=>setCalcs(p=>({...p,[k]:{...p[k],...v}}));
+  // ── Helpers de moeda (campos BRL que podem ser editados em USD) ──
+  const isBRL=d.moedaCusto!=="USD";
+  const toDisp=v=>isBRL?v:+(v/d.ptax).toFixed(4);
+  const toStore=v=>isBRL?v:+(v*d.ptax).toFixed(4);
+  const sfxM=isBRL?"R$":"USD";
 
   const prod=useMemo(()=>PRODUTOS.find(p=>p.id===d.prodId)||PRODUTOS[0],[d.prodId]);
   const isZFM=prod.uf==="AM";
@@ -654,6 +785,7 @@ export default function App(){
     const pdV=pSI*(d.pd/100),cfxV=pSI*(d.cfixo/100);
     const scV=pSI*(d.scrap/100),ryV=pSI*(d.royal/100);
     const cfnV=pSI*(d.cfVenda/100),frV=pSI*(d.frete/100),cmV=pSI*((d.comis+comisXPct)/100);
+    const mktV=pSI*(d.mkt/100),rebateV=pSI*(d.rebate/100);
     let stV=0,stBase=0;
     if(d.stAtivo&&d.mva>0){stBase=pCI*(1+d.mva/100);stV=Math.max(0,stBase*(d.icmsDestST/100)-icmsV);}
     const pF=pCI+stV;
@@ -673,7 +805,7 @@ export default function App(){
     return{cfrUSD,cfrBRL,iiV,vpl,bkpV,cfrImp,cmvImp,cmvTotal,ppbTot,despesas,
       pcPct,pcEf,pcLabel,pcV,aliqInter,aliqDest,icmsEfPct,icmsV,icmsEfV,
       difal,difalV,ftiPct,ftiV,fcpPct,fcpV,ipi,ipiV,pSI,pCI,
-      margV,indPct,pdV,cfxV,scV,ryV,cfnV,frV,cmV,stV,stBase,pF,pUSD,
+      margV,indPct,pdV,cfxV,scV,ryV,cfnV,frV,cmV,mktV,rebateV,stV,stBase,pF,pUSD,
       cargaTot,cargaPct,margPct,mc,mkp,ufO,intra,deveDifal,margemAlvo,comisXPct};
   },[d,prod,isZFM,pcEntry,ppbTot]);
 
@@ -732,6 +864,12 @@ export default function App(){
           <nav className="tnav">
             {TABS.map((t,i)=><button key={t} className={`tbtn ${tab===t?"on":""}`} onClick={()=>setTab(t)}>{TLBL[i]}</button>)}
           </nav>
+          <div className="moeda-toggle">
+            <span>Moeda de custo</span>
+            <button className={`rgb ${isBRL?"on":""}`} onClick={()=>S("moedaCusto")("BRL")}>BRL</button>
+            <button className={`rgb ${!isBRL?"on":""}`} onClick={()=>S("moedaCusto")("USD")}>USD</button>
+            {!isBRL&&<span style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:"#7a90b0",marginLeft:4}}>× {d.ptax} = BRL</span>}
+          </div>
           <div className="pscroll">
 
           {tab==="perfil"&&<>
@@ -827,7 +965,7 @@ export default function App(){
               <Field label="Aliquota II (TEC)" sfx="%" value={d.aliqII} onChange={S("aliqII")}
                 note={isZFM?"II incide mesmo na ZFM — verificar portaria MDIC/SUFRAMA":undefined}/>
               <DR label="II sobre CFR" value={brl(c.iiV)} accent="red"/>
-              <Field label="Seguro" sfx="R$" value={d.seguroBRL} onChange={S("seguroBRL")}/>
+              <Field label="Seguro" sfx={sfxM} value={toDisp(d.seguroBRL)} onChange={v=>S("seguroBRL")(toStore(v))}/>
 
               {/* Despesas — toggle modo */}
               <div style={{display:"flex",flexDirection:"column",gap:5}}>
@@ -846,19 +984,19 @@ export default function App(){
                     <div className="pbase"><span>Despesas calculadas</span><span>{brl(c.despesas)}</span></div>
                   </>
                 ):(
-                  <Field label="Despesas (manual)" sfx="R$" value={d.despesas} onChange={S("despesas")} hint="SISCOMEX + Despachante + Armazenagem"/>
+                  <Field label="Despesas (manual)" sfx={sfxM} value={toDisp(d.despesas)} onChange={v=>S("despesas")(toStore(v))} hint="SISCOMEX + Despachante + Armazenagem"/>
                 )}
               </div>
 
-              <Field label="Custo Financeiro de Importacao" sfx="R$" value={d.cfImp}
-                onChange={calcs.cfImp.applied?undefined:S("cfImp")}
+              <Field label="Custo Financeiro de Importacao" sfx={sfxM} value={toDisp(d.cfImp)}
+                onChange={calcs.cfImp.applied?undefined:v=>S("cfImp")(toStore(v))}
                 locked={calcs.cfImp.applied}
                 onUnlock={()=>SC("cfImp")({applied:false})}
                 hint="Juros/IOF — entra no VPL"
                 action={<button className={`cbtn ${calcs.cfImp.applied?"cactive":""}`}
                   title={calcs.cfImp.applied?"Recalcular custo financeiro":"Calcular custo financeiro"}
                   onClick={()=>setModal("cfImp")}>$</button>}/>
-              <Field label="CRA / Creditos Fiscais" sfx="R$" value={d.cra} onChange={S("cra")} hint="Certificados / creditos — entram no VPL"/>
+              <Field label="CRA / Creditos Fiscais" sfx={sfxM} value={toDisp(d.cra)} onChange={v=>S("cra")(toStore(v))} hint="Certificados / creditos — entram no VPL"/>
             </Sec>
 
             <Sec title="Resumo" hl>
@@ -906,9 +1044,9 @@ export default function App(){
 
           {tab==="producao"&&<>
             <Sec title="Custos de Producao" tag="BRL">
-              <Field label="Producao / Montagem" sfx="R$" value={d.producao} onChange={S("producao")}/>
-              <Field label="Garantia" sfx="R$" value={d.garantia} onChange={S("garantia")}/>
-              <Field label="Outros Custos BRL" sfx="R$" value={d.outrosBRL} onChange={S("outrosBRL")}/>
+              <Field label="Producao / Montagem" sfx={sfxM} value={toDisp(d.producao)} onChange={v=>S("producao")(toStore(v))}/>
+              <Field label="Garantia" sfx={sfxM} value={toDisp(d.garantia)} onChange={v=>S("garantia")(toStore(v))}/>
+              <Field label="Outros Custos BRL" sfx={sfxM} value={toDisp(d.outrosBRL)} onChange={v=>S("outrosBRL")(toStore(v))}/>
             </Sec>
             <Sec title="BKP — Backup de Custodia" tag="% sobre VPL" hl>
               <Box t="blue">BKP = % sobre o VPL (CFR+II+Desp+Seguro+CF+PPB+CRA).</Box>
@@ -1053,85 +1191,7 @@ export default function App(){
 
           <RevCalc precoAlvo={d.precoAlvo} onChange={S("precoAlvo")} c={c} margem={d.margem}/>
 
-          <div className="strip">
-            {[
-              {l:"FOB",v:usd(d.fobUSD),cls:""},
-              {l:"+",v:"",cls:"arr"},
-              {l:"Frete",v:usd(d.freteUSD)+(calcs.frete.applied?" *":""),cls:calcs.frete.applied?"blue":""},
-              {l:"=",v:"",cls:"arr"},
-              {l:"CFR",v:usd(c.cfrUSD),cls:"hl"},
-              {l:`x ${n3(d.ptax)}`,v:"",cls:"arr"},
-              {l:"CFR (BRL)",v:brl(c.cfrBRL),cls:"blue"},
-              {l:"+II+Desp",v:"",cls:"arr"},
-              {l:"CMV Imp.",v:brl(c.cmvImp),cls:"hl"},
-              {l:"+PPB+Prod",v:"",cls:"arr"},
-              {l:"CMV Total",v:brl(c.cmvTotal),cls:"dk"},
-            ].map((x,i)=>x.cls==="arr"
-              ?<span key={i} style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:"#334155",whiteSpace:"nowrap",flexShrink:0}}>{x.l}</span>
-              :<div key={i} className={`sb ${x.cls}`}><div className="sbl">{x.l}</div><div className="sbv">{x.v}</div></div>
-            )}
-          </div>
-
-          <div className="wfc">
-            <div className="ctit">COMPOSICAO DO PRECO DE VENDA</div>
-            {[
-              {l:"CMV Importacao",v:c.cmvImp,color:"#1a65d4"},
-              ppbTot>0&&{l:"PPB",v:ppbTot,color:"#3a85e0",sub:true},
-              {l:"Producao + BRL",v:d.producao+d.garantia+d.outrosBRL,color:"#5a9de8",sub:true},
-              c.bkpV>0&&{l:`BKP (${pct(d.bkpPct)} VPL)`,v:c.bkpV,color:"#7ab5ef",sub:true},
-              {l:`PIS+COFINS (${c.pcLabel})`,v:c.pcV,color:"#CC0000"},
-              c.icmsEfPct>0&&{l:`ICMS ef. (${pct(c.icmsEfPct)})`,v:c.icmsEfV,color:"#e63946"},
-              c.difal>0&&{l:`DIFAL (${pct(c.difal)})`,v:c.difalV,color:"#ff4d4d"},
-              c.ipi>0&&{l:`IPI (${pct(c.ipi)})`,v:c.ipiV,color:"#b91c1c"},
-              c.ftiPct>0&&{l:`FTI/UEA-AM (${pct(c.ftiPct)})`,v:c.ftiV,color:"#7c3aed"},
-              c.fcpPct>0&&{l:`Fundo Pobreza ${d.ufDestino}`,v:c.fcpV,color:"#dc2626"},
-              c.stV>0&&{l:"ICMS-ST",v:c.stV,color:"#f59e0b"},
-              {l:"P&D",v:c.pdV,color:"#6b7280",sub:true},
-              {l:"Scrap+Royalties",v:c.scV+c.ryV,color:"#6b7280",sub:true},
-              {l:"CF Venda",v:c.cfnV,color:"#9ca3af",sub:true},{l:"Frete+Comissao",v:c.frV+c.cmV,color:"#9ca3af",sub:true},
-              {l:"Custo Fixo (CF)",v:c.cfxV,color:"#4a9de0"},
-              {l:"Margem Liquida (ML)",v:c.margV,color:"#059669"},
-            ].filter(Boolean).map((r,i)=><WF key={i} label={r.l} val={r.v} total={c.pF} color={r.color} sub={r.sub}/>)}
-            <div style={{height:1,background:"#1a2233",margin:"6px 0"}}/>
-            <WF label="PRECO FINAL" val={c.pF} total={c.pF} color="#0047BB" isT/>
-          </div>
-
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-            <div className="dc">
-              <div className="ctit">FORMACAO DO CUSTO</div>
-              <DR label="FOB" value={usd(d.fobUSD)}/><DR label="(+) Frete" value={usd(d.freteUSD)+(calcs.frete.applied?" [calc]":"")}/>
-              <DR label="CFR (USD)" value={usd(c.cfrUSD)} bold/>
-              <DR label="x PTAX" value={`${n3(d.ptax)} R$/USD`}/>
-              <DR label="CFR (BRL)" value={brl(c.cfrBRL)} bold sep/>
-              <DR label="(+) II" value={brl(c.iiV)} accent="red"/>
-              <DR label="(+) Seguro" value={brl(d.seguroBRL)}/>
-              <DR label={`(+) Despesas (${d.despesasModo==="pct"?pct(d.despesasPct)+" CFR":"manual"})`} value={brl(c.despesas)}/>
-              {d.cfImp!==0&&<DR label={`(+) CF Imp.${calcs.cfImp.applied?" [calc]":""}`} value={brl(d.cfImp)} accent={d.cfImp<0?"green":""}/>}
-              <DR label="CMV Importacao" value={brl(c.cmvImp)} bold sep accent="blue"/>
-              {ppbTot>0&&<DR label="(+) PPB" value={brl(ppbTot)}/>}
-              <DR label="(+) Producao+BRL" value={brl(d.producao+d.garantia+d.outrosBRL)}/>
-              <DR label="(+) BKP" value={brl(c.bkpV)}/>
-              <DR label="VPL" value={brl(c.vpl)} bold accent="blue"/>
-              <DR label="CMV Total" value={brl(c.cmvTotal)} bold sep accent="blue"/>
-            </div>
-            <div className="dc">
-              <div className="ctit">IMPOSTOS NA VENDA</div>
-              <DR label={`P/C nominal (${pct(c.pcPct)})`} value={brl(c.pcV)} accent="red"/>
-              <DR label={`ICMS ef. (${pct(c.icmsEfPct)})`} value={brl(c.icmsEfV)} accent={c.icmsEfPct===0?"green":"red"}/>
-              {c.difal>0&&<DR label={`DIFAL (${pct(c.difal)})`} value={brl(c.difalV)} accent="red"/>}
-              {c.ipi>0&&<DR label={`IPI (${pct(c.ipi)})`} value={brl(c.ipiV)} accent="red"/>}
-              {c.stV>0&&<DR label="ICMS-ST" value={brl(c.stV)} accent="warn"/>}
-              <DR label="Carga Total" value={brl(c.cargaTot)} bold sep accent="red"/>
-              <DR label="Carga / Preco" value={pct(c.cargaPct)} bold accent="red"/>
-              <div style={{height:8}}/>
-              <div className="ctit">RESULTADO</div>
-              <DR label="Margem Liq. ML (R$)" value={brl(c.margV)} accent="green"/>
-              <DR label="ML %" value={pct(c.margPct)} bold accent="green"/>
-              <DR label="(+) Custo Fixo CF (R$)" value={brl(c.cfxV)} accent="blue"/>
-              <DR label="MC = ML + CF %" value={pct(c.mc)} bold accent="blue"/>
-              <DR label="Markup s/ CMV" value={`${n3(c.mkp)}x`} accent="blue"/>
-            </div>
-          </div>
+          <BreakdownPanel c={c} d={d} prod={prod} ppbTot={ppbTot} calcs={calcs}/>
         </main>
       </div>
     </div>
