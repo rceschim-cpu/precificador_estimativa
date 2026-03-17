@@ -1541,7 +1541,7 @@ function BreakdownPanel({c,d,prod,ppbTot,calcs}){
         <Row l={`MC — Margem Contribuição${d.margGerAtivo&&d.margGer!==0?" (c/ MG)":""} (${pct(c.mc)})`} v={mcV} acc="blue"/>
         <Row l={`Custo Fixo (${pct(d.cfixo)})`} v={c.cfxV} indent sub/>
         <Row l={`ML — Margem Líquida (${pct(c.margPct)})`} v={c.margV} acc="green"/>
-        {d.margGer!==0&&<Row l={`  ↳ Margem Gerencial (${pct(d.margGer)})`} v={c.margGerV} acc={d.margGer<0?"red":"green"} indent sub/>}
+        {d.margGerAtivo&&d.margGer!==0&&<Row l={`  ↳ Margem Gerencial/Agnóstica (${pct(d.margGer)})`} v={c.margGerV} acc={d.margGer<0?"green":"red"} indent sub/>}
       </Grp>
 
       {/* PREÇO FINAL — fixo */}
@@ -1976,22 +1976,21 @@ function Calculadora({user:currentUser, isAdmin=false}){
     const ipi=prod.ipi;
     const comisXPct=d.comis*(2/3);
     const indPct=d.pd+d.cfixo+d.scrap+d.royal+d.cfVenda+d.frete+d.comis+comisXPct+d.mkt+d.rebate;
-    // MG sempre entra no preço como parte da ML
+    // MG é um índice independente — entra no soma como os outros índices
+    // Valor negativo = crédito = eleva o preço (denominador menor)
     const margGerPct=(d.margGer||0);
-    // soma: indices + margem líquida (que já inclui MG conceitualmente)
-    // MG entra separado no soma para poder isolar no MC
     const soma=(pcEf+pcSubvPct+icmsEfPct+difal+ftiPct+fcpPct+indPct+margGerPct+d.margem)/100;
     const pSI=soma<1?cmvTotal/(1-soma):cmvTotal*99;
     const ipiV=pSI*(ipi/100),pCI=pSI+ipiV;
     const pcV=pSI*(pcEf/100),icmsV=pSI*(aliqInter/100);
     const icmsEfV=pSI*(icmsEfPct/100),difalV=pSI*(difal/100);
     const pcSubvV=pSI*(pcSubvPct/100);
-    // pcBaseRedPct: redução da base do P/C pelo ICMS destacado (para exibição)
     const pcBaseRedPct=pcPct*(aliqInter/100);
     const ftiV=pSI*(ftiPct/100),fcpV=pSI*(fcpPct/100);
-    // ML inclui MG sempre (MG faz parte da margem líquida)
+    // MG como valor isolado (para exibição no breakdown quando toggle ON)
     const margGerV=pSI*(margGerPct/100);
-    const margV=pSI*(d.margem/100)+margGerV;
+    // ML limpa — não inclui MG
+    const margV=pSI*(d.margem/100);
     const pdV=pSI*(d.pd/100),cfxV=pSI*(d.cfixo/100);
     const scV=pSI*(d.scrap/100),ryV=pSI*(d.royal/100);
     const cfnV=pSI*(d.cfVenda/100),frV=pSI*(d.frete/100),cmV=pSI*((d.comis+comisXPct)/100);
@@ -2003,11 +2002,9 @@ function Calculadora({user:currentUser, isAdmin=false}){
     const cargaTot=pcV+ipiV+icmsEfV+difalV+stV+fcpV;
     const cargaPct=pF>0?(cargaTot/pF)*100:0;
     const margPct=pF>0?(margV/pF)*100:0;
-    // MC = Margem de Contribuicao = ML + Custo Fixo (ambos sobre o preco)
-    // MC: toggle OFF → MG não entra na MC (passa "abaixo da linha")
-    //     toggle ON  → MG entra na MC junto com ML e CF
-    const mcMargV = d.margGerAtivo ? margV : pSI*(d.margem/100);
-    const mc=pF>0?((mcMargV+cfxV)/pF)*100:0;
+    // MC: toggle OFF → MG não entra na MC
+    //     toggle ON  → MG entra na MC (aumenta MC, ML permanece igual)
+    const mc=pF>0?((margV+cfxV+(d.margGerAtivo?margGerV:0))/pF)*100:0;
     const mkp=cmvTotal>0?pF/cmvTotal:0;
     let margemAlvo=null;
     if(d.precoAlvo>0){
@@ -2419,12 +2416,7 @@ function Calculadora({user:currentUser, isAdmin=false}){
                 </Sec>
                 <Sec title="Margem Líquida (ML)" hl>
                   <Field label="Margem Líquida desejada" value={d.margem} onChange={S("margem")} sfx="%" hint="% por dentro do preço"/>
-                  {d.margGer!==0&&(
-                    <div style={{fontSize:10,color:d.margGer<0?"#f87171":"#4ade80",fontFamily:"'DM Mono',monospace",textAlign:"right",paddingRight:4,marginTop:2}}>
-                      Margem Gerencial: {d.margGer>0?"+":""}{n3(d.margGer)}% → ML efetiva: {n3(d.margem+d.margGer)}%
-                    </div>
-                  )}
-                  {/* Toggle: impactar MC com Margem Gerencial */}
+                  {/* Toggle: impactar MC com Margem Gerencial/Agnóstica */}
                   <div style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderTop:"1px solid rgba(255,255,255,.06)",marginTop:4}}>
                     <button onClick={()=>S("margGerAtivo")(!d.margGerAtivo)}
                       style={{padding:"3px 10px",fontSize:10,fontWeight:700,fontFamily:"'Barlow Condensed',sans-serif",
@@ -2436,7 +2428,7 @@ function Calculadora({user:currentUser, isAdmin=false}){
                     </button>
                     <span style={{fontSize:11,fontWeight:600,color:d.margGerAtivo?"#fbbf24":"#5a6a84",flex:1}}>Impactar MC com Margem Gerencial/Agnóstica</span>
                   </div>
-                  <DR label={`MC = ML + CF${d.margGerAtivo&&d.margGer!==0?" + Margem Gerencial":""}`} value={pct(c.mc)} bold accent="blue"/>
+                  <DR label={`MC = ML + CF${d.margGerAtivo&&d.margGer!==0?" + Margem Gerencial/Agnóstica":""}`} value={pct(c.mc)} bold accent="blue"/>
                   <DR label="Markup s/ CMV" value={`${n3(c.mkp)}x`} accent="blue"/>
                 </Sec>
               </div>
