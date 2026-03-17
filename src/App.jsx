@@ -2029,9 +2029,34 @@ function Calculadora({user:currentUser, isAdmin=false}){
   const isZFM=prodAtrib.isZFM;
   const isCBU=prodAtrib.isCBU;
   const pcEntry=PC_ZFM.find(e=>e.k===d.pcZfmKey)||PC_ZFM[1];
-  const setProd=id=>{const p=PRODUTOS.find(x=>x.id===id)||PRODUTOS[0];setD(pv=>({...pv,prodId:id,stAtivo:p.mva>0,mva:p.mva,icmsDestST:p.aliqST}));};
+  const setProd=id=>{
+    const p=PRODUTOS.find(x=>x.id===id)||PRODUTOS[0];
+    setD(pv=>({...pv,prodId:id,stAtivo:p.mva>0,mva:p.mva,icmsDestST:p.aliqST}));
+    if(d.modalidade==="CBU") fetchIIParaProd(p.ncm);
+  };
   const setOrigem=origem=>setD(pv=>({...pv,origem}));
-  const setModalidade=modalidade=>setD(pv=>({...pv,modalidade}));
+  const setModalidade=modalidade=>{
+    setD(pv=>({...pv,modalidade}));
+    // Quando CBU selecionado, busca II automaticamente
+    if(modalidade==="CBU") fetchIIParaProd(prod.ncm);
+  };
+
+  const [iiStatus,setIiStatus]=useState(null); // null | "loading" | "ok" | "err"
+  const fetchIIParaProd=async(ncm)=>{
+    setIiStatus("loading");
+    try{
+      const r=await fetch(`/api/ii?ncm=${encodeURIComponent(ncm)}`);
+      const data=await r.json();
+      if(data.ii!=null){
+        setD(pv=>({...pv,aliqII:data.ii}));
+        setIiStatus("ok");
+      } else {
+        setIiStatus("err");
+      }
+    }catch(e){
+      setIiStatus("err");
+    }
+  };
   const ppbTot=useMemo(()=>isCBU?0:PPB_ITEMS.reduce((s,i)=>s+(d.ppbAtivos[i.id]?+d.ppbVals[i.id]||0:0),0),[d.ppbAtivos,d.ppbVals,isCBU]);
 
   const c=useMemo(()=>{
@@ -2263,6 +2288,17 @@ function Calculadora({user:currentUser, isAdmin=false}){
                     {d.modalidade==="SKD"&&(
                       <div style={{marginTop:6,padding:"8px 10px",background:"rgba(217,119,6,.1)",border:"1px solid rgba(217,119,6,.3)",borderRadius:4,fontSize:10,color:"#fbbf24",lineHeight:1.5}}>
                         ⚠️ <strong>SKD — confira o II:</strong> a alíquota de Imposto de Importação da placa pode ser diferente da do produto acabado. Verifique o NCM da placa e ajuste o campo II na aba Importação.
+                      </div>
+                    )}
+                    {d.modalidade==="CBU"&&(
+                      <div style={{marginTop:6,padding:"8px 10px",borderRadius:4,fontSize:10,lineHeight:1.5,
+                        background: iiStatus==="ok"?"rgba(5,150,105,.1)":iiStatus==="err"?"rgba(220,38,38,.1)":"rgba(0,71,187,.08)",
+                        border:`1px solid ${iiStatus==="ok"?"rgba(5,150,105,.3)":iiStatus==="err"?"rgba(220,38,38,.3)":"rgba(0,71,187,.2)"}`,
+                        color: iiStatus==="ok"?"#34d399":iiStatus==="err"?"#f87171":"#93c5fd"}}>
+                        {iiStatus==="loading"&&"⏳ Consultando alíquota de II na Receita Federal..."}
+                        {iiStatus==="ok"&&`✓ II preenchido automaticamente (${n3(d.aliqII)}%) — confira na aba Importação.`}
+                        {iiStatus==="err"&&<>⚠️ Não foi possível buscar o II automaticamente. <button onClick={()=>fetchIIParaProd(prod.ncm)} style={{background:"none",border:"none",color:"#f87171",cursor:"pointer",textDecoration:"underline",fontSize:10}}>Tentar novamente</button></>}
+                        {!iiStatus&&"ℹ️ CBU selecionado — buscando II da Receita Federal..."}
                       </div>
                     )}
                   </div>
