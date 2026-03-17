@@ -1066,6 +1066,7 @@ const DEF={
   pd:3.47,cfixo:4.63,scrap:0.91,royal:1.27,cfVenda:2.11,frete:0.80,
   comis:0.15,comisX:0.10,mkt:0,rebate:0,margem:5,
   margGer:0,margGerAtivo:false,
+  royalModo:"pct",royalUSD:0,
   stAtivo:false,mva:0,icmsDestST:18,precoAlvo:0,
   moedaCusto:"BRL",
 };
@@ -1974,9 +1975,10 @@ function Calculadora({user:currentUser, isAdmin=false}){
     const ipi=prod.ipi;
     const comisXPct=d.comis*(2/3);
     const indPct=d.pd+d.cfixo+d.scrap+d.royal+d.cfVenda+d.frete+d.comis+comisXPct+d.mkt+d.rebate;
-    // MG sempre entra no preço, independente do toggle
+    // MG sempre entra no preço como parte da ML
     const margGerPct=(d.margGer||0);
-    // soma: todos os índices + margem gerencial (pode ser negativa) + margem líquida
+    // soma: indices + margem líquida (que já inclui MG conceitualmente)
+    // MG entra separado no soma para poder isolar no MC
     const soma=(pcEf+pcSubvPct+icmsEfPct+difal+ftiPct+fcpPct+indPct+margGerPct+d.margem)/100;
     const pSI=soma<1?cmvTotal/(1-soma):cmvTotal*99;
     const ipiV=pSI*(ipi/100),pCI=pSI+ipiV;
@@ -2111,21 +2113,24 @@ function Calculadora({user:currentUser, isAdmin=false}){
           <div className="pscroll">
 
           {tab==="perfil"&&<>
-            <Sec title="Produto" tag="NCM / PLAN_TRIB">
-              <select className="psel" value={d.prodId} onChange={e=>setProd(e.target.value)}>
-                {PRODUTOS.map(p=><option key={p.id} value={p.id}>{p.ncm} -- {p.nome}</option>)}
-              </select>
-              <div className="pgrid">
-                {[["NCM",prod.ncm],["Origem",prod.uf],["IPI",pct(prod.ipi)],
-                  ["P/C Base",prod.pcBase==="zmf"?"ZFM":pct(+prod.pcBase)],
-                  ["ICMS NF",pct(prod.icms)],["Cred.Pres.",pct(prod.cred)],
-                  ["MVA",prod.mva>0?pct(prod.mva):"N/A"],["FTI/UEA",prod.fti>0?pct(prod.fti):"--"],
-                ].map(([l,v])=>(
-                  <div key={l} className="pchip"><span className="pcl">{l}</span><span className="pcv">{v}</span></div>
-                ))}
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+              <div style={{display:"flex",flexDirection:"column",gap:10}}>
+                <Sec title="Produto" tag="NCM / PLAN_TRIB">
+                  <select className="psel" value={d.prodId} onChange={e=>setProd(e.target.value)}>
+                    {PRODUTOS.map(p=><option key={p.id} value={p.id}>{p.ncm} -- {p.nome}</option>)}
+                  </select>
+                  <div className="pgrid">
+                    {[["NCM",prod.ncm],["Origem",prod.uf],["IPI",pct(prod.ipi)],
+                      ["P/C Base",prod.pcBase==="zmf"?"ZFM":pct(+prod.pcBase)],
+                      ["ICMS NF",pct(prod.icms)],["Cred.Pres.",pct(prod.cred)],
+                      ["MVA",prod.mva>0?pct(prod.mva):"N/A"],["FTI/UEA",prod.fti>0?pct(prod.fti):"--"],
+                    ].map(([l,v])=>(
+                      <div key={l} className="pchip"><span className="pcl">{l}</span><span className="pcv">{v}</span></div>
+                    ))}
+                  </div>
+                </Sec>
               </div>
-            </Sec>
-
+              <div style={{display:"flex",flexDirection:"column",gap:10}}>
             {isZFM&&prod.pcBase==="zmf"?(
               <Sec title="P/C ZFM — Regime do Comprador" tag="Lei 10.637/02">
                 <Box t="blue">Regime do COMPRADOR determina a aliquota de P/C debitada pelo vendedor.</Box>
@@ -2152,32 +2157,33 @@ function Calculadora({user:currentUser, isAdmin=false}){
                   opts={[{v:"real",l:"Lucro Real — 9,25%"},{v:"presumido",l:"Lucro Presumido — 3,65%"}]}/>
               </Sec>
             )}
-
-            <Sec title="Perfil do Comprador" tag="ICMS / DIFAL">
-              <RG label="Tipo de contribuinte" val={d.tipoComprador} onChange={S("tipoComprador")}
-                opts={[{v:"contrib",l:"Contribuinte ICMS"},{v:"naocontrib",l:"Nao-contribuinte"}]}/>
-              {d.tipoComprador==="contrib"&&(
-                <RG label="Destinacao" val={d.destinacaoCliente} onChange={S("destinacaoCliente")}
-                  opts={[{v:"revenda",l:"Revenda"},{v:"imobilizado",l:"Ativo Imobilizado"}]}/>
-              )}
-              <Box t={c.difal>0?"warn":"ok"}>
-                {d.tipoComprador==="naocontrib"?"Nao-contribuinte: vendedor recolhe DIFAL (EC 87/2015)."
-                  :d.destinacaoCliente==="imobilizado"?"Ativo imobilizado: vendedor recolhe DIFAL."
-                  :"Revenda para contribuinte: DIFAL e responsabilidade do destinatario."}
-              </Box>
-              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}>
-                <span style={{fontSize:12,fontWeight:600,color:"#dce7f7"}}>UF Destino</span>
-                <select className="fsel" value={d.ufDestino} onChange={e=>S("ufDestino")(e.target.value)}>
-                  {UFS.map(u=><option key={u} value={u}>{u}</option>)}
-                </select>
+                <Sec title="Perfil do Comprador" tag="ICMS / DIFAL">
+                  <RG label="Tipo de contribuinte" val={d.tipoComprador} onChange={S("tipoComprador")}
+                    opts={[{v:"contrib",l:"Contribuinte ICMS"},{v:"naocontrib",l:"Nao-contribuinte"}]}/>
+                  {d.tipoComprador==="contrib"&&(
+                    <RG label="Destinacao" val={d.destinacaoCliente} onChange={S("destinacaoCliente")}
+                      opts={[{v:"revenda",l:"Revenda"},{v:"imobilizado",l:"Ativo Imobilizado"}]}/>
+                  )}
+                  <Box t={c.difal>0?"warn":"ok"}>
+                    {d.tipoComprador==="naocontrib"?"Nao-contribuinte: vendedor recolhe DIFAL (EC 87/2015)."
+                      :d.destinacaoCliente==="imobilizado"?"Ativo imobilizado: vendedor recolhe DIFAL."
+                      :"Revenda para contribuinte: DIFAL e responsabilidade do destinatario."}
+                  </Box>
+                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}>
+                    <span style={{fontSize:12,fontWeight:600,color:"#dce7f7"}}>UF Destino</span>
+                    <select className="fsel" value={d.ufDestino} onChange={e=>S("ufDestino")(e.target.value)}>
+                      {UFS.map(u=><option key={u} value={u}>{u}</option>)}
+                    </select>
+                  </div>
+                  <DR label={`ICMS ${c.ufO} -> ${d.ufDestino}`} value={pct(c.aliqInter)} bold/>
+                  <DR label={`ICMS interna ${d.ufDestino}`} value={pct(c.aliqDest)}/>
+                  {c.difal>0&&<DR label={`DIFAL (${c.ufO}->${d.ufDestino})`} value={pct(c.difal)} accent="red" bold/>}
+                  {c.deveDifal&&prod.aliqST>0&&c.difal===0&&(
+                    <Box t="ok">DIFAL zerado: ST cobre.</Box>
+                  )}
+                </Sec>
               </div>
-              <DR label={`ICMS ${c.ufO} -> ${d.ufDestino}`} value={pct(c.aliqInter)} bold/>
-              <DR label={`ICMS interna ${d.ufDestino}`} value={pct(c.aliqDest)}/>
-              {c.difal>0&&<DR label={`DIFAL (${c.ufO}->${d.ufDestino})`} value={pct(c.difal)} accent="red" bold/>}
-              {c.deveDifal&&prod.aliqST>0&&c.difal===0&&(
-                <Box t="ok">DIFAL zerado: ST cobre.</Box>
-              )}
-            </Sec>
+            </div>
           </>}
 
           {tab==="importacao"&&<>
@@ -2305,47 +2311,89 @@ function Calculadora({user:currentUser, isAdmin=false}){
 
           {tab==="indices"&&<>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
-              <div style={{display:"flex",flexDirection:"column",gap:10}}>
-                <Sec title="Índices Gerais" tag="% s/ preço">
-                  <Box t="gray">Calculados por dentro do preço de venda.</Box>
-                  {[["P&D","pd"],["Scrap","scrap"],["Royalties / Qualcomm","royal"],["Frete venda","frete"]
-                  ].map(([l,k])=>(
-                    <Field key={k} label={l} value={d[k]} onChange={S(k)} sfx="%" hint={`≈ ${brl(c.pSI*(d[k]/100))}`}/>
-                  ))}
-                </Sec>
-                <Sec title="Índices Comerciais" tag="% s/ preço">
-                  <Field label="CF Venda" sfx="%" value={d.cfVenda}
-                    onChange={calcs.cfVenda.applied?undefined:S("cfVenda")}
-                    locked={calcs.cfVenda.applied} onUnlock={()=>SC("cfVenda")({applied:false})}
-                    hint={calcs.cfVenda.applied?`${calcs.cfVenda.prazo}d @ ${calcs.cfVenda.taxa}%`:`≈ ${brl(c.cfnV)}`}
-                    action={<button className={`cbtn ${calcs.cfVenda.applied?"cactive":""}`}
-                      title="Calcular CF venda" onClick={()=>setModal("cfVenda")}>%</button>}/>
-                  {[["Comissão","comis"],["Marketing","mkt"],["Rebate","rebate"]
-                  ].map(([l,k])=>(
-                    <Field key={k} label={l} value={d[k]} onChange={S(k)} sfx="%" hint={`≈ ${brl(c.pSI*(d[k]/100))}`}/>
-                  ))}
-                  <div style={{display:"flex",alignItems:"flex-start",gap:8,justifyContent:"space-between"}}>
-                    <div style={{flex:1}}>
-                      <span style={{fontSize:12,fontWeight:600,color:"#dce7f7"}}>Encargos s/ comissões</span>
-                      <div style={{fontSize:10,color:"#7a90b0",fontFamily:"'DM Mono',monospace"}}>{pct(c.comisXPct)} (auto)</div>
-                    </div>
-                    <div className="fw fro" style={{minWidth:100}}>
-                      <span className="fpre">%</span>
-                      <input readOnly value={String(+(c.comisXPct||0).toFixed(3)).replace(".",",")}
-                        style={{background:"none",border:"none",outline:"none",fontFamily:"'DM Mono',monospace",fontSize:11,color:"#94a3b8",padding:"5px 8px",width:70,textAlign:"right"}}/>
-                    </div>
+              <Sec title="Índices Gerais" tag="% s/ preço">
+                <Box t="gray">Calculados por dentro do preço de venda.</Box>
+                {[["P&D","pd"],["Scrap","scrap"],["Frete venda","frete"]
+                ].map(([l,k])=>(
+                  <Field key={k} label={l} value={d[k]} onChange={S(k)} sfx="%" hint={`≈ ${brl(c.pSI*(d[k]/100))}`}/>
+                ))}
+                {/* Royalties — % ou USD */}
+                <div style={{display:"flex",alignItems:"center",gap:6,padding:"4px 0",borderTop:"1px solid rgba(255,255,255,.06)",marginTop:2}}>
+                  <span style={{fontSize:12,fontWeight:600,color:"#dce7f7",flex:1}}>Royalties / Qualcomm</span>
+                  <button onClick={()=>S("royalModo")(d.royalModo==="usd"?"pct":"usd")}
+                    style={{padding:"2px 8px",fontSize:9,fontWeight:700,cursor:"pointer",borderRadius:20,border:"1px solid",
+                      background:d.royalModo==="usd"?"rgba(0,71,187,.2)":"rgba(255,255,255,.05)",
+                      borderColor:d.royalModo==="usd"?"rgba(0,71,187,.5)":"rgba(255,255,255,.12)",
+                      color:d.royalModo==="usd"?"#93c5fd":"#7a90b0"}}>
+                    {d.royalModo==="usd"?"USD":"% "}
+                  </button>
+                </div>
+                {d.royalModo==="usd"?(
+                  <Field label="Royalties (USD)" sfx="USD"
+                    value={d.royalUSD||0}
+                    onChange={v=>{const pct=c.pSI>0?(v*d.ptax/c.pSI)*100:0;setD(p=>({...p,royalUSD:+v,royal:+pct.toFixed(4)}));}}
+                    hint={`≈ ${brl((d.royalUSD||0)*d.ptax)} — ${n3(d.royal)}%`}/>
+                ):(
+                  <Field label="Royalties %" sfx="%" value={d.royal} onChange={v=>{S("royal")(v);setD(p=>({...p,royalUSD:0}));}} hint={`≈ ${brl(c.ryV)}`}/>
+                )}
+              </Sec>
+              <Sec title="Índices Comerciais" tag="% s/ preço">
+                <Field label="CF Venda" sfx="%" value={d.cfVenda}
+                  onChange={calcs.cfVenda.applied?undefined:S("cfVenda")}
+                  locked={calcs.cfVenda.applied} onUnlock={()=>SC("cfVenda")({applied:false})}
+                  hint={calcs.cfVenda.applied?`${calcs.cfVenda.prazo}d @ ${calcs.cfVenda.taxa}%`:`≈ ${brl(c.cfnV)}`}
+                  action={<button className={`cbtn ${calcs.cfVenda.applied?"cactive":""}`}
+                    title="Calcular CF venda" onClick={()=>setModal("cfVenda")}>%</button>}/>
+                {[["Comissão","comis"],["Marketing","mkt"],["Rebate","rebate"]
+                ].map(([l,k])=>(
+                  <Field key={k} label={l} value={d[k]} onChange={S(k)} sfx="%" hint={`≈ ${brl(c.pSI*(d[k]/100))}`}/>
+                ))}
+                <div style={{display:"flex",alignItems:"flex-start",gap:8,justifyContent:"space-between"}}>
+                  <div style={{flex:1}}>
+                    <span style={{fontSize:12,fontWeight:600,color:"#dce7f7"}}>Encargos s/ comissões</span>
+                    <div style={{fontSize:10,color:"#7a90b0",fontFamily:"'DM Mono',monospace"}}>{pct(c.comisXPct)} (auto)</div>
                   </div>
-                  <DR label="Total Índices" value={pct(c.indPct)} bold sep accent="blue"/>
-                </Sec>
-              </div>
+                  <div className="fw fro" style={{minWidth:100}}>
+                    <span className="fpre">%</span>
+                    <input readOnly value={String(+(c.comisXPct||0).toFixed(3)).replace(".",",")}
+                      style={{background:"none",border:"none",outline:"none",fontFamily:"'DM Mono',monospace",fontSize:11,color:"#94a3b8",padding:"5px 8px",width:70,textAlign:"right"}}/>
+                  </div>
+                </div>
+                <DR label="Total Índices" value={pct(c.indPct)} bold sep accent="blue"/>
+              </Sec>
+            </div>
+          </>}
+
+          {tab==="venda"&&<>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
               <div style={{display:"flex",flexDirection:"column",gap:10}}>
+                <Sec title="Impostos de Venda" tag="PLAN_TRIB auto">
+                  <Box t="blue">Alíquotas carregadas do catálogo PLAN_TRIB 09/02/2026.</Box>
+                  <div className="txgrid">
+                    {[
+                      ["IPI Saida",pct(prod.ipi),prod.ipi===0],
+                      ["P/C Debito",c.pcLabel,false],
+                      ["P/C Ef. (base liq.)",pct(c.pcEf),false],
+                      ["ICMS Destacado NF",pct(c.aliqInter),false],
+                      ["Cred. Presumido",pct(prod.cred),true],
+                      ["ICMS Custo Efetivo",pct(c.icmsEfPct),c.icmsEfPct===0],
+                      ["DIFAL",c.difal>0?pct(c.difal):"0% — N/A",c.difal===0],
+                    ].map(([l,v,ok])=>(
+                      <div key={l} className={`txc ${ok?"txok":"txon"}`}>
+                        <div className="txl">{l}</div><div className="txv">{v}</div>
+                      </div>
+                    ))}
+                    {c.ftiPct>0&&<div className="txc txon"><div className="txl">FTI/UEA-AM</div><div className="txv">{pct(c.ftiPct)}</div></div>}
+                    {c.fcpPct>0&&<div className="txc txwn"><div className="txl">Fundo Pobreza {d.ufDestino}</div><div className="txv">{pct(c.fcpPct)}</div></div>}
+                  </div>
+                </Sec>
                 <Sec title="Custo Fixo" tag="% s/ preço">
                   <Box t="gray">CF compõe a MC junto com a ML. MC = ML + CF</Box>
                   <Field label="Custo Fixo" value={d.cfixo} onChange={S("cfixo")} sfx="%" hint={`≈ ${brl(c.cfxV)}`}/>
                 </Sec>
                 <Sec title="Margem Líquida (ML)" hl>
                   <Field label="Margem Líquida desejada" value={d.margem} onChange={S("margem")} sfx="%" hint="% por dentro do preço"/>
-                  {/* Margem Gerencial — sempre impacta ML e preço; toggle controla se entra na MC */}
+                  {/* Margem Gerencial — sempre na ML; toggle controla se entra na MC */}
                   <div style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderTop:"1px solid rgba(255,255,255,.06)",marginTop:2}}>
                     <span style={{fontSize:11,fontWeight:600,color:"#a8b5cc",flex:1}}>Margem Gerencial</span>
                     <div className="fw" style={{minWidth:110}}>
@@ -2376,33 +2424,6 @@ function Calculadora({user:currentUser, isAdmin=false}){
                   </div>
                   <DR label={`MC = ML + CF${d.margGerAtivo&&d.margGer!==0?" + MG":""}`} value={pct(c.mc)} bold accent="blue"/>
                   <DR label="Markup s/ CMV" value={`${n3(c.mkp)}x`} accent="blue"/>
-                </Sec>
-              </div>
-            </div>
-          </>}
-
-          {tab==="venda"&&<>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
-              <div style={{display:"flex",flexDirection:"column",gap:10}}>
-                <Sec title="Impostos de Venda" tag="PLAN_TRIB auto">
-                  <Box t="blue">Alíquotas carregadas do catálogo PLAN_TRIB 09/02/2026.</Box>
-                  <div className="txgrid">
-                    {[
-                      ["IPI Saida",pct(prod.ipi),prod.ipi===0],
-                      ["P/C Debito",c.pcLabel,false],
-                      ["P/C Ef. (base liq.)",pct(c.pcEf),false],
-                      ["ICMS Destacado NF",pct(c.aliqInter),false],
-                      ["Cred. Presumido",pct(prod.cred),true],
-                      ["ICMS Custo Efetivo",pct(c.icmsEfPct),c.icmsEfPct===0],
-                      ["DIFAL",c.difal>0?pct(c.difal):"0% — N/A",c.difal===0],
-                    ].map(([l,v,ok])=>(
-                      <div key={l} className={`txc ${ok?"txok":"txon"}`}>
-                        <div className="txl">{l}</div><div className="txv">{v}</div>
-                      </div>
-                    ))}
-                    {c.ftiPct>0&&<div className="txc txon"><div className="txl">FTI/UEA-AM</div><div className="txv">{pct(c.ftiPct)}</div></div>}
-                    {c.fcpPct>0&&<div className="txc txwn"><div className="txl">Fundo Pobreza {d.ufDestino}</div><div className="txv">{pct(c.fcpPct)}</div></div>}
-                  </div>
                 </Sec>
               </div>
               <div style={{display:"flex",flexDirection:"column",gap:10}}>
