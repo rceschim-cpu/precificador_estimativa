@@ -1062,7 +1062,7 @@ const DEF={
   cfImp:0,cra:0,
   ppbAtivos:{injecao:false,bateria:false,carregador:false,memoria:false,cabo:false,placa:false},
   ppbVals:{injecao:0,bateria:0,carregador:0,memoria:0,cabo:0,placa:0},
-  producao:38.5,garantia:21.27,bkpPct:2,outrosBRL:6.8,ftiAtivo:true,
+  producao:38.5,garantia:21.27,bkpPct:2,outrosBRL:6.8,embalagem:0,ftiAtivo:true,
   pd:3.47,cfixo:4.63,scrap:0.91,royal:1.27,cfVenda:2.11,frete:0.80,
   comis:0.15,comisX:0.10,mkt:0,rebate:0,margem:5,
   margGer:0,margGerAtivo:false,
@@ -1501,6 +1501,7 @@ function BreakdownPanel({c,d,prod,ppbTot,calcs}){
         <Row l="Garantia" v={d.garantia}/>
         <Row l={`BKP (${pct(d.bkpPct)} × VPL)`} v={c.bkpV} indent sub/>
         <Row l="Produção / Montagem" v={d.producao}/>
+        <Row l="Embalagem" v={d.embalagem||0} indent sub/>
         <Row l="Outros Custos" v={d.outrosBRL} indent sub/>
       </Grp>
 
@@ -1950,8 +1951,8 @@ function Calculadora({user:currentUser, isAdmin=false}){
     const cmvImp=cfrBRL+iiV+despesas+d.seguroBRL;
     const vpl=cmvImp+d.cfImp+ppbTot+d.cra;
     const bkpV=vpl*(d.bkpPct/100);
-    // cmvTotal inclui cfImp e cra (custos reais, não só base do BKP)
-    const cmvTotal=cmvImp+d.cfImp+(d.cra||0)+ppbTot+d.producao+d.garantia+bkpV+d.outrosBRL;
+    // cmvTotal inclui cfImp, cra, embalagem e outrosBRL
+    const cmvTotal=cmvImp+d.cfImp+(d.cra||0)+ppbTot+d.producao+d.garantia+bkpV+(d.embalagem||0)+d.outrosBRL;
 
     let pcPct,pcLabel;
     if(isZFM&&prod.pcBase==="zmf"){pcPct=pcEntry.pct;pcLabel=`ZFM ${pct(pcPct)}`;}
@@ -2284,24 +2285,26 @@ function Calculadora({user:currentUser, isAdmin=false}){
           {tab==="producao"&&<>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
               <div style={{display:"flex",flexDirection:"column",gap:10}}>
-                <Sec title="Custos de Produção" tag="sempre R$">
-                  <Box t="gray">Produção, Garantia e Outros sempre em R$.</Box>
+                <Sec title="Custos de Produção" tag="R$">
                   <Field label="Produção / Montagem" sfx="R$" value={d.producao} onChange={S("producao")}/>
-                  <Field label="Garantia" sfx="R$" value={d.garantia} onChange={S("garantia")}/>
-                  <Field label="Outros Custos BRL" sfx="R$" value={d.outrosBRL} onChange={S("outrosBRL")}/>
+                  <Field label="Embalagem" sfx="R$" value={d.embalagem||0} onChange={S("embalagem")}/>
+                  <Field label="Outros Custos" sfx="R$" value={d.outrosBRL} onChange={S("outrosBRL")}/>
                 </Sec>
-              </div>
-              <div style={{display:"flex",flexDirection:"column",gap:10}}>
-                <Sec title="BKP — Backup de Custódia" tag="% sobre VPL" hl>
-                  <Box t="blue">BKP = % sobre VPL.</Box>
-                  <DR label="VPL (base)" value={brl(c.vpl)} bold accent="blue"/>
+                <Sec title="Garantia + BKP — Custódia" tag="% sobre VPL" hl>
+                  <DR label="VPL (base BKP)" value={brl(c.vpl)} bold accent="blue"/>
+                  <Field label="Garantia" sfx="R$" value={d.garantia} onChange={S("garantia")}/>
                   <Field label="BKP (%)" sfx="%" value={d.bkpPct} onChange={S("bkpPct")} hint={`= ${brl(c.bkpV)}`}/>
                   <DR label="BKP (R$)" value={brl(c.bkpV)} accent="blue"/>
                 </Sec>
+              </div>
+              <div style={{display:"flex",flexDirection:"column",gap:10}}>
                 <Sec title="Resumo Custos" hl>
                   <DR label="CMV Importação" value={brl(c.cmvImp)}/>
                   {ppbTot>0&&<DR label="PPB" value={brl(ppbTot)}/>}
-                  <DR label="Produção + BRL" value={brl(d.producao+d.garantia+d.outrosBRL)}/>
+                  <DR label="Produção / Montagem" value={brl(d.producao)}/>
+                  <DR label="Embalagem" value={brl(d.embalagem||0)}/>
+                  <DR label="Outros Custos" value={brl(d.outrosBRL)}/>
+                  <DR label="Garantia" value={brl(d.garantia)}/>
                   <DR label="BKP" value={brl(c.bkpV)}/>
                   <DR label="CMV Total" value={brl(c.cmvTotal)} bold sep accent="blue"/>
                 </Sec>
@@ -2336,7 +2339,52 @@ function Calculadora({user:currentUser, isAdmin=false}){
                 ):(
                   <Field label="Royalties %" sfx="%" value={d.royal} onChange={v=>{S("royal")(v);setD(p=>({...p,royalUSD:0}));}} hint={`≈ ${brl(c.ryV)}`}/>
                 )}
+                {/* Margem Gerencial / Agnóstica — sempre na ML */}
+                <div style={{borderTop:"1px solid rgba(255,255,255,.06)",marginTop:4,paddingTop:6}}>
+                  <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
+                    <span style={{fontSize:12,fontWeight:600,color:"#dce7f7",flex:1}}>Margem Gerencial / Agnóstica</span>
+                    <div className="fw" style={{minWidth:110}}>
+                      <span className="fpre">%</span>
+                      <input type="number" step="0.01"
+                        value={d.margGer}
+                        onChange={e=>S("margGer")(parseFloat(e.target.value)||0)}
+                        style={{background:"none",border:"none",outline:"none",fontFamily:"'DM Mono',monospace",
+                          fontSize:11,fontWeight:500,color:d.margGer<0?"#f87171":"#a8b5cc",padding:"5px 8px",width:80,textAlign:"right"}}/>
+                    </div>
+                  </div>
+                  {d.margGer!==0&&(
+                    <div style={{fontSize:10,color:d.margGer<0?"#f87171":"#4ade80",fontFamily:"'DM Mono',monospace",textAlign:"right",paddingRight:4}}>
+                      {d.margGer<0?"↑ eleva preço (crédito)":"↓ reduz preço"} — {brl(Math.abs(c.margGerV))}
+                    </div>
+                  )}
+                </div>
               </Sec>
+              <Sec title="Índices Comerciais" tag="% s/ preço">
+                <Field label="CF Venda" sfx="%" value={d.cfVenda}
+                  onChange={calcs.cfVenda.applied?undefined:S("cfVenda")}
+                  locked={calcs.cfVenda.applied} onUnlock={()=>SC("cfVenda")({applied:false})}
+                  hint={calcs.cfVenda.applied?`${calcs.cfVenda.prazo}d @ ${calcs.cfVenda.taxa}%`:`≈ ${brl(c.cfnV)}`}
+                  action={<button className={`cbtn ${calcs.cfVenda.applied?"cactive":""}`}
+                    title="Calcular CF venda" onClick={()=>setModal("cfVenda")}>%</button>}/>
+                {[["Comissão","comis"],["Marketing","mkt"],["Rebate","rebate"]
+                ].map(([l,k])=>(
+                  <Field key={k} label={l} value={d[k]} onChange={S(k)} sfx="%" hint={`≈ ${brl(c.pSI*(d[k]/100))}`}/>
+                ))}
+                <div style={{display:"flex",alignItems:"flex-start",gap:8,justifyContent:"space-between"}}>
+                  <div style={{flex:1}}>
+                    <span style={{fontSize:12,fontWeight:600,color:"#dce7f7"}}>Encargos s/ comissões</span>
+                    <div style={{fontSize:10,color:"#7a90b0",fontFamily:"'DM Mono',monospace"}}>{pct(c.comisXPct)} (auto)</div>
+                  </div>
+                  <div className="fw fro" style={{minWidth:100}}>
+                    <span className="fpre">%</span>
+                    <input readOnly value={String(+(c.comisXPct||0).toFixed(3)).replace(".",",")}
+                      style={{background:"none",border:"none",outline:"none",fontFamily:"'DM Mono',monospace",fontSize:11,color:"#94a3b8",padding:"5px 8px",width:70,textAlign:"right"}}/>
+                  </div>
+                </div>
+                <DR label="Total Índices" value={pct(c.indPct)} bold sep accent="blue"/>
+              </Sec>
+            </div>
+          </>}
               <Sec title="Índices Comerciais" tag="% s/ preço">
                 <Field label="CF Venda" sfx="%" value={d.cfVenda}
                   onChange={calcs.cfVenda.applied?undefined:S("cfVenda")}
@@ -2393,24 +2441,12 @@ function Calculadora({user:currentUser, isAdmin=false}){
                 </Sec>
                 <Sec title="Margem Líquida (ML)" hl>
                   <Field label="Margem Líquida desejada" value={d.margem} onChange={S("margem")} sfx="%" hint="% por dentro do preço"/>
-                  {/* Margem Gerencial — sempre na ML; toggle controla se entra na MC */}
-                  <div style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderTop:"1px solid rgba(255,255,255,.06)",marginTop:2}}>
-                    <span style={{fontSize:11,fontWeight:600,color:"#a8b5cc",flex:1}}>Margem Gerencial</span>
-                    <div className="fw" style={{minWidth:110}}>
-                      <span className="fpre">%</span>
-                      <input type="number" step="0.01"
-                        value={d.margGer}
-                        onChange={e=>S("margGer")(parseFloat(e.target.value)||0)}
-                        style={{background:"none",border:"none",outline:"none",fontFamily:"'DM Mono',monospace",
-                          fontSize:11,fontWeight:500,color:d.margGer<0?"#f87171":"#a8b5cc",padding:"5px 8px",width:80,textAlign:"right"}}/>
-                    </div>
-                  </div>
                   {d.margGer!==0&&(
-                    <div style={{fontSize:10,color:"#7a90b0",fontFamily:"'DM Mono',monospace",textAlign:"right",paddingRight:4}}>
-                      Sempre na ML — {brl(Math.abs(c.margGerV))} {d.margGer<0?"(reduz)":"(eleva)"}
+                    <div style={{fontSize:10,color:d.margGer<0?"#f87171":"#4ade80",fontFamily:"'DM Mono',monospace",textAlign:"right",paddingRight:4,marginTop:2}}>
+                      Margem Gerencial: {d.margGer>0?"+":""}{n3(d.margGer)}% → ML efetiva: {n3(d.margem+d.margGer)}%
                     </div>
                   )}
-                  {/* Toggle: impactar MC com MG */}
+                  {/* Toggle: impactar MC com Margem Gerencial */}
                   <div style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderTop:"1px solid rgba(255,255,255,.06)",marginTop:4}}>
                     <button onClick={()=>S("margGerAtivo")(!d.margGerAtivo)}
                       style={{padding:"3px 10px",fontSize:10,fontWeight:700,fontFamily:"'Barlow Condensed',sans-serif",
@@ -2420,9 +2456,9 @@ function Calculadora({user:currentUser, isAdmin=false}){
                         color:d.margGerAtivo?"#fbbf24":"#7a90b0"}}>
                       {d.margGerAtivo?"● ON":"○ OFF"}
                     </button>
-                    <span style={{fontSize:11,fontWeight:600,color:d.margGerAtivo?"#fbbf24":"#5a6a84",flex:1}}>Impactar MC com MG</span>
+                    <span style={{fontSize:11,fontWeight:600,color:d.margGerAtivo?"#fbbf24":"#5a6a84",flex:1}}>Impactar MC com Margem Gerencial/Agnóstica</span>
                   </div>
-                  <DR label={`MC = ML + CF${d.margGerAtivo&&d.margGer!==0?" + MG":""}`} value={pct(c.mc)} bold accent="blue"/>
+                  <DR label={`MC = ML + CF${d.margGerAtivo&&d.margGer!==0?" + Margem Gerencial":""}`} value={pct(c.mc)} bold accent="blue"/>
                   <DR label="Markup s/ CMV" value={`${n3(c.mkp)}x`} accent="blue"/>
                 </Sec>
               </div>
