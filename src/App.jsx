@@ -2345,18 +2345,10 @@ function Calculadora({user:currentUser, isAdmin=false}){
                 </Sec>
                 <Sec title="Margem Líquida (ML)" hl>
                   <Field label="Margem Líquida desejada" value={d.margem} onChange={S("margem")} sfx="%" hint="% por dentro do preço"/>
-                  {/* Margem Gerencial — opcional, pode ser negativa */}
+                  {/* Margem Gerencial — sempre impacta ML e preço; toggle controla se entra na MC */}
                   <div style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderTop:"1px solid rgba(255,255,255,.06)",marginTop:2}}>
-                    <button onClick={()=>S("margGerAtivo")(!d.margGerAtivo)}
-                      style={{padding:"3px 10px",fontSize:10,fontWeight:700,fontFamily:"'Barlow Condensed',sans-serif",
-                        letterSpacing:.4,cursor:"pointer",borderRadius:20,border:"1px solid",transition:".15s",
-                        background:d.margGerAtivo?"rgba(251,191,36,.2)":"rgba(255,255,255,.05)",
-                        borderColor:d.margGerAtivo?"rgba(251,191,36,.5)":"rgba(255,255,255,.12)",
-                        color:d.margGerAtivo?"#fbbf24":"#7a90b0"}}>
-                      {d.margGerAtivo?"● ON":"○ OFF"}
-                    </button>
-                    <span style={{fontSize:11,fontWeight:600,color:d.margGerAtivo?"#fbbf24":"#5a6a84",flex:1}}>Margem Gerencial</span>
-                    <div className="fw" style={{minWidth:110,opacity:d.margGerAtivo?1:.4,pointerEvents:d.margGerAtivo?"auto":"none"}}>
+                    <span style={{fontSize:11,fontWeight:600,color:"#a8b5cc",flex:1}}>Margem Gerencial</span>
+                    <div className="fw" style={{minWidth:110}}>
                       <span className="fpre">%</span>
                       <input type="number" step="0.01"
                         value={d.margGer}
@@ -2366,10 +2358,22 @@ function Calculadora({user:currentUser, isAdmin=false}){
                     </div>
                   </div>
                   {d.margGer!==0&&(
-                    <div style={{fontSize:10,color:d.margGer<0?"#f87171":"#4ade80",fontFamily:"'DM Mono',monospace",textAlign:"right",paddingRight:4}}>
-                      {d.margGer<0?"↓ reduz preço":"↑ eleva preço"} — {brl(Math.abs(c.margGerV))}
+                    <div style={{fontSize:10,color:"#7a90b0",fontFamily:"'DM Mono',monospace",textAlign:"right",paddingRight:4}}>
+                      Sempre na ML — {brl(Math.abs(c.margGerV))} {d.margGer<0?"(reduz)":"(eleva)"}
                     </div>
                   )}
+                  {/* Toggle: impactar MC com MG */}
+                  <div style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderTop:"1px solid rgba(255,255,255,.06)",marginTop:4}}>
+                    <button onClick={()=>S("margGerAtivo")(!d.margGerAtivo)}
+                      style={{padding:"3px 10px",fontSize:10,fontWeight:700,fontFamily:"'Barlow Condensed',sans-serif",
+                        letterSpacing:.4,cursor:"pointer",borderRadius:20,border:"1px solid",transition:".15s",
+                        background:d.margGerAtivo?"rgba(251,191,36,.2)":"rgba(255,255,255,.05)",
+                        borderColor:d.margGerAtivo?"rgba(251,191,36,.5)":"rgba(255,255,255,.12)",
+                        color:d.margGerAtivo?"#fbbf24":"#7a90b0"}}>
+                      {d.margGerAtivo?"● ON":"○ OFF"}
+                    </button>
+                    <span style={{fontSize:11,fontWeight:600,color:d.margGerAtivo?"#fbbf24":"#5a6a84",flex:1}}>Impactar MC com MG</span>
+                  </div>
                   <DR label={`MC = ML + CF${d.margGerAtivo&&d.margGer!==0?" + MG":""}`} value={pct(c.mc)} bold accent="blue"/>
                   <DR label="Markup s/ CMV" value={`${n3(c.mkp)}x`} accent="blue"/>
                 </Sec>
