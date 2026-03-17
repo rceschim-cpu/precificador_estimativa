@@ -2314,7 +2314,8 @@ function Calculadora({user:currentUser, isAdmin=false}){
 
           {tab==="indices"&&<>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
-              <Sec title="Índices Gerais" tag="% s/ preço">
+              <div style={{display:"flex",flexDirection:"column",gap:10}}>
+                <Sec title="Índices Gerais" tag="% s/ preço">
                 <Box t="gray">Calculados por dentro do preço de venda.</Box>
                 {[["P&D","pd"],["Scrap","scrap"],["Frete venda","frete"]
                 ].map(([l,k])=>(
@@ -2359,7 +2360,9 @@ function Calculadora({user:currentUser, isAdmin=false}){
                   )}
                 </div>
               </Sec>
-              <Sec title="Índices Comerciais" tag="% s/ preço">
+              </div>
+              <div style={{display:"flex",flexDirection:"column",gap:10}}>
+                <Sec title="Índices Comerciais" tag="% s/ preço">
                 <Field label="CF Venda" sfx="%" value={d.cfVenda}
                   onChange={calcs.cfVenda.applied?undefined:S("cfVenda")}
                   locked={calcs.cfVenda.applied} onUnlock={()=>SC("cfVenda")({applied:false})}
@@ -2383,32 +2386,7 @@ function Calculadora({user:currentUser, isAdmin=false}){
                 </div>
                 <DR label="Total Índices" value={pct(c.indPct)} bold sep accent="blue"/>
               </Sec>
-            </div>
-          </>}
-              <Sec title="Índices Comerciais" tag="% s/ preço">
-                <Field label="CF Venda" sfx="%" value={d.cfVenda}
-                  onChange={calcs.cfVenda.applied?undefined:S("cfVenda")}
-                  locked={calcs.cfVenda.applied} onUnlock={()=>SC("cfVenda")({applied:false})}
-                  hint={calcs.cfVenda.applied?`${calcs.cfVenda.prazo}d @ ${calcs.cfVenda.taxa}%`:`≈ ${brl(c.cfnV)}`}
-                  action={<button className={`cbtn ${calcs.cfVenda.applied?"cactive":""}`}
-                    title="Calcular CF venda" onClick={()=>setModal("cfVenda")}>%</button>}/>
-                {[["Comissão","comis"],["Marketing","mkt"],["Rebate","rebate"]
-                ].map(([l,k])=>(
-                  <Field key={k} label={l} value={d[k]} onChange={S(k)} sfx="%" hint={`≈ ${brl(c.pSI*(d[k]/100))}`}/>
-                ))}
-                <div style={{display:"flex",alignItems:"flex-start",gap:8,justifyContent:"space-between"}}>
-                  <div style={{flex:1}}>
-                    <span style={{fontSize:12,fontWeight:600,color:"#dce7f7"}}>Encargos s/ comissões</span>
-                    <div style={{fontSize:10,color:"#7a90b0",fontFamily:"'DM Mono',monospace"}}>{pct(c.comisXPct)} (auto)</div>
-                  </div>
-                  <div className="fw fro" style={{minWidth:100}}>
-                    <span className="fpre">%</span>
-                    <input readOnly value={String(+(c.comisXPct||0).toFixed(3)).replace(".",",")}
-                      style={{background:"none",border:"none",outline:"none",fontFamily:"'DM Mono',monospace",fontSize:11,color:"#94a3b8",padding:"5px 8px",width:70,textAlign:"right"}}/>
-                  </div>
-                </div>
-                <DR label="Total Índices" value={pct(c.indPct)} bold sep accent="blue"/>
-              </Sec>
+              </div>
             </div>
           </>}
 
