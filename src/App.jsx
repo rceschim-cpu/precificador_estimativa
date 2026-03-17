@@ -1067,6 +1067,7 @@ const DEF={
   comis:0.15,comisX:0.10,mkt:0,rebate:0,margem:5,
   margGer:0,margGerAtivo:false,
   royalModo:"pct",royalUSD:0,
+  ptaxPreco:0,
   stAtivo:false,mva:0,icmsDestST:18,precoAlvo:0,
   moedaCusto:"BRL",
 };
@@ -1950,7 +1951,8 @@ function Calculadora({user:currentUser, isAdmin=false}){
     const cfrImp=cfrBRL+iiV+despesas;
     const cmvImp=cfrBRL+iiV+despesas+d.seguroBRL;
     const vpl=cmvImp+d.cfImp+ppbTot+d.cra;
-    const bkpV=vpl*(d.bkpPct/100);
+    const bkpBase=vpl+(d.embalagem||0)+d.outrosBRL;
+    const bkpV=bkpBase*(d.bkpPct/100);
     // cmvTotal inclui cfImp, cra, embalagem e outrosBRL
     const cmvTotal=cmvImp+d.cfImp+(d.cra||0)+ppbTot+d.producao+d.garantia+bkpV+(d.embalagem||0)+d.outrosBRL;
 
@@ -1998,13 +2000,13 @@ function Calculadora({user:currentUser, isAdmin=false}){
     let stV=0,stBase=0;
     if(d.stAtivo&&d.mva>0){stBase=pCI*(1+d.mva/100);stV=Math.max(0,stBase*(d.icmsDestST/100)-icmsV);}
     const pF=pCI+stV;
-    const pUSD=d.ptax>0?pF/d.ptax:0;
+    const pUSD=(d.ptaxPreco||d.ptax)>0?pF/(d.ptaxPreco||d.ptax):0;
     const cargaTot=pcV+ipiV+icmsEfV+difalV+stV+fcpV;
     const cargaPct=pF>0?(cargaTot/pF)*100:0;
     const margPct=pF>0?(margV/pF)*100:0;
-    // MC: toggle OFF → MG não entra na MC
-    //     toggle ON  → MG entra na MC (aumenta MC, ML permanece igual)
-    const mc=pF>0?((margV+cfxV+(d.margGerAtivo?margGerV:0))/pF)*100:0;
+    // MC: toggle OFF → sem MG
+    //     toggle ON  → MG negativa reduz MC (é um crédito/benefício)
+    const mc=pF>0?((margV+cfxV-(d.margGerAtivo?margGerV:0))/pF)*100:0;
     const mkp=cmvTotal>0?pF/cmvTotal:0;
     let margemAlvo=null;
     if(d.precoAlvo>0){
@@ -2012,7 +2014,7 @@ function Calculadora({user:currentUser, isAdmin=false}){
       const sf=(pcEf+pcSubvPct+icmsEfPct+difal+ftiPct+fcpPct+indPct+margGerPct)/100;
       margemAlvo=pSIa>0?(1-cmvTotal/pSIa)*100-sf*100:null;
     }
-    return{cfrUSD,cfrBRL,iiV,vpl,bkpV,cfrImp,cmvImp,cmvTotal,ppbTot,despesas,
+    return{cfrUSD,cfrBRL,iiV,vpl,bkpV,bkpBase,cfrImp,cmvImp,cmvTotal,ppbTot,despesas,
       pcPct,pcEf,pcLabel,pcV,pcSubvPct,pcSubvV,pcBaseRedPct,aliqInter,aliqDest,icmsEfPct,icmsV,icmsEfV,
       difal,difalV,ftiPct,ftiV,fcpPct,fcpV,ipi,ipiV,pSI,pCI,
       margV,indPct,pdV,cfxV,scV,ryV,cfnV,frV,cmV,mktV,rebateV,stV,stBase,pF,pUSD,
@@ -2054,6 +2056,20 @@ function Calculadora({user:currentUser, isAdmin=false}){
         <span className="brt">{c.ufO} → {d.ufDestino}</span>
         <span className="bdf">{c.difal>0?`DIFAL ${pct(c.difal)}`:"DIFAL 0%"}</span>
         <div style={{flex:1}}/>
+        {/* Dólar Custo — PTAX para conversão de todos os custos USD */}
+        <div style={{display:"flex",alignItems:"center",gap:6,padding:"3px 10px",background:"rgba(255,255,255,.04)",border:"1px solid rgba(255,255,255,.1)",borderRadius:8}}>
+          <span style={{fontSize:9,fontWeight:700,color:"#5a6a84",letterSpacing:.5,textTransform:"uppercase"}}>Dólar Custo</span>
+          <span style={{fontSize:9,color:"#475569"}}>R$/USD</span>
+          <input type="number" step="0.01" value={d.ptax} onChange={e=>S("ptax")(parseFloat(e.target.value)||0)}
+            style={{background:"none",border:"none",outline:"none",fontFamily:"'DM Mono',monospace",fontSize:12,fontWeight:700,color:"#93c5fd",width:52,textAlign:"right"}}/>
+        </div>
+        {/* Dólar Preço — cotação para precificação indexada em USD */}
+        <div style={{display:"flex",alignItems:"center",gap:6,padding:"3px 10px",background:"rgba(0,71,187,.06)",border:"1px solid rgba(0,71,187,.2)",borderRadius:8}}>
+          <span style={{fontSize:9,fontWeight:700,color:"#5a6a84",letterSpacing:.5,textTransform:"uppercase"}}>Dólar Preço</span>
+          <span style={{fontSize:9,color:"#475569"}}>R$/USD</span>
+          <input type="number" step="0.01" value={d.ptaxPreco||d.ptax} onChange={e=>S("ptaxPreco")(parseFloat(e.target.value)||0)}
+            style={{background:"none",border:"none",outline:"none",fontFamily:"'DM Mono',monospace",fontSize:12,fontWeight:700,color:"#60a5fa",width:52,textAlign:"right"}}/>
+        </div>
         <button onClick={()=>setModal("registros")}
           style={{padding:"4px 12px",background:"rgba(0,71,187,.2)",border:"1px solid rgba(0,71,187,.45)",color:"#93c5fd",fontFamily:"'Barlow Condensed',sans-serif",fontSize:11,fontWeight:700,letterSpacing:.5,cursor:"pointer",borderRadius:20,display:"flex",alignItems:"center",gap:5}}>
           💾 Registros
@@ -2077,7 +2093,7 @@ function Calculadora({user:currentUser, isAdmin=false}){
                   {c.ipi>0&&`s/IPI ${brl(c.pSI)} · IPI ${brl(c.ipiV)} · `}
                   {c.stV>0&&`ST ${brl(c.stV)} · `}
                   {c.difal>0&&`DIFAL ${brl(c.difalV)} · `}
-                  {d.ptax>0&&<span style={{color:"#0047BB"}}>{usd(c.pUSD)}</span>}
+                  {(d.ptaxPreco||d.ptax)>0&&<span style={{color:"#0047BB"}}>{usd(c.pUSD)}{d.ptaxPreco>0&&<span style={{fontSize:9,color:"#5a6a84",marginLeft:3}}>×{n3(d.ptaxPreco)}</span>}</span>}
                 </div>
               </div>
               <div style={{display:"flex",gap:5,flexWrap:"wrap",marginTop:8}}>
@@ -2188,7 +2204,7 @@ function Calculadora({user:currentUser, isAdmin=false}){
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
               <div style={{display:"flex",flexDirection:"column",gap:10}}>
                 <Sec title="FOB + Frete" tag="USD → BRL">
-                  <Box t="blue">CFR = FOB + Frete. Conversão pela PTAX.</Box>
+                  <Box t="blue">CFR = FOB + Frete. Convertido pelo Dólar Custo.</Box>
                   <Field label="FOB" sfx="USD" value={d.fobUSD} onChange={S("fobUSD")}/>
                   <Field label="Frete Internacional" sfx="USD" value={d.freteUSD}
                     onChange={calcs.frete.applied?undefined:S("freteUSD")}
@@ -2196,9 +2212,8 @@ function Calculadora({user:currentUser, isAdmin=false}){
                     action={<button className={`cbtn ${calcs.frete.applied?"cactive":""}`}
                       title="Frete ponderado" onClick={()=>setModal("frete")}>+/-</button>}/>
                   <DR label="CFR (FOB+Frete)" value={usd(c.cfrUSD)} bold/>
-                  <Field label="PTAX" sfx="R$/USD" value={d.ptax} onChange={S("ptax")} hint="Cotação do dia anterior ao DI"/>
                   <div className="cvres">
-                    <span>CFR em BRL</span>
+                    <span>CFR em BRL <span style={{fontSize:9,color:"#5a6a84"}}>× {n3(d.ptax)}</span></span>
                     <span style={{fontFamily:"'DM Mono',monospace",fontSize:16,fontWeight:700,color:"#93c5fd"}}>{brl(c.cfrBRL)}</span>
                   </div>
                 </Sec>
@@ -2288,7 +2303,7 @@ function Calculadora({user:currentUser, isAdmin=false}){
                   <Field label="Outros Custos" sfx="R$" value={d.outrosBRL} onChange={S("outrosBRL")}/>
                 </Sec>
                 <Sec title="Garantia + BKP — Custódia" tag="% sobre VPL" hl>
-                  <DR label="VPL (base BKP)" value={brl(c.vpl)} bold accent="blue"/>
+                  <DR label="VPL + Embalagem + Outros (base BKP)" value={brl(c.vpl+(d.embalagem||0)+d.outrosBRL)} bold accent="blue"/>
                   <Field label="Garantia" sfx="R$" value={d.garantia} onChange={S("garantia")}/>
                   <Field label="BKP (%)" sfx="%" value={d.bkpPct} onChange={S("bkpPct")} hint={`= ${brl(c.bkpV)}`}/>
                   <DR label="BKP (R$)" value={brl(c.bkpV)} accent="blue"/>
@@ -2345,7 +2360,7 @@ function Calculadora({user:currentUser, isAdmin=false}){
                       <span className="fpre">%</span>
                       <input type="number" step="0.01"
                         value={d.margGer}
-                        onChange={e=>S("margGer")(parseFloat(e.target.value)||0)}
+                        onChange={e=>{const v=e.target.value;if(v==="-"||v==="")S("margGer")(v===""?0:v);else{const n=parseFloat(v);if(!isNaN(n))S("margGer")(n);}}}
                         style={{background:"none",border:"none",outline:"none",fontFamily:"'DM Mono',monospace",
                           fontSize:11,fontWeight:500,color:d.margGer<0?"#f87171":"#a8b5cc",padding:"5px 8px",width:80,textAlign:"right"}}/>
                     </div>
