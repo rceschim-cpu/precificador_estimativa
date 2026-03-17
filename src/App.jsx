@@ -1065,6 +1065,7 @@ const DEF={
   producao:38.5,garantia:21.27,bkpPct:2,outrosBRL:6.8,ftiAtivo:true,
   pd:3.47,cfixo:4.63,scrap:0.91,royal:1.27,cfVenda:2.11,frete:0.80,
   comis:0.15,comisX:0.10,mkt:0,rebate:0,margem:5,
+  margGer:0,margGerAtivo:false,
   stAtivo:false,mva:0,icmsDestST:18,precoAlvo:0,
   moedaCusto:"BRL",
 };
@@ -1535,9 +1536,10 @@ function BreakdownPanel({c,d,prod,ppbTot,calcs}){
 
       {/* RESULTADO */}
       <Grp id="res" label="Resultado" total={mcV} color="#2563eb" accentColor="#93c5fd">
-        <Row l={`MC — Margem Contribuição (${pct(c.mc)})`} v={mcV} acc="blue"/>
+        <Row l={`MC — Margem Contribuição${d.margGerAtivo&&d.margGer!==0?" (c/ MG)":""} (${pct(c.mc)})`} v={mcV} acc="blue"/>
         <Row l={`Custo Fixo (${pct(d.cfixo)})`} v={c.cfxV} indent sub/>
         <Row l={`ML — Margem Líquida (${pct(c.margPct)})`} v={c.margV} acc="green"/>
+        {d.margGer!==0&&<Row l={`  ↳ Margem Gerencial (${pct(d.margGer)})`} v={c.margGerV} acc={d.margGer<0?"red":"green"} indent sub/>}
       </Grp>
 
       {/* PREÇO FINAL — fixo */}
@@ -1947,7 +1949,8 @@ function Calculadora({user:currentUser, isAdmin=false}){
     const cmvImp=cfrBRL+iiV+despesas+d.seguroBRL;
     const vpl=cmvImp+d.cfImp+ppbTot+d.cra;
     const bkpV=vpl*(d.bkpPct/100);
-    const cmvTotal=cmvImp+d.producao+d.garantia+bkpV+d.outrosBRL+ppbTot;
+    // cmvTotal inclui cfImp e cra (custos reais, não só base do BKP)
+    const cmvTotal=cmvImp+d.cfImp+(d.cra||0)+ppbTot+d.producao+d.garantia+bkpV+d.outrosBRL;
 
     let pcPct,pcLabel;
     if(isZFM&&prod.pcBase==="zmf"){pcPct=pcEntry.pct;pcLabel=`ZFM ${pct(pcPct)}`;}
@@ -1971,8 +1974,10 @@ function Calculadora({user:currentUser, isAdmin=false}){
     const ipi=prod.ipi;
     const comisXPct=d.comis*(2/3);
     const indPct=d.pd+d.cfixo+d.scrap+d.royal+d.cfVenda+d.frete+d.comis+comisXPct+d.mkt+d.rebate;
-    // soma: pcEf + pcSubvPct + icmsEfPct + difal + demais índices + margem
-    const soma=(pcEf+pcSubvPct+icmsEfPct+difal+ftiPct+fcpPct+indPct+d.margem)/100;
+    // MG sempre entra no preço, independente do toggle
+    const margGerPct=(d.margGer||0);
+    // soma: todos os índices + margem gerencial (pode ser negativa) + margem líquida
+    const soma=(pcEf+pcSubvPct+icmsEfPct+difal+ftiPct+fcpPct+indPct+margGerPct+d.margem)/100;
     const pSI=soma<1?cmvTotal/(1-soma):cmvTotal*99;
     const ipiV=pSI*(ipi/100),pCI=pSI+ipiV;
     const pcV=pSI*(pcEf/100),icmsV=pSI*(aliqInter/100);
@@ -1981,7 +1986,9 @@ function Calculadora({user:currentUser, isAdmin=false}){
     // pcBaseRedPct: redução da base do P/C pelo ICMS destacado (para exibição)
     const pcBaseRedPct=pcPct*(aliqInter/100);
     const ftiV=pSI*(ftiPct/100),fcpV=pSI*(fcpPct/100);
-    const margV=pSI*(d.margem/100);
+    // ML inclui MG sempre (MG faz parte da margem líquida)
+    const margGerV=pSI*(margGerPct/100);
+    const margV=pSI*(d.margem/100)+margGerV;
     const pdV=pSI*(d.pd/100),cfxV=pSI*(d.cfixo/100);
     const scV=pSI*(d.scrap/100),ryV=pSI*(d.royal/100);
     const cfnV=pSI*(d.cfVenda/100),frV=pSI*(d.frete/100),cmV=pSI*((d.comis+comisXPct)/100);
@@ -1994,19 +2001,22 @@ function Calculadora({user:currentUser, isAdmin=false}){
     const cargaPct=pF>0?(cargaTot/pF)*100:0;
     const margPct=pF>0?(margV/pF)*100:0;
     // MC = Margem de Contribuicao = ML + Custo Fixo (ambos sobre o preco)
-    const mc=pF>0?((margV+cfxV)/pF)*100:0;
+    // MC: toggle OFF → MG não entra na MC (passa "abaixo da linha")
+    //     toggle ON  → MG entra na MC junto com ML e CF
+    const mcMargV = d.margGerAtivo ? margV : pSI*(d.margem/100);
+    const mc=pF>0?((mcMargV+cfxV)/pF)*100:0;
     const mkp=cmvTotal>0?pF/cmvTotal:0;
     let margemAlvo=null;
     if(d.precoAlvo>0){
       const pSIa=d.precoAlvo/(1+ipi/100);
-      const sf=(pcEf+pcSubvPct+icmsEfPct+difal+ftiPct+fcpPct+indPct)/100;
+      const sf=(pcEf+pcSubvPct+icmsEfPct+difal+ftiPct+fcpPct+indPct+margGerPct)/100;
       margemAlvo=pSIa>0?(1-cmvTotal/pSIa)*100-sf*100:null;
     }
     return{cfrUSD,cfrBRL,iiV,vpl,bkpV,cfrImp,cmvImp,cmvTotal,ppbTot,despesas,
       pcPct,pcEf,pcLabel,pcV,pcSubvPct,pcSubvV,pcBaseRedPct,aliqInter,aliqDest,icmsEfPct,icmsV,icmsEfV,
       difal,difalV,ftiPct,ftiV,fcpPct,fcpV,ipi,ipiV,pSI,pCI,
       margV,indPct,pdV,cfxV,scV,ryV,cfnV,frV,cmV,mktV,rebateV,stV,stBase,pF,pUSD,
-      cargaTot,cargaPct,margPct,mc,mkp,ufO,intra,deveDifal,margemAlvo,comisXPct};
+      cargaTot,cargaPct,margPct,mc,mkp,ufO,intra,deveDifal,margemAlvo,comisXPct,margGerPct,margGerV};
   },[d,prod,isZFM,pcEntry,ppbTot]);
 
   const TABS=["perfil","importacao","ppb","producao","indices","venda","st"];
@@ -2335,7 +2345,32 @@ function Calculadora({user:currentUser, isAdmin=false}){
                 </Sec>
                 <Sec title="Margem Líquida (ML)" hl>
                   <Field label="Margem Líquida desejada" value={d.margem} onChange={S("margem")} sfx="%" hint="% por dentro do preço"/>
-                  <DR label="MC = ML + Custo Fixo" value={pct(c.mc)} bold accent="blue"/>
+                  {/* Margem Gerencial — opcional, pode ser negativa */}
+                  <div style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderTop:"1px solid rgba(255,255,255,.06)",marginTop:2}}>
+                    <button onClick={()=>S("margGerAtivo")(!d.margGerAtivo)}
+                      style={{padding:"3px 10px",fontSize:10,fontWeight:700,fontFamily:"'Barlow Condensed',sans-serif",
+                        letterSpacing:.4,cursor:"pointer",borderRadius:20,border:"1px solid",transition:".15s",
+                        background:d.margGerAtivo?"rgba(251,191,36,.2)":"rgba(255,255,255,.05)",
+                        borderColor:d.margGerAtivo?"rgba(251,191,36,.5)":"rgba(255,255,255,.12)",
+                        color:d.margGerAtivo?"#fbbf24":"#7a90b0"}}>
+                      {d.margGerAtivo?"● ON":"○ OFF"}
+                    </button>
+                    <span style={{fontSize:11,fontWeight:600,color:d.margGerAtivo?"#fbbf24":"#5a6a84",flex:1}}>Margem Gerencial</span>
+                    <div className="fw" style={{minWidth:110,opacity:d.margGerAtivo?1:.4,pointerEvents:d.margGerAtivo?"auto":"none"}}>
+                      <span className="fpre">%</span>
+                      <input type="number" step="0.01"
+                        value={d.margGer}
+                        onChange={e=>S("margGer")(parseFloat(e.target.value)||0)}
+                        style={{background:"none",border:"none",outline:"none",fontFamily:"'DM Mono',monospace",
+                          fontSize:11,fontWeight:500,color:d.margGer<0?"#f87171":"#a8b5cc",padding:"5px 8px",width:80,textAlign:"right"}}/>
+                    </div>
+                  </div>
+                  {d.margGer!==0&&(
+                    <div style={{fontSize:10,color:d.margGer<0?"#f87171":"#4ade80",fontFamily:"'DM Mono',monospace",textAlign:"right",paddingRight:4}}>
+                      {d.margGer<0?"↓ reduz preço":"↑ eleva preço"} — {brl(Math.abs(c.margGerV))}
+                    </div>
+                  )}
+                  <DR label={`MC = ML + CF${d.margGerAtivo&&d.margGer!==0?" + MG":""}`} value={pct(c.mc)} bold accent="blue"/>
                   <DR label="Markup s/ CMV" value={`${n3(c.mkp)}x`} accent="blue"/>
                 </Sec>
               </div>
