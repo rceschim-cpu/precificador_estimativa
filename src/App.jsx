@@ -1,7 +1,38 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 
-// ── STORAGE ──────────────────────────────────────────────────────────────────
-const KEYS = { users: "ptc_users", session: "ptc_session", perfis: "ptc_perfis" };
+// ── SUPABASE CONFIG ───────────────────────────────────────────────────────────
+const SB_URL = "https://eiihpyzihiqhhwirqwxe.supabase.co";
+const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVpaWhweXppaGlxaGh3aXJxd3hlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM3ODA4MTUsImV4cCI6MjA4OTM1NjgxNX0.7DBHSMAOBUcrEPbpWIq9z87SQlXyxFbV2i98a2boW_s";
+
+const sbFetch = async (path, opts = {}) => {
+  const res = await fetch(`${SB_URL}/rest/v1/${path}`, {
+    ...opts,
+    headers: {
+      "apikey": SB_KEY,
+      "Authorization": `Bearer ${SB_KEY}`,
+      "Content-Type": "application/json",
+      "Prefer": opts.prefer || "return=representation",
+      ...(opts.headers || {}),
+    },
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message || res.statusText);
+  }
+  const text = await res.text();
+  return text ? JSON.parse(text) : null;
+};
+
+const db = {
+  getUsers:    ()          => sbFetch("usuarios?select=*&order=criado_em.asc"),
+  getUserByEmail: (email)  => sbFetch(`usuarios?email=eq.${encodeURIComponent(email)}&select=*`),
+  insertUser:  (u)         => sbFetch("usuarios", { method: "POST", body: JSON.stringify(u) }),
+  updateUser:  (id, data)  => sbFetch(`usuarios?id=eq.${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  deleteUser:  (id)        => sbFetch(`usuarios?id=eq.${id}`, { method: "DELETE", prefer: "return=minimal" }),
+};
+
+// ── STORAGE (sessão local apenas) ─────────────────────────────────────────────
+const KEYS = { session: "ptc_session", perfis: "ptc_perfis" };
 
 // ── MÓDULOS disponíveis no sistema ──
 const MODULOS = [
@@ -11,7 +42,6 @@ const MODULOS = [
   { id: "sap",          label: "Interface SAP",         icone: "🔗", desc: "Em desenvolvimento.", ativo: false },
 ];
 
-// ── PERFIS padrão (seed) ──
 const PERFIS_DEFAULT = [
   { id: "admin",    label: "Administrador",       icone: "⚙️",  cor: "#0047BB", desc: "Acesso total ao sistema. Gerencia usuários e perfis.", modulos: ["precificacao"], sistema: true  },
   { id: "custos",   label: "Depto. de Custos",    icone: "📊", cor: "#059669", desc: "Acesso completo à calculadora.", modulos: ["precificacao"], sistema: false },
@@ -24,36 +54,11 @@ const loadPerfis = () => {
   } catch { return PERFIS_DEFAULT; }
 };
 const savePerfis = (p) => localStorage.setItem(KEYS.perfis, JSON.stringify(p));
-
-// Helper: objeto indexado por id para lookup rápido
 const getPerfisMap = (list) => Object.fromEntries((list||[]).map(p => [p.id, p]));
-
-// PERFIS como objeto estático para compatibilidade com código legado
-// (será substituído por getPerfisMap(loadPerfis()) onde necessário)
 const PERFIS = getPerfisMap(PERFIS_DEFAULT);
 
-const MASTER = {
-  id: "master",
-  nome: "Administrador",
-  email: "admin@positec.com.br",
-  senha: "Positec@2026",
-  perfil: "admin",
-  status: "ativo",
-  criadoEm: new Date("2026-01-01").toISOString(),
-  aprovadoEm: new Date("2026-01-01").toISOString(),
-  aprovadoPor: "sistema",
-};
-
-const loadUsers  = () => { try { return JSON.parse(localStorage.getItem(KEYS.users) || "[]"); } catch { return []; } };
-const saveUsers  = (u) => localStorage.setItem(KEYS.users, JSON.stringify(u));
-const loadSession = () => { try { return JSON.parse(localStorage.getItem(KEYS.session) || "null"); } catch { return null; } };
-const saveSession = (s) => s ? localStorage.setItem(KEYS.session, JSON.stringify(s)) : localStorage.removeItem(KEYS.session);
-
-const getAllUsers = () => {
-  const stored = loadUsers();
-  const hasMaster = stored.find(u => u.id === "master");
-  return hasMaster ? stored : [MASTER, ...stored];
-};
+const loadSession  = () => { try { return JSON.parse(localStorage.getItem(KEYS.session) || "null"); } catch { return null; } };
+const saveSession  = (s) => s ? localStorage.setItem(KEYS.session, JSON.stringify(s)) : localStorage.removeItem(KEYS.session);
 
 // ── HELPERS ──────────────────────────────────────────────────────────────────
 const fmtDate = (iso) => iso ? new Date(iso).toLocaleString("pt-BR", { day:"2-digit", month:"2-digit", year:"numeric", hour:"2-digit", minute:"2-digit" }) : "—";
@@ -463,50 +468,52 @@ function StatusBadge({ status }) {
 
 function AuthScreen({ onLogin }) {
   const [aba, setAba] = useState("login");
-  const [form, setForm] = useState({ email: "", senha: "", nome: "", confirma: "", perfil: "comercial" });
+  const [form, setForm] = useState({ email: "", senha: "", nome: "", confirma: "", perfil: "custos" });
   const [msg, setMsg] = useState(null);
   const [loading, setLoading] = useState(false);
 
   const F = k => v => setForm(p => ({ ...p, [k]: v }));
 
-  const handleLogin = () => {
-    setMsg(null);
-    const users = getAllUsers();
-    const user = users.find(u => u.email.toLowerCase() === form.email.toLowerCase().trim());
-    if (!user) return setMsg({ type: "err", text: "E-mail não encontrado." });
-    if (user.senha !== form.senha) return setMsg({ type: "err", text: "Senha incorreta." });
-    if (user.status === "pendente") return setMsg({ type: "warn", text: "Sua conta ainda não foi aprovada pelo administrador." });
-    if (user.status === "rejeitado") return setMsg({ type: "err", text: "Acesso negado. Conta rejeitada. Entre em contato com o administrador." });
-    if (user.status === "inativo") return setMsg({ type: "err", text: "Conta inativa. Entre em contato com o administrador." });
-    saveSession(user);
-    onLogin(user);
+  const handleLogin = async () => {
+    setMsg(null); setLoading(true);
+    try {
+      const rows = await db.getUserByEmail(form.email.toLowerCase().trim());
+      const user = rows?.[0];
+      if (!user) return setMsg({ type: "err", text: "E-mail não encontrado." });
+      if (user.senha !== form.senha) return setMsg({ type: "err", text: "Senha incorreta." });
+      if (user.status === "pendente") return setMsg({ type: "warn", text: "Sua conta ainda não foi aprovada pelo administrador." });
+      if (user.status === "rejeitado") return setMsg({ type: "err", text: "Acesso negado. Entre em contato com o administrador." });
+      if (user.status === "inativo") return setMsg({ type: "err", text: "Conta inativa. Entre em contato com o administrador." });
+      saveSession(user);
+      onLogin(user);
+    } catch(e) {
+      setMsg({ type: "err", text: "Erro de conexão. Tente novamente." });
+    } finally { setLoading(false); }
   };
 
-  const handleRegister = () => {
+  const handleRegister = async () => {
     setMsg(null);
     if (!form.nome.trim()) return setMsg({ type: "err", text: "Informe seu nome completo." });
     if (!form.email.includes("@")) return setMsg({ type: "err", text: "Informe um e-mail válido." });
     if (form.senha.length < 6) return setMsg({ type: "err", text: "Senha deve ter ao menos 6 caracteres." });
     if (form.senha !== form.confirma) return setMsg({ type: "err", text: "As senhas não conferem." });
-    const users = getAllUsers();
-    if (users.find(u => u.email.toLowerCase() === form.email.toLowerCase().trim()))
-      return setMsg({ type: "err", text: "Este e-mail já está cadastrado." });
-    const novo = {
-      id: Date.now().toString(),
-      nome: form.nome.trim(),
-      email: form.email.toLowerCase().trim(),
-      senha: form.senha,
-      perfil: form.perfil,
-      status: "pendente",
-      criadoEm: new Date().toISOString(),
-      aprovadoEm: null,
-      aprovadoPor: null,
-    };
-    const stored = loadUsers().filter(u => u.id !== "master");
-    saveUsers([...stored, novo]);
-    setMsg({ type: "ok", text: "Cadastro realizado! Aguarde aprovação do administrador para acessar o sistema." });
-    setForm({ email: novo.email, senha: "", nome: "", confirma: "", perfil: "comercial" });
-    setTimeout(() => setAba("login"), 2500);
+    setLoading(true);
+    try {
+      const existing = await db.getUserByEmail(form.email.toLowerCase().trim());
+      if (existing?.length > 0) return setMsg({ type: "err", text: "Este e-mail já está cadastrado." });
+      await db.insertUser({
+        nome: form.nome.trim(),
+        email: form.email.toLowerCase().trim(),
+        senha: form.senha,
+        perfil: form.perfil,
+        status: "pendente",
+      });
+      setMsg({ type: "ok", text: "Cadastro realizado! Aguarde aprovação do administrador." });
+      setForm(p => ({ ...p, senha: "", confirma: "", nome: "" }));
+      setTimeout(() => setAba("login"), 2500);
+    } catch(e) {
+      setMsg({ type: "err", text: "Erro ao cadastrar. Tente novamente." });
+    } finally { setLoading(false); }
   };
 
   return (
@@ -541,7 +548,7 @@ function AuthScreen({ onLogin }) {
               <label>Senha</label>
               <input type="password" placeholder="••••••••" value={form.senha} onChange={e => F("senha")(e.target.value)} onKeyDown={e => e.key === "Enter" && handleLogin()} autoComplete="current-password"/>
             </div>
-            <button className="btn-primary" onClick={handleLogin}>Entrar</button>
+            <button className="btn-primary" onClick={handleLogin} disabled={loading}>{loading?"Entrando...":"Entrar"}</button>
             <div style={{ textAlign: "center", fontSize: 11, color: "var(--muted)" }}>
               Acesso inicial: admin@positec.com.br / Positec@2026
             </div>
@@ -570,7 +577,7 @@ function AuthScreen({ onLogin }) {
               <label>Confirmar senha</label>
               <input type="password" placeholder="Repita a senha" value={form.confirma} onChange={e => F("confirma")(e.target.value)}/>
             </div>
-            <button className="btn-primary" onClick={handleRegister}>Solicitar Acesso</button>
+            <button className="btn-primary" onClick={handleRegister} disabled={loading}>{loading?"Enviando...":"Solicitar Acesso"}</button>
             <div style={{ textAlign: "center", fontSize: 11, color: "var(--muted)", lineHeight: 1.5 }}>
               Seu cadastro será analisado pelo administrador.<br/>Você receberá confirmação após aprovação.
             </div>
@@ -796,36 +803,59 @@ function ViewPerfis({ users }) {
 
 function PainelAdmin({ currentUser }) {
   const [view, setView] = useState("pendentes");
-  const [users, setUsers] = useState(getAllUsers);
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [modal, setModal] = useState(null); // { type: "edit"|"aprovar", user }
+  const [modal, setModal] = useState(null);
 
-  const refresh = () => setUsers(getAllUsers());
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    try { setUsers(await db.getUsers()); }
+    catch(e) { console.error(e); }
+    finally { setLoading(false); }
+  }, []);
 
-  const saveUser = (updated) => {
-    const stored = loadUsers().filter(u => u.id !== "master");
-    const isMaster = updated.id === "master";
-    if (!isMaster) {
-      const idx = stored.findIndex(u => u.id === updated.id);
-      if (idx >= 0) stored[idx] = updated;
-      else stored.push(updated);
-      saveUsers(stored);
-    }
-    refresh();
+  useEffect(() => { refresh(); }, [refresh]);
+
+  const saveUser = async (updated) => {
+    try {
+      const { id, ...data } = updated;
+      await db.updateUser(id, {
+        nome: data.nome, email: data.email, perfil: data.perfil,
+        status: data.status, aprovado_em: data.aprovadoEm || data.aprovado_em,
+        aprovado_por: data.aprovadoPor || data.aprovado_por,
+      });
+      await refresh();
+    } catch(e) { alert("Erro ao salvar: " + e.message); }
     setModal(null);
   };
 
-  const pendentes = users.filter(u => u.status === "pendente");
-  const todos = users.filter(u => {
+  const deleteUser = async (id) => {
+    if (!confirm("Excluir este usuário?")) return;
+    try { await db.deleteUser(id); await refresh(); }
+    catch(e) { alert("Erro ao excluir: " + e.message); }
+  };
+
+  // normaliza campos snake_case do Supabase para camelCase
+  const norm = u => ({
+    ...u,
+    criadoEm: u.criado_em || u.criadoEm,
+    aprovadoEm: u.aprovado_em || u.aprovadoEm,
+    aprovadoPor: u.aprovado_por || u.aprovadoPor,
+  });
+
+  const allUsers = users.map(norm);
+  const pendentes = allUsers.filter(u => u.status === "pendente");
+  const todos = allUsers.filter(u => {
     const q = search.toLowerCase();
     return !q || u.nome.toLowerCase().includes(q) || u.email.toLowerCase().includes(q);
   });
 
   const stats = {
-    total: users.length,
-    ativos: users.filter(u => u.status === "ativo").length,
+    total: allUsers.length,
+    ativos: allUsers.filter(u => u.status === "ativo").length,
     pendentes: pendentes.length,
-    inativos: users.filter(u => u.status === "inativo" || u.status === "rejeitado").length,
+    inativos: allUsers.filter(u => u.status === "inativo" || u.status === "rejeitado").length,
   };
 
   const NAV = [
@@ -936,13 +966,14 @@ function PainelAdmin({ currentUser }) {
                     <td style={{ fontFamily: "JetBrains Mono", fontSize: 11, color: "var(--muted)" }}>{fmtDate(u.criadoEm)}</td>
                     <td style={{ fontSize: 12, color: "var(--muted)" }}>{u.aprovadoPor || "—"}</td>
                     <td><div className="act-row">
-                      {u.id !== "master" && <>
+                      {u.perfil !== "admin" && <>
                         <button className="btn-sm btn-edit" onClick={() => setModal({ type: "edit", user: u })}>✎ Editar</button>
                         {u.status === "ativo" && <button className="btn-sm btn-disable" onClick={() => saveUser({ ...u, status: "inativo" })}>Desativar</button>}
                         {u.status === "inativo" && <button className="btn-sm btn-approve" onClick={() => saveUser({ ...u, status: "ativo" })}>Reativar</button>}
                         {u.status === "pendente" && <button className="btn-sm btn-approve" onClick={() => setModal({ type: "aprovar", user: u })}>Analisar</button>}
+                        <button className="btn-sm btn-reject" onClick={() => deleteUser(u.id)}>Excluir</button>
                       </>}
-                      {u.id === "master" && <span style={{ fontSize: 11, color: "var(--muted)", fontStyle: "italic" }}>master</span>}
+                      {u.perfil === "admin" && <span style={{ fontSize: 11, color: "var(--muted)", fontStyle: "italic" }}>admin</span>}
                     </div></td>
                   </tr>
                 ))}
@@ -1557,23 +1588,34 @@ function BreakdownPanel({c,d,prod,ppbTot,calcs}){
 // ── Modal Gestão de Usuários ─────────────────────────────────────────────────
 function ModalGestaoUsers({ onClose, currentUser }) {
   const [aba, setAba] = useState("pendentes");
-  const [users, setUsers] = useState(getAllUsers);
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [modal, setModal] = useState(null);
   const [perfisLista, setPerfisLista] = useState(loadPerfis);
   const [modalPerfil, setModalPerfil] = useState(null);
   const [confirmDel, setConfirmDel] = useState(null);
 
-  const refresh = () => setUsers(getAllUsers());
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    try { setUsers((await db.getUsers()).map(u=>({...u,criadoEm:u.criado_em,aprovadoEm:u.aprovado_em,aprovadoPor:u.aprovado_por}))); }
+    catch(e) { console.error(e); }
+    finally { setLoading(false); }
+  }, []);
 
-  const saveUser = (updated) => {
-    const stored = loadUsers().filter(u => u.id !== "master");
-    if (updated.id !== "master") {
-      const idx = stored.findIndex(u => u.id === updated.id);
-      if (idx >= 0) stored[idx] = updated; else stored.push(updated);
-      saveUsers(stored);
-    }
-    refresh(); setModal(null);
+  useEffect(() => { refresh(); }, [refresh]);
+
+  const saveUser = async (updated) => {
+    try {
+      await db.updateUser(updated.id, {
+        nome: updated.nome, email: updated.email, perfil: updated.perfil,
+        status: updated.status,
+        aprovado_em: updated.aprovadoEm || null,
+        aprovado_por: updated.aprovadoPor || null,
+      });
+      await refresh();
+    } catch(e) { alert("Erro: " + e.message); }
+    setModal(null);
   };
 
   const salvarPerfil = (p) => {
@@ -2365,11 +2407,6 @@ function Calculadora({user:currentUser, isAdmin=false}){
                           fontSize:11,fontWeight:500,color:d.margGer<0?"#f87171":"#a8b5cc",padding:"5px 8px",width:80,textAlign:"right"}}/>
                     </div>
                   </div>
-                  {d.margGer!==0&&(
-                    <div style={{fontSize:10,color:d.margGer<0?"#f87171":"#4ade80",fontFamily:"'DM Mono',monospace",textAlign:"right",paddingRight:4}}>
-                      {d.margGer<0?"↑ eleva preço (crédito)":"↓ reduz preço"} — {brl(Math.abs(c.margGerV))}
-                    </div>
-                  )}
                 </div>
               </Sec>
               </div>
