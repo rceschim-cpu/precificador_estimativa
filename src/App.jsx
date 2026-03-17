@@ -995,34 +995,70 @@ function PainelAdmin({ currentUser }) {
 // ── DASHBOARD USUÁRIO ─────────────────────────────────────────────────────────
 
 
+// ── PRODUTOS — NCM base sem fábrica ──────────────────────────────────────────
+// uf/ipi/pcBase são definidos dinamicamente pela origem escolhida pelo usuário
 const PRODUTOS = [
-  {id:"pos-mao", ncm:"8470.50.10",nome:"Terminal de Pagamento - MAO",   uf:"AM",ipi:0,    pcBase:"zmf", icms:12,cred:12,mva:0,  aliqST:0,  fti:0  },
-  {id:"nb12-mao",ncm:"8471.30.12",nome:'Notebook/Tablet 8"-14" - MAO',  uf:"AM",ipi:0,    pcBase:"zmf", icms:12,cred:12,mva:35, aliqST:19, fti:0  },
-  {id:"nb19-mao",ncm:"8471.30.19",nome:'Notebook/Tablet 15"+ - MAO',    uf:"AM",ipi:0,    pcBase:"zmf", icms:12,cred:12,mva:35, aliqST:19, fti:0  },
-  {id:"cpu-mao", ncm:"8471.50.10",nome:"CPU Peq. Capac. - MAO",         uf:"AM",ipi:0,    pcBase:"zmf", icms:12,cred:12,mva:35, aliqST:19, fti:0  },
-  {id:"smt-mao", ncm:"8517.13.00",nome:"Smartphone - MAO",              uf:"AM",ipi:0,    pcBase:"zmf", icms:12,cred:12,mva:25, aliqST:19, fti:2.2},
-  {id:"cam-mao", ncm:"8525.89.29",nome:"Smart Camera WiFi - MAO",       uf:"AM",ipi:0,    pcBase:"zmf", icms:12,cred:12,mva:35, aliqST:19, fti:2.2},
-  {id:"mon-mao", ncm:"8528.52.00",nome:"Monitor PPB MAO - MAO",         uf:"AM",ipi:0,    pcBase:"zmf", icms:12,cred:12,mva:25, aliqST:19, fti:0  },
-  {id:"mon3-mao",ncm:"8528.52.00",nome:"Monitor 3o PPB fora ZFM - MAO", uf:"AM",ipi:0,    pcBase:9.25,  icms:12,cred:0, mva:25, aliqST:19, fti:0  },
-  {id:"kbd-mao", ncm:"8471.60.52",nome:"Teclado Imp. Direta - MAO",     uf:"AM",ipi:9.75, pcBase:9.25,  icms:4, cred:3, mva:35, aliqST:19, fti:0  },
-  {id:"nb12-ios",ncm:"8471.30.12",nome:'Notebook/Tablet 8"-14" - IOS',  uf:"BA",ipi:15,   pcBase:9.25,  icms:12,cred:12,mva:35, aliqST:19, fti:0  },
-  {id:"nb19-ios",ncm:"8471.30.19",nome:'Notebook/Tablet 15"+ - IOS',    uf:"BA",ipi:15,   pcBase:9.25,  icms:12,cred:12,mva:35, aliqST:19, fti:0  },
-  {id:"aio-ios", ncm:"8471.49.00",nome:"All In One / Servidor - IOS",   uf:"BA",ipi:9.75, pcBase:9.25,  icms:12,cred:12,mva:35, aliqST:19, fti:0  },
-  {id:"smt-ios", ncm:"8517.13.00",nome:"Smartphone - IOS",              uf:"BA",ipi:15,   pcBase:9.25,  icms:12,cred:12,mva:25, aliqST:19, fti:0  },
-  {id:"mon-ios", ncm:"8528.52.00",nome:"Monitor - IOS",                 uf:"BA",ipi:0,    pcBase:9.25,  icms:12,cred:12,mva:25, aliqST:19, fti:0  },
-  {id:"smt-cwb", ncm:"8517.13.00",nome:"Smartphone - CWB",              uf:"PR",ipi:15,   pcBase:9.25,  icms:4, cred:4, mva:25, aliqST:19, fti:0  },
-  {id:"fp-cwb",  ncm:"8517.14.31",nome:"Feature Phone (linha P) - CWB", uf:"PR",ipi:11.25,pcBase:9.25,  icms:4, cred:4, mva:25, aliqST:19, fti:0  },
-  {id:"vpc-cwb", ncm:"8517.62.77",nome:"Smart Video Porteiro - CWB",    uf:"PR",ipi:15,   pcBase:9.25,  icms:7, cred:0, mva:37, aliqST:19, fti:0  },
-  {id:"tab-cwb", ncm:"8471.30.11",nome:'Tablet 7" - CWB',               uf:"PR",ipi:15,   pcBase:9.25,  icms:7, cred:7, mva:35, aliqST:19, fti:0  },
-  {id:"gw-cwb",  ncm:"8517.62.94",nome:"Smart Central/Gateway - CWB",   uf:"PR",ipi:9.75, pcBase:9.25,  icms:4, cred:4, mva:35, aliqST:19, fti:0  },
-  {id:"spk-cwb", ncm:"8518.22.00",nome:"Caixa de Som Bluetooth - CWB",  uf:"PR",ipi:15,   pcBase:9.25,  icms:4, cred:0, mva:35, aliqST:19, fti:0  },
-  {id:"spg-cwb", ncm:"8536.50.90",nome:"Smart Plug WiFi (Ex03) - CWB",  uf:"PR",ipi:3.25, pcBase:9.25,  icms:7, cred:0, mva:38, aliqST:19, fti:0  },
-  {id:"chr-cwb", ncm:"8504.40.10",nome:"Carregador Celular - CWB",      uf:"PR",ipi:5,    pcBase:9.25,  icms:4, cred:0, mva:50, aliqST:19, fti:0  },
-  {id:"lmp-cwb", ncm:"8539.52.00",nome:"Smart Lampada WiFi - CWB",      uf:"PR",ipi:6.5,  pcBase:9.25,  icms:4, cred:0, mva:63.67,aliqST:19,fti:0 },
-  {id:"rob-cwb", ncm:"8508.11.00",nome:"Smart Robo Aspirador - CWB",    uf:"PR",ipi:6.5,  pcBase:9.25,  icms:4, cred:0, mva:35, aliqST:19, fti:0  },
-  {id:"tot-cwb", ncm:"8471.60.80",nome:"Totem - CWB",                   uf:"PR",ipi:9.75, pcBase:9.25,  icms:7, cred:0, mva:0,  aliqST:0,  fti:0  },
-  {id:"rtr-cwb", ncm:"8517.62.41",nome:"Router Mesh - CWB",             uf:"PR",ipi:15,   pcBase:9.25,  icms:4, cred:0, mva:35, aliqST:19, fti:0  },
+  {id:"pos",  ncm:"8470.50.10", nome:"Terminal de Pagamento",         mva:0,   aliqST:0,   fti:2.2, ipiMAO:0,    ipiIOS:0,    ipiCWB:0,    credMAO:12, credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:4 },
+  {id:"nb12", ncm:"8471.30.12", nome:'Notebook/Tablet 8"-14"',        mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:15,   ipiCWB:15,   credMAO:12, credIOS:12, credCWB:7,  icmsMAO:12, icmsIOS:12, icmsCWB:7 },
+  {id:"nb19", ncm:"8471.30.19", nome:'Notebook/Tablet 15"+',          mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:15,   ipiCWB:15,   credMAO:12, credIOS:12, credCWB:7,  icmsMAO:12, icmsIOS:12, icmsCWB:7 },
+  {id:"tab7", ncm:"8471.30.11", nome:'Tablet 7"',                     mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:15,   ipiCWB:15,   credMAO:12, credIOS:12, credCWB:7,  icmsMAO:12, icmsIOS:12, icmsCWB:7 },
+  {id:"cpu",  ncm:"8471.50.10", nome:"CPU Pequena Capacidade",        mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:9.75, ipiCWB:9.75, credMAO:12, credIOS:12, credCWB:4,  icmsMAO:12, icmsIOS:12, icmsCWB:4 },
+  {id:"aio",  ncm:"8471.49.00", nome:"All In One / Servidor",         mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:9.75, ipiCWB:9.75, credMAO:12, credIOS:12, credCWB:4,  icmsMAO:12, icmsIOS:12, icmsCWB:4 },
+  {id:"smt",  ncm:"8517.13.00", nome:"Smartphone",                    mva:25,  aliqST:19,  fti:2.2, ipiMAO:0,    ipiIOS:15,   ipiCWB:15,   credMAO:12, credIOS:12, credCWB:4,  icmsMAO:12, icmsIOS:12, icmsCWB:4 },
+  {id:"fp",   ncm:"8517.14.31", nome:"Feature Phone (linha P)",       mva:25,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:11.25,ipiCWB:11.25,credMAO:12, credIOS:0,  credCWB:4,  icmsMAO:12, icmsIOS:12, icmsCWB:4 },
+  {id:"vpc",  ncm:"8517.62.77", nome:"Smart Video Porteiro",          mva:37,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:15,   ipiCWB:15,   credMAO:12, credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:7 },
+  {id:"rtr",  ncm:"8517.62.41", nome:"Router Mesh",                   mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:15,   ipiCWB:15,   credMAO:12, credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:4 },
+  {id:"gw",   ncm:"8517.62.94", nome:"Smart Central/Gateway",         mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:9.75, ipiCWB:9.75, credMAO:12, credIOS:0,  credCWB:4,  icmsMAO:12, icmsIOS:12, icmsCWB:4 },
+  {id:"cam",  ncm:"8525.89.29", nome:"Smart Camera WiFi",             mva:35,  aliqST:19,  fti:2.2, ipiMAO:0,    ipiIOS:15,   ipiCWB:15,   credMAO:12, credIOS:12, credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:7 },
+  {id:"mon",  ncm:"8528.52.00", nome:"Monitor PPB",                   mva:25,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:0,    ipiCWB:0,    credMAO:12, credIOS:12, credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:7 },
+  {id:"kbd",  ncm:"8471.60.52", nome:"Teclado Importação Direta",     mva:35,  aliqST:19,  fti:0,   ipiMAO:9.75, ipiIOS:9.75, ipiCWB:9.75, credMAO:3,  credIOS:3,  credCWB:0,  icmsMAO:4,  icmsIOS:12, icmsCWB:4 },
+  {id:"tot",  ncm:"8471.60.80", nome:"Totem",                         mva:0,   aliqST:0,   fti:0,   ipiMAO:0,    ipiIOS:9.75, ipiCWB:9.75, credMAO:12, credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:7 },
+  {id:"spk",  ncm:"8518.22.00", nome:"Caixa de Som Bluetooth",        mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:15,   ipiCWB:15,   credMAO:12, credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:4 },
+  {id:"chr",  ncm:"8504.40.10", nome:"Carregador Celular",            mva:50,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:5,    ipiCWB:5,    credMAO:12, credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:4 },
+  {id:"lmp",  ncm:"8539.52.00", nome:"Smart Lâmpada WiFi",            mva:63.67,aliqST:19, fti:0,   ipiMAO:0,    ipiIOS:6.5,  ipiCWB:6.5,  credMAO:12, credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:4 },
+  {id:"rob",  ncm:"8508.11.00", nome:"Smart Robô Aspirador",          mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:6.5,  ipiCWB:6.5,  credMAO:12, credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:4 },
+  {id:"spg",  ncm:"8536.50.90", nome:"Smart Plug WiFi",               mva:38,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:3.25, ipiCWB:3.25, credMAO:12, credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:7 },
 ];
+
+// ── ORIGENS e MODALIDADES ─────────────────────────────────────────────────────
+const ORIGENS = [
+  { id:"MAO", label:"MAO — Manaus",      uf:"AM", zmf:true  },
+  { id:"IOS", label:"IOS — Ilhéus (BA)", uf:"BA", zmf:false },
+  { id:"CWB", label:"CWB — Curitiba (PR)",uf:"PR", zmf:false },
+];
+const MODALIDADES = [
+  { id:"CKD", label:"CKD — Componentes importados + produção nacional",
+    desc:"Importação de componentes desagregados. PPB obrigatório aplicável." },
+  { id:"SKD", label:"SKD — Semi knocked down (placa importada)",
+    desc:"Placa principal importada já montada. Produção parcial nacional." },
+  { id:"CBU", label:"CBU — Produto acabado importado",
+    desc:"Produto 100% importado pronto para comercialização. PPB não se aplica." },
+];
+
+// Resolve atributos do produto baseado em origem + modalidade
+const getProdAtributos = (prod, origem, modalidade) => {
+  const o = ORIGENS.find(x=>x.id===origem) || ORIGENS[0];
+  const isCBU = modalidade === "CBU";
+  const k = origem.toLowerCase(); // "mao" | "ios" | "cwb"
+
+  // CBU: todos os impostos de importação cheios, sem isenções ZFM
+  // CKD/SKD em MAO: isenções ZFM
+  // CKD/SKD em IOS/CWB: impostos cheios (CWB tem ICMS com possível deságio 35%)
+  return {
+    uf: o.uf,
+    ipi:  isCBU ? prod[`ipi${origem}`]  : prod[`ipi${origem}`],
+    pcBase: o.zmf && !isCBU ? "zmf" : 9.25,
+    icms: prod[`icms${origem}`],
+    cred: isCBU ? 0 : prod[`cred${origem}`],
+    mva:  prod.mva,
+    aliqST: prod.aliqST,
+    fti:  o.zmf && !isCBU ? prod.fti : 0,
+    // CBU: PIS/COFINS cheio (pcBase vira 9.25 acima), sem FTI
+    // CBU: ICMS da UF importadora (SP por padrão, editável)
+    isCBU,
+    isZFM: o.zmf && !isCBU,
+  };
+};
 
 const PC_ZFM = [
   {k:"dentro_zmf",   label:"Comprador dentro da ZFM",pct:0,
@@ -1086,8 +1122,10 @@ const n3=v=>(+v||0).toFixed(3).replace(/\.?0+$/,"").replace(".",",");
 const parse=s=>parseFloat(String(s).replace(",","."))||0;
 
 const DEF={
-  prodId:"pos-mao",pcZfmKey:"nao_cumulativo",regimeVendedor:"real",
+  prodId:"pos", origem:"MAO", modalidade:"CKD",
+  pcZfmKey:"nao_cumulativo",regimeVendedor:"real",
   tipoComprador:"contrib",destinacaoCliente:"revenda",ufDestino:"SP",
+  icmsDiferimento:0,
   fobUSD:0,freteUSD:0,ptax:0,seguroBRL:0,aliqII:0,
   despesas:0,despesasPct:0,despesasModo:"pct",
   cfImp:0,cra:0,
@@ -1987,10 +2025,14 @@ function Calculadora({user:currentUser, isAdmin=false}){
   const sfxM=isBRL?"R$":"USD";
 
   const prod=useMemo(()=>PRODUTOS.find(p=>p.id===d.prodId)||PRODUTOS[0],[d.prodId]);
-  const isZFM=prod.uf==="AM";
+  const prodAtrib=useMemo(()=>getProdAtributos(prod,d.origem||"MAO",d.modalidade||"CKD"),[prod,d.origem,d.modalidade]);
+  const isZFM=prodAtrib.isZFM;
+  const isCBU=prodAtrib.isCBU;
   const pcEntry=PC_ZFM.find(e=>e.k===d.pcZfmKey)||PC_ZFM[1];
   const setProd=id=>{const p=PRODUTOS.find(x=>x.id===id)||PRODUTOS[0];setD(pv=>({...pv,prodId:id,stAtivo:p.mva>0,mva:p.mva,icmsDestST:p.aliqST}));};
-  const ppbTot=useMemo(()=>PPB_ITEMS.reduce((s,i)=>s+(d.ppbAtivos[i.id]?+d.ppbVals[i.id]||0:0),0),[d.ppbAtivos,d.ppbVals]);
+  const setOrigem=origem=>setD(pv=>({...pv,origem}));
+  const setModalidade=modalidade=>setD(pv=>({...pv,modalidade}));
+  const ppbTot=useMemo(()=>isCBU?0:PPB_ITEMS.reduce((s,i)=>s+(d.ppbAtivos[i.id]?+d.ppbVals[i.id]||0:0),0),[d.ppbAtivos,d.ppbVals,isCBU]);
 
   const c=useMemo(()=>{
     const cfrUSD=d.fobUSD+d.freteUSD;
@@ -2006,25 +2048,29 @@ function Calculadora({user:currentUser, isAdmin=false}){
     const cmvTotal=cmvImp+d.cfImp+(d.cra||0)+ppbTot+d.producao+d.garantia+bkpV+(d.embalagem||0)+d.outrosBRL;
 
     let pcPct,pcLabel;
-    if(isZFM&&prod.pcBase==="zmf"){pcPct=pcEntry.pct;pcLabel=`ZFM ${pct(pcPct)}`;}
-    else if(typeof prod.pcBase==="number"){pcPct=prod.pcBase;pcLabel=pct(pcPct);}
+    if(isZFM&&prodAtrib.pcBase==="zmf"){pcPct=pcEntry.pct;pcLabel=`ZFM ${pct(pcPct)}`;}
+    else if(typeof prodAtrib.pcBase==="number"){pcPct=prodAtrib.pcBase;pcLabel=pct(pcPct);}
     else{pcPct=d.regimeVendedor==="presumido"?3.65:9.25;pcLabel=pct(pcPct);}
 
-    const ufO=prod.uf,ufD=d.ufDestino,intra=ufO===ufD;
+    const ufO=prodAtrib.uf,ufD=d.ufDestino,intra=ufO===ufD;
     const aliqInter=getICMS(ufO,ufD);
     const aliqDest=ALIQ_INT[ufD]||18;
-    const icmsEfPct=Math.max(0,aliqInter-prod.cred);
+    // CWB: ICMS com deságio de 35% na importação
+    const icmsOrigemEf = prodAtrib.uf==="PR" ? prodAtrib.icms*(1-0.35) : prodAtrib.icms;
+    // CBU: diferimento parcial/total do ICMS importação
+    const icmsImpEf = isCBU ? prodAtrib.icms*(1-(d.icmsDiferimento||0)/100) : icmsOrigemEf;
+    const icmsEfPct=Math.max(0,aliqInter-prodAtrib.cred);
     let difal=0;
     const deveDifal=d.tipoComprador==="naocontrib"||(d.tipoComprador==="contrib"&&d.destinacaoCliente==="imobilizado");
-    if(!intra&&deveDifal){const delta=aliqDest-aliqInter;if(delta>0)difal=(prod.aliqST>0&&delta<prod.aliqST)?0:delta;}
+    if(!intra&&deveDifal){const delta=aliqDest-aliqInter;if(delta>0)difal=(prodAtrib.aliqST>0&&delta<prodAtrib.aliqST)?0:delta;}
 
     // pcEf: usa aliqInter (incidência cheia) — a base do P/C é reduzida pelo ICMS destacado na NF, não pelo líquido
     const pcEf=pcPct*(1-(aliqInter+difal)/100);  // ex: 3,65% × (1-12%-6%) = 2,993%
     // pcSubvPct: sempre 9,25% sobre o crédito presumido (P/C sobre receita de subvenção) — é um custo
-    const pcSubvPct=prod.cred>0?+(9.25*(prod.cred/100)).toFixed(6):0;  // ex: 9,25% × 12% = 1,11%
-    const ftiPct=(isZFM&&d.ftiAtivo)?prod.fti:0;
+    const pcSubvPct=prodAtrib.cred>0?+(9.25*(prodAtrib.cred/100)).toFixed(6):0;
+    const ftiPct=(isZFM&&d.ftiAtivo)?prodAtrib.fti:0;
     const fcpPct=FCP[ufD]||0;
-    const ipi=prod.ipi;
+    const ipi=prodAtrib.ipi;
     const comisXPct=d.comis*(2/3);
     const indPct=d.pd+d.cfixo+d.scrap+d.royal+d.cfVenda+d.frete+d.comis+comisXPct+d.mkt+d.rebate;
     // MG é um índice independente — entra no soma como os outros índices
@@ -2068,7 +2114,7 @@ function Calculadora({user:currentUser, isAdmin=false}){
       difal,difalV,ftiPct,ftiV,fcpPct,fcpV,ipi,ipiV,pSI,pCI,
       margV,indPct,pdV,cfxV,scV,ryV,cfnV,frV,cmV,mktV,rebateV,stV,stBase,pF,pUSD,
       cargaTot,cargaPct,margPct,mc,mkp,ufO,intra,deveDifal,margemAlvo,comisXPct,margGerPct,margGerV};
-  },[d,prod,isZFM,pcEntry,ppbTot]);
+  },[d,prod,prodAtrib,isZFM,isCBU,pcEntry,ppbTot]);
 
   const TABS=["perfil","importacao","ppb","producao","indices","venda","st"];
   const TLBL=["Perfil","Importacao","PPB","Producao","Indices","Venda","ST"];
@@ -2100,8 +2146,9 @@ function Calculadora({user:currentUser, isAdmin=false}){
       {/* sub-header: badges de contexto + botão Registros */}
       <div style={{display:"flex",alignItems:"center",gap:6,padding:"6px 16px",background:"#1e2a3d",borderBottom:"1px solid rgba(255,255,255,.07)",flexWrap:"wrap",flexShrink:0,flexBasis:"auto"}}>
         {isZFM&&<span className="buf zmf">ZFM / MAO</span>}
-        {prod.uf==="BA"&&<span className="buf ios">IOS / BA</span>}
-        {prod.uf==="PR"&&<span className="buf cwb">CWB / PR</span>}
+        {prodAtrib.uf==="BA"&&<span className="buf ios">IOS / BA</span>}
+        {prodAtrib.uf==="PR"&&<span className="buf cwb">CWB / PR</span>}
+        {isCBU&&<span className="buf" style={{background:"rgba(220,38,38,.15)",color:"#f87171",border:"1px solid rgba(220,38,38,.3)"}}>CBU</span>}
         <span className="brt">{c.ufO} → {d.ufDestino}</span>
         <span className="bdf">{c.difal>0?`DIFAL ${pct(c.difal)}`:"DIFAL 0%"}</span>
         <div style={{flex:1}}/>
@@ -2180,21 +2227,60 @@ function Calculadora({user:currentUser, isAdmin=false}){
               <div style={{display:"flex",flexDirection:"column",gap:10}}>
                 <Sec title="Produto" tag="NCM / PLAN_TRIB">
                   <select className="psel" value={d.prodId} onChange={e=>setProd(e.target.value)}>
-                    {PRODUTOS.map(p=><option key={p.id} value={p.id}>{p.ncm} -- {p.nome}</option>)}
+                    {PRODUTOS.map(p=><option key={p.id} value={p.id}>{p.ncm} — {p.nome}</option>)}
                   </select>
-                  <div className="pgrid">
-                    {[["NCM",prod.ncm],["Origem",prod.uf],["IPI",pct(prod.ipi)],
-                      ["P/C Base",prod.pcBase==="zmf"?"ZFM":pct(+prod.pcBase)],
-                      ["ICMS NF",pct(prod.icms)],["Cred.Pres.",pct(prod.cred)],
-                      ["MVA",prod.mva>0?pct(prod.mva):"N/A"],["FTI/UEA",prod.fti>0?pct(prod.fti):"--"],
+                  {/* Origem de Fabricação */}
+                  <div style={{marginTop:6}}>
+                    <div style={{fontSize:10,fontWeight:700,color:"#5a6a84",textTransform:"uppercase",letterSpacing:.5,marginBottom:5}}>Origem de Fabricação</div>
+                    <div style={{display:"flex",gap:6}}>
+                      {ORIGENS.map(o=>(
+                        <button key={o.id} onClick={()=>setOrigem(o.id)}
+                          style={{flex:1,padding:"6px 4px",fontSize:10,fontWeight:700,cursor:"pointer",borderRadius:4,border:"1px solid",transition:".15s",
+                            background:d.origem===o.id?"rgba(0,71,187,.25)":"rgba(255,255,255,.04)",
+                            borderColor:d.origem===o.id?"#0047BB":"rgba(255,255,255,.1)",
+                            color:d.origem===o.id?"#93c5fd":"#7a90b0"}}>
+                          {o.id}
+                        </button>
+                      ))}
+                    </div>
+                    <div style={{fontSize:9,color:"#5a6a84",marginTop:4}}>{ORIGENS.find(o=>o.id===d.origem)?.label}</div>
+                  </div>
+                  {/* Modalidade de Importação */}
+                  <div style={{marginTop:6}}>
+                    <div style={{fontSize:10,fontWeight:700,color:"#5a6a84",textTransform:"uppercase",letterSpacing:.5,marginBottom:5}}>Modalidade</div>
+                    <div style={{display:"flex",gap:6}}>
+                      {MODALIDADES.map(m=>(
+                        <button key={m.id} onClick={()=>setModalidade(m.id)}
+                          style={{flex:1,padding:"6px 4px",fontSize:10,fontWeight:700,cursor:"pointer",borderRadius:4,border:"1px solid",transition:".15s",
+                            background:d.modalidade===m.id?(m.id==="CBU"?"rgba(220,38,38,.2)":m.id==="SKD"?"rgba(217,119,6,.2)":"rgba(0,71,187,.25)"):"rgba(255,255,255,.04)",
+                            borderColor:d.modalidade===m.id?(m.id==="CBU"?"#dc2626":m.id==="SKD"?"#d97706":"#0047BB"):"rgba(255,255,255,.1)",
+                            color:d.modalidade===m.id?(m.id==="CBU"?"#f87171":m.id==="SKD"?"#fbbf24":"#93c5fd"):"#7a90b0"}}>
+                          {m.id}
+                        </button>
+                      ))}
+                    </div>
+                    <div style={{fontSize:9,color:"#5a6a84",marginTop:4}}>{MODALIDADES.find(m=>m.id===d.modalidade)?.desc}</div>
+                  </div>
+                  {/* Atributos calculados */}
+                  <div className="pgrid" style={{marginTop:6}}>
+                    {[["NCM",prod.ncm],["UF Origem",prodAtrib.uf],["IPI",pct(prodAtrib.ipi)],
+                      ["P/C Base",prodAtrib.pcBase==="zmf"?"ZFM":pct(+prodAtrib.pcBase)],
+                      ["ICMS NF",pct(prodAtrib.icms)],["Cred.Pres.",pct(prodAtrib.cred)],
+                      ["MVA",prod.mva>0?pct(prod.mva):"N/A"],["FTI/UEA",prodAtrib.fti>0?pct(prodAtrib.fti):"--"],
                     ].map(([l,v])=>(
                       <div key={l} className="pchip"><span className="pcl">{l}</span><span className="pcv">{v}</span></div>
                     ))}
                   </div>
+                  {isCBU&&(
+                    <div style={{marginTop:6}}>
+                      <Box t="warn">CBU — PPB desabilitado. ICMS importação pela UF do importador.</Box>
+                      <Field label="Diferimento ICMS importação" sfx="%" value={d.icmsDiferimento||0} onChange={S("icmsDiferimento")} hint="0% = sem diferimento / 100% = diferimento total"/>
+                    </div>
+                  )}
                 </Sec>
               </div>
               <div style={{display:"flex",flexDirection:"column",gap:10}}>
-            {isZFM&&prod.pcBase==="zmf"?(
+            {isZFM&&prodAtrib.pcBase==="zmf"?(
               <Sec title="P/C ZFM — Regime do Comprador" tag="Lei 10.637/02">
                 <Box t="blue">Regime do COMPRADOR determina a aliquota de P/C debitada pelo vendedor.</Box>
                 <div style={{display:"flex",flexDirection:"column",gap:4}}>
@@ -2241,7 +2327,7 @@ function Calculadora({user:currentUser, isAdmin=false}){
                   <DR label={`ICMS ${c.ufO} -> ${d.ufDestino}`} value={pct(c.aliqInter)} bold/>
                   <DR label={`ICMS interna ${d.ufDestino}`} value={pct(c.aliqDest)}/>
                   {c.difal>0&&<DR label={`DIFAL (${c.ufO}->${d.ufDestino})`} value={pct(c.difal)} accent="red" bold/>}
-                  {c.deveDifal&&prod.aliqST>0&&c.difal===0&&(
+                  {c.deveDifal&&prodAtrib.aliqST>0&&c.difal===0&&(
                     <Box t="ok">DIFAL zerado: ST cobre.</Box>
                   )}
                 </Sec>
@@ -2308,6 +2394,9 @@ function Calculadora({user:currentUser, isAdmin=false}){
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
               <div style={{display:"flex",flexDirection:"column",gap:10}}>
                 <Sec title="Itens de PPB" tag="Processo Produtivo">
+                  {isCBU
+                    ? <Box t="warn">Modalidade CBU — produto acabado importado. PPB não se aplica.</Box>
+                    : <>
                   <Box t="blue">Marque os itens do PPB. Incorporados ao CMV e VPL.</Box>
                   {PPB_ITEMS.map(item=>(
                     <div key={item.id} className="ppbi">
@@ -2327,13 +2416,14 @@ function Calculadora({user:currentUser, isAdmin=false}){
                     </div>
                   ))}
                   <div className="ppbtot"><span>Total PPB</span><span>{brl(ppbTot)}</span></div>
+                  </>}
                 </Sec>
               </div>
               <div style={{display:"flex",flexDirection:"column",gap:10}}>
                 {isZFM&&<Sec title="FTI / UEA-AM" tag="Fundo Tecnologico">
-                  <Tog label={`FTI/UEA-AM ativo (${prod.fti>0?pct(prod.fti):"0% — N/A"})`}
+                  <Tog label={`FTI/UEA-AM ativo (${prodAtrib.fti>0?pct(prodAtrib.fti):"0% — N/A"})`}
                     val={d.ftiAtivo} onChange={S("ftiAtivo")} hint="1% faturamento bruto + 10% credito estimulo"/>
-                  {prod.fti===0&&d.ftiAtivo&&<Box t="warn">Produto sem FTI/UEA-AM na PLAN_TRIB.</Box>}
+                  {prodAtrib.fti===0&&d.ftiAtivo&&<Box t="warn">Produto sem FTI/UEA-AM na PLAN_TRIB.</Box>}
                 </Sec>}
                 <Sec title="Resumo PPB" hl>
                   <DR label="Total PPB" value={brl(ppbTot)} bold accent="blue"/>
@@ -2453,11 +2543,11 @@ function Calculadora({user:currentUser, isAdmin=false}){
                   <Box t="blue">Alíquotas carregadas do catálogo PLAN_TRIB 09/02/2026.</Box>
                   <div className="txgrid">
                     {[
-                      ["IPI Saida",pct(prod.ipi),prod.ipi===0],
+                      ["IPI Saida",pct(prodAtrib.ipi),prodAtrib.ipi===0],
                       ["P/C Debito",c.pcLabel,false],
                       ["P/C Ef. (base liq.)",pct(c.pcEf),false],
                       ["ICMS Destacado NF",pct(c.aliqInter),false],
-                      ["Cred. Presumido",pct(prod.cred),true],
+                      ["Cred. Presumido",pct(prodAtrib.cred),true],
                       ["ICMS Custo Efetivo",pct(c.icmsEfPct),c.icmsEfPct===0],
                       ["DIFAL",c.difal>0?pct(c.difal):"0% — N/A",c.difal===0],
                     ].map(([l,v,ok])=>(
@@ -2499,13 +2589,13 @@ function Calculadora({user:currentUser, isAdmin=false}){
                   {c.difal>0&&<DR label={`(-) DIFAL — ${pct(c.difal)}`} value={`(${pct(c.pcPct*c.difal/100)})`} accent="green"/>}
                   <DR label={`P/C efetivo (${pct(c.pcEf)})`} value={brl(c.pcV)} bold accent="blue" sep/>
                   {c.pcSubvPct>0.001&&<>
-                    <DR label={`P/C subvenção: 9,25%×${pct(prod.cred)}`} value={pct(c.pcSubvPct)} accent="red"/>
+                    <DR label={`P/C subvenção: 9,25%×${pct(prodAtrib.cred)}`} value={pct(c.pcSubvPct)} accent="red"/>
                     <Box t="warn">{`P/C subvenção (${pct(c.pcSubvPct)}) = CUSTO sobre crédito presumido.`}</Box>
                   </>}
                 </Sec>
                 <Sec title="ICMS: Destacado x Efetivo">
                   <DR label={`ICMS destacado NF (${c.ufO}→${d.ufDestino})`} value={pct(c.aliqInter)}/>
-                  <DR label="(-) Crédito presumido" value={`(${pct(prod.cred)})`} accent="green"/>
+                  <DR label={`(-) Crédito presumido`} value={`(${pct(prodAtrib.cred)})`} accent="green"/>
                   <DR label="ICMS custo efetivo" value={pct(c.icmsEfPct)} bold accent={c.icmsEfPct===0?"green":"warn"} sep/>
                   <Box t={c.icmsEfPct===0?"ok":"warn"}>
                     {c.icmsEfPct===0?`Crédito absorve ICMS. Custo = 0%.`:`Residual: ${pct(c.icmsEfPct)}.`}
