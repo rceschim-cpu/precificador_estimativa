@@ -2260,6 +2260,11 @@ function Calculadora({user:currentUser, isAdmin=false}){
                       ))}
                     </div>
                     <div style={{fontSize:9,color:"#5a6a84",marginTop:4}}>{MODALIDADES.find(m=>m.id===d.modalidade)?.desc}</div>
+                    {d.modalidade==="SKD"&&(
+                      <div style={{marginTop:6,padding:"8px 10px",background:"rgba(217,119,6,.1)",border:"1px solid rgba(217,119,6,.3)",borderRadius:4,fontSize:10,color:"#fbbf24",lineHeight:1.5}}>
+                        ⚠️ <strong>SKD — confira o II:</strong> a alíquota de Imposto de Importação da placa pode ser diferente da do produto acabado. Verifique o NCM da placa e ajuste o campo II na aba Importação.
+                      </div>
+                    )}
                   </div>
                   {/* Atributos calculados */}
                   <div className="pgrid" style={{marginTop:6}}>
