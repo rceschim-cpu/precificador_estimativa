@@ -1088,14 +1088,14 @@ const parse=s=>parseFloat(String(s).replace(",","."))||0;
 const DEF={
   prodId:"pos-mao",pcZfmKey:"nao_cumulativo",regimeVendedor:"real",
   tipoComprador:"contrib",destinacaoCliente:"revenda",ufDestino:"SP",
-  fobUSD:60,freteUSD:5,ptax:5.70,seguroBRL:2,aliqII:4.19,
-  despesas:1.1,despesasPct:1.1,despesasModo:"pct",
+  fobUSD:0,freteUSD:0,ptax:0,seguroBRL:0,aliqII:0,
+  despesas:0,despesasPct:0,despesasModo:"pct",
   cfImp:0,cra:0,
   ppbAtivos:{injecao:false,bateria:false,carregador:false,memoria:false,cabo:false,placa:false},
   ppbVals:{injecao:0,bateria:0,carregador:0,memoria:0,cabo:0,placa:0},
-  producao:38.5,garantia:21.27,bkpPct:2,outrosBRL:6.8,embalagem:0,ftiAtivo:true,
-  pd:3.47,cfixo:4.63,scrap:0.91,royal:1.27,cfVenda:2.11,frete:0.80,
-  comis:0.15,comisX:0.10,mkt:0,rebate:0,margem:5,
+  producao:0,garantia:0,bkpPct:0,outrosBRL:0,embalagem:0,ftiAtivo:false,
+  pd:0,cfixo:0,scrap:0,royal:0,cfVenda:0,frete:0,
+  comis:0,comisX:0,mkt:0,rebate:0,margem:0,
   margGer:0,margGerAtivo:false,
   royalModo:"pct",royalUSD:0,
   ptaxPreco:0,
@@ -1966,10 +1966,17 @@ input::-webkit-inner-spin-button,input::-webkit-outer-spin-button{-webkit-appear
 
 // ── APP ────────────────────────────────────────────────────────────────────────
 function Calculadora({user:currentUser, isAdmin=false}){
-  const [d,setD]=useState(DEF);
-  const [calcs,setCalcs]=useState(CALC_DEF);
+  const [d,setD]=useState(()=>({...DEF}));
+  const [calcs,setCalcs]=useState(()=>({...CALC_DEF}));
   const [tab,setTab]=useState("perfil");
   const [modal,setModal]=useState(null);
+
+  // Reset completo ao montar (novo login sempre começa zerado)
+  useEffect(()=>{
+    setD({...DEF});
+    setCalcs({...CALC_DEF});
+    setTab("perfil");
+  },[currentUser?.id]);
 
   const S=k=>v=>setD(p=>({...p,[k]:v}));
   const SC=k=>v=>setCalcs(p=>({...p,[k]:{...p[k],...v}}));
