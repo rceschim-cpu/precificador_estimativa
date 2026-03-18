@@ -1,8 +1,8 @@
-// api/ii.js — Vercel Function
+// api/ii.js — Vercel Function (CommonJS)
 // Consulta o II (Imposto de Importação) do simulador da Receita Federal
 // pelo NCM informado como query param: /api/ii?ncm=8517.13.00
 
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   // CORS para o domínio do app
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET");
