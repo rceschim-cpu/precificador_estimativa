@@ -1133,7 +1133,8 @@ const DEF={
   ppbVals:{injecao:0,bateria:0,carregador:0,memoria:0,cabo:0,placa:0},
   producao:0,garantia:0,bkpPct:0,outrosBRL:0,embalagem:0,ftiAtivo:false,
   pd:0,cfixo:0,scrap:0,royal:0,cfVenda:0,frete:0,
-  comis:0,comisX:0,mkt:0,rebate:0,margem:0,
+  comis:0,comisX:0,mkt:0,rebate:0,pdd:0,vbExtra:0,vpc:0,margem:0,
+  cartaoAtivo:false,
   margGer:0,margGerAtivo:false,
   royalModo:"pct",royalUSD:0,
   ptaxPreco:0,
@@ -1683,10 +1684,13 @@ function BreakdownPanel({c,d,prod,ppbTot,calcs}){
 
       {/* ÍNDICES COMERCIAIS */}
       <Grp id="icom" label="Índices Comerciais" total={totalIndCom} color="#d97706">
-        <Row l={`CF Venda (${pct(d.cfVenda)})`} v={c.cfnV}/>
+        <Row l={`CF Venda (${pct(c.cfVendaEf)}${c.cartaoPct>0?" c/ cartão":""})`} v={c.cfnV}/>
         <Row l={`Comissão+Enc. (${pct(d.comis+c.comisXPct)})`} v={c.cmV}/>
         {(d.mkt||0)>0&&<Row l={`Marketing (${pct(d.mkt)})`} v={c.mktV||0}/>}
         {(d.rebate||0)>0&&<Row l={`Rebate (${pct(d.rebate)})`} v={c.rebateV||0}/>}
+        {(d.pdd||0)>0&&<Row l={`PDD (${pct(d.pdd)})`} v={c.pSI*(d.pdd/100)}/>}
+        {(d.vbExtra||0)>0&&<Row l={`Verba Extra (${pct(d.vbExtra)})`} v={c.pSI*(d.vbExtra/100)}/>}
+        {(d.vpc||0)>0&&<Row l={`VPC (${pct(d.vpc)})`} v={c.pSI*(d.vpc/100)}/>}
       </Grp>
 
       {/* RESULTADO */}
@@ -1694,7 +1698,7 @@ function BreakdownPanel({c,d,prod,ppbTot,calcs}){
         <Row l={`MC — Margem Contribuição${d.margGerAtivo&&d.margGer!==0?" (c/ MG)":""} (${pct(c.mc)})`} v={mcV} acc="blue"/>
         <Row l={`Custo Fixo (${pct(d.cfixo)})`} v={c.cfxV} indent sub/>
         <Row l={`ML — Margem Líquida (${pct(c.margPct)})`} v={c.margV} acc="green"/>
-        {d.margGerAtivo&&d.margGer!==0&&<Row l={`  ↳ Margem Gerencial/Agnóstica (${pct(d.margGer)})`} v={c.margGerV} acc={d.margGer<0?"green":"red"} indent sub/>}
+        {d.margGer!==0&&<Row l={`  ↳ Margem Gerencial/Agnóstica (${pct(d.margGer)})`} v={c.margGerV} acc={d.margGer<0?"green":"red"} indent sub/>}
       </Grp>
 
       {/* PREÇO FINAL — fixo */}
@@ -2192,6 +2196,12 @@ function Calculadora({user:currentUser, isAdmin=false}){
     // cmvTotal inclui cfImp, cra, embalagem e outrosBRL
     const cmvTotal=cmvImp+d.cfImp+(d.cra||0)+ppbTot+d.producao+d.garantia+bkpV+(d.embalagem||0)+d.outrosBRL;
 
+    // IPI: para IOS a base de cálculo é sobre preço sem IPI → IPI ef = IPI% / (1 + IPI%)
+    const ipi=prodAtrib.ipi;
+    const ipiEfPct = d.origem==="IOS" && ipi>0 ? ipi/(1+ipi/100) : ipi;
+
+    // P/C: para IOS base exclui IPI → pcEf = (9,25% × (1-ICMS%)) / (1+IPI%)
+    // Para MAO/ZFM: usa lógica normal
     let pcPct,pcLabel;
     if(isZFM&&prodAtrib.pcBase==="zmf"){pcPct=pcEntry.pct;pcLabel=`ZFM ${pct(pcPct)}`;}
     else if(typeof prodAtrib.pcBase==="number"){pcPct=prodAtrib.pcBase;pcLabel=pct(pcPct);}
@@ -2200,28 +2210,36 @@ function Calculadora({user:currentUser, isAdmin=false}){
     const ufO=prodAtrib.uf,ufD=d.ufDestino,intra=ufO===ufD;
     const aliqInter=getICMS(ufO,ufD);
     const aliqDest=ALIQ_INT[ufD]||18;
-    // CWB: ICMS com deságio de 35% na importação
     const icmsOrigemEf = prodAtrib.uf==="PR" ? prodAtrib.icms*(1-0.35) : prodAtrib.icms;
-    // CBU: diferimento parcial/total do ICMS importação
     const icmsImpEf = isCBU ? prodAtrib.icms*(1-(d.icmsDiferimento||0)/100) : icmsOrigemEf;
     const icmsEfPct=Math.max(0,aliqInter-prodAtrib.cred);
     let difal=0;
     const deveDifal=d.tipoComprador==="naocontrib"||(d.tipoComprador==="contrib"&&d.destinacaoCliente==="imobilizado");
     if(!intra&&deveDifal){const delta=aliqDest-aliqInter;if(delta>0)difal=(prodAtrib.aliqST>0&&delta<prodAtrib.aliqST)?0:delta;}
 
-    // pcEf: usa aliqInter (incidência cheia) — a base do P/C é reduzida pelo ICMS destacado na NF, não pelo líquido
-    const pcEf=pcPct*(1-(aliqInter+difal)/100);  // ex: 3,65% × (1-12%-6%) = 2,993%
-    // pcSubvPct: sempre 9,25% sobre o crédito presumido (P/C sobre receita de subvenção) — é um custo
-    const pcSubvPct=prodAtrib.cred>0?+(9.25*(prodAtrib.cred/100)).toFixed(6):0;
+    // P/C efetivo:
+    // IOS: (pcPct × (1 - aliqInter% - difal%)) / (1 + IPI%)  — base exclui IPI
+    // Outros: pcPct × (1 - aliqInter% - difal%)
+    const pcEfBase = pcPct*(1-(aliqInter+difal)/100);
+    const pcEf = d.origem==="IOS" && ipi>0 ? pcEfBase/(1+ipi/100) : pcEfBase;
+
+    // Subvenção:
+    // IOS: 9,25% × (ICMS%/(1+IPI%) - 1,2%)  — 1,2% = coef. interno créditos acessórios
+    // Outros: 9,25% × cred%
+    const COEF_ACES_IOS = 1.2; // coeficiente interno de créditos de acessórios
+    const pcSubvPct = d.origem==="IOS" && ipi>0 && prodAtrib.cred>0
+      ? Math.max(0, +(9.25*(prodAtrib.cred/100/(1+ipi/100) - COEF_ACES_IOS/100)).toFixed(6))
+      : prodAtrib.cred>0 ? +(9.25*(prodAtrib.cred/100)).toFixed(6) : 0;
+
     const ftiPct=(isZFM&&d.ftiAtivo)?prodAtrib.fti:0;
     const fcpPct=FCP[ufD]||0;
-    const ipi=prodAtrib.ipi;
-    // Crédito de IPI na venda para IOS (BA) — 12,97% / (1 + IPI%) como índice negativo no soma
-    // Reduz a base total de índices/impostos, não a alíquota do IPI em si
+
+    // Crédito IPI IOS: -12,97% / (1+IPI%) como índice negativo no soma
     const ipiCreditoIOSPct = d.origem==="IOS" && ipi>0 ? 12.97/(1+ipi/100) : 0;
-    const ipiEf = ipi; // IPI nominal inalterado — o crédito entra no soma
     const comisXPct=d.comis*(2/3);
-    const indPct=d.pd+d.cfixo+d.scrap+d.royal+d.cfVenda+d.frete+d.comis+comisXPct+d.mkt+d.rebate;
+    const cartaoPct=d.cartaoAtivo?2:0;
+    const cfVendaEf=d.cfVenda+cartaoPct;
+    const indPct=d.pd+d.cfixo+d.scrap+d.royal+cfVendaEf+d.frete+d.comis+comisXPct+d.mkt+d.rebate+(d.pdd||0)+(d.vbExtra||0)+(d.vpc||0);
     // MG é um índice independente — entra no soma como os outros índices
     // Valor negativo = crédito = eleva o preço (denominador menor)
     const margGerPct=(d.margGer||0);
@@ -2240,7 +2258,7 @@ function Calculadora({user:currentUser, isAdmin=false}){
     const margV=pSI*(d.margem/100);
     const pdV=pSI*(d.pd/100),cfxV=pSI*(d.cfixo/100);
     const scV=pSI*(d.scrap/100),ryV=pSI*(d.royal/100);
-    const cfnV=pSI*(d.cfVenda/100),frV=pSI*(d.frete/100),cmV=pSI*((d.comis+comisXPct)/100);
+    const cfnV=pSI*(cfVendaEf/100),frV=pSI*(d.frete/100),cmV=pSI*((d.comis+comisXPct)/100);
     const mktV=pSI*(d.mkt/100),rebateV=pSI*(d.rebate/100);
     let stV=0,stBase=0;
     if(d.stAtivo&&d.mva>0){stBase=pCI*(1+d.mva/100);stV=Math.max(0,stBase*(d.icmsDestST/100)-icmsV);}
@@ -2262,8 +2280,8 @@ function Calculadora({user:currentUser, isAdmin=false}){
     return{cfrUSD,cfrBRL,iiV,iiUSD,vpl,bkpV,bkpBase,cfrImp,cmvImp,cmvTotal,ppbTot,despesas,
       craCalcMAO,creditoCalcIOS,cfrExpandidoUSD,basePlacaUSD,
       pcPct,pcEf,pcLabel,pcV,pcSubvPct,pcSubvV,pcBaseRedPct,aliqInter,aliqDest,icmsEfPct,icmsV,icmsEfV,
-      difal,difalV,ftiPct,ftiV,fcpPct,fcpV,ipi,ipiEf,ipiV,ipiCreditoV,ipiCreditoIOSPct,pSI,pCI,
-      margV,indPct,pdV,cfxV,scV,ryV,cfnV,frV,cmV,mktV,rebateV,stV,stBase,pF,pUSD,
+      difal,difalV,ftiPct,ftiV,fcpPct,fcpV,ipi,ipiEfPct,ipiV,ipiCreditoV,ipiCreditoIOSPct,pSI,pCI,
+      margV,indPct,pdV,cfxV,scV,ryV,cfnV,cfVendaEf,cartaoPct,frV,cmV,mktV,rebateV,stV,stBase,pF,pUSD,
       cargaTot,cargaPct,margPct,mc,mkp,ufO,intra,deveDifal,margemAlvo,comisXPct,margGerPct,margGerV};
   },[d,prod,prodAtrib,isZFM,isCBU,pcEntry,ppbTot]);
 
@@ -2712,9 +2730,21 @@ function Calculadora({user:currentUser, isAdmin=false}){
                   hint={calcs.cfVenda.applied?`${calcs.cfVenda.prazo}d @ ${calcs.cfVenda.taxa}%`:`≈ ${brl(c.cfnV)}`}
                   action={<button className={`cbtn ${calcs.cfVenda.applied?"cactive":""}`}
                     title="Calcular CF venda" onClick={()=>setModal("cfVenda")}>%</button>}/>
-                {[["Comissão","comis"],["Marketing","mkt"],["Rebate","rebate"]
+                {/* Toggle taxa cartão */}
+                <div style={{display:"flex",alignItems:"center",gap:8,padding:"4px 0",borderTop:"1px solid rgba(255,255,255,.06)"}}>
+                  <button onClick={()=>S("cartaoAtivo")(!d.cartaoAtivo)}
+                    style={{padding:"2px 8px",fontSize:9,fontWeight:700,cursor:"pointer",borderRadius:20,border:"1px solid",transition:".15s",
+                      background:d.cartaoAtivo?"rgba(251,191,36,.2)":"rgba(255,255,255,.05)",
+                      borderColor:d.cartaoAtivo?"rgba(251,191,36,.5)":"rgba(255,255,255,.12)",
+                      color:d.cartaoAtivo?"#fbbf24":"#7a90b0"}}>
+                    {d.cartaoAtivo?"● ON":"○ OFF"}
+                  </button>
+                  <span style={{fontSize:11,fontWeight:600,color:d.cartaoAtivo?"#fbbf24":"#5a6a84",flex:1}}>Taxa Cartão (+2%)</span>
+                  {d.cartaoAtivo&&<span style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:"#fbbf24"}}>{pct(c.cfVendaEf)}</span>}
+                </div>
+                {[["Comissão","comis"],["Marketing","mkt"],["Rebate","rebate"],["PDD","pdd"],["Verba Extra","vbExtra"],["VPC","vpc"]
                 ].map(([l,k])=>(
-                  <Field key={k} label={l} value={d[k]} onChange={S(k)} sfx="%" hint={`≈ ${brl(c.pSI*(d[k]/100))}`}/>
+                  <Field key={k} label={l} value={d[k]||0} onChange={S(k)} sfx="%" hint={`≈ ${brl(c.pSI*((d[k]||0)/100))}`}/>
                 ))}
                 <div style={{display:"flex",alignItems:"flex-start",gap:8,justifyContent:"space-between"}}>
                   <div style={{flex:1}}>
