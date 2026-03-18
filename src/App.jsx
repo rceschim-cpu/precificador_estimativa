@@ -1539,7 +1539,7 @@ function ModalRegistros({onClose, onLoad, currentD, currentCalcs, prodNome}){
     setEditNome(null);
   };
 
-  const regsNaPasta = registros.filter(r=>r.pastaId===(pastaAtual));
+  const regsNaPasta = registros.filter(r=>(r.pastaId??null)===(pastaAtual));
   const pastasLista = pastas;
 
   const btnStyle = (active) => ({
