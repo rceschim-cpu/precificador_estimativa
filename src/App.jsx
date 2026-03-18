@@ -2556,17 +2556,13 @@ function Calculadora({user:currentUser, isAdmin=false}){
                     :<Field label={`Despesas (${sfxM})`} sfx={sfxM} value={toDisp(d.despesas)} onChange={v=>S("despesas")(toStore(v))} hint="SISCOMEX+Despachante"/>
                   }
                 </Sec>
-                <Sec title="CF Importação + CRA" tag="→ VPL">
+                <Sec title="CF Importação" tag="→ VPL">
                   <Field label={`CF Importação (${sfxM})`} sfx={sfxM} value={toDisp(d.cfImp)}
                     onChange={calcs.cfImp.applied?undefined:v=>S("cfImp")(toStore(v))}
                     locked={calcs.cfImp.applied} onUnlock={()=>SC("cfImp")({applied:false})}
                     hint="Juros/IOF — entra no VPL"
                     action={<button className={`cbtn ${calcs.cfImp.applied?"cactive":""}`}
                       title="Calcular CF" onClick={()=>setModal("cfImp")}>$</button>}/>
-                  <Field label={`${d.origem==="IOS"?"Crédito Federal":"CRA / Créditos"} (${sfxM})`}
-                    sfx={sfxM} value={toDisp(d.cra)} onChange={v=>S("cra")(toStore(v))}
-                    hint="Entra no VPL"
-                    action={<button className="cbtn" title="Calcular CRA / Crédito" onClick={()=>setModal("cra")}>$</button>}/>
                   <DR label="CMV Importação" value={brl(c.cmvImp)} bold sep/>
                   <DR label="VPL" value={brl(c.vpl)} bold accent="blue"/>
                 </Sec>
@@ -2612,6 +2608,18 @@ function Calculadora({user:currentUser, isAdmin=false}){
                 <Sec title="Resumo PPB" hl>
                   <DR label="Total PPB" value={brl(ppbTot)} bold accent="blue"/>
                   <DR label="VPL (com PPB)" value={brl(c.vpl)} bold accent="blue" sep/>
+                  {/* CRA / Crédito Federal — depende da origem */}
+                  {!isCBU&&<>
+                    <div style={{borderTop:"1px solid rgba(255,255,255,.06)",marginTop:6,paddingTop:6}}>
+                      <Field label={`${d.origem==="IOS"?"Crédito Federal":"CRA / Créditos"} (${sfxM})`}
+                        sfx={sfxM} value={toDisp(d.cra)} onChange={v=>S("cra")(toStore(v))}
+                        hint={d.origem==="IOS"?"(-IPI+ICMS×7,3%)×base×(1+CL%)":"% CL × II"}
+                        action={<button className={`cbtn${d.cra?d.ptax>0&&Math.abs(d.cra)>0?" cactive":"":""}`}
+                          title={d.origem==="IOS"?"Calcular Crédito Federal":"Calcular CRA"}
+                          onClick={()=>setModal("cra")}>$</button>}/>
+                      {d.cra!==0&&<DR label="VPL (com crédito)" value={brl(c.vpl)} bold accent="blue"/>}
+                    </div>
+                  </>}
                 </Sec>
               </div>
             </div>
