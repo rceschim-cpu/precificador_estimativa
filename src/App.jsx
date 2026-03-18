@@ -2215,6 +2215,10 @@ function Calculadora({user:currentUser, isAdmin=false}){
     const ftiPct=(isZFM&&d.ftiAtivo)?prodAtrib.fti:0;
     const fcpPct=FCP[ufD]||0;
     const ipi=prodAtrib.ipi;
+    // Crédito de IPI na venda para IOS (BA) — 12,97% fixo sobre o IPI debitado na saída
+    // O crédito reduz o IPI efetivo de saída, impactando o preço final
+    const ipiCreditoIOSPct = d.origem==="IOS" ? 12.97 : 0;
+    const ipiEf = ipi * (1 - ipiCreditoIOSPct/100); // IPI efetivo após crédito
     const comisXPct=d.comis*(2/3);
     const indPct=d.pd+d.cfixo+d.scrap+d.royal+d.cfVenda+d.frete+d.comis+comisXPct+d.mkt+d.rebate;
     // MG é um índice independente — entra no soma como os outros índices
@@ -2222,7 +2226,8 @@ function Calculadora({user:currentUser, isAdmin=false}){
     const margGerPct=(d.margGer||0);
     const soma=(pcEf+pcSubvPct+icmsEfPct+difal+ftiPct+fcpPct+indPct+margGerPct+d.margem)/100;
     const pSI=soma<1?cmvTotal/(1-soma):cmvTotal*99;
-    const ipiV=pSI*(ipi/100),pCI=pSI+ipiV;
+    const ipiV=pSI*(ipiEf/100),pCI=pSI+ipiV;
+    const ipiCreditoV=pSI*(ipi/100)-ipiV; // valor do crédito de IPI (IOS)
     const pcV=pSI*(pcEf/100),icmsV=pSI*(aliqInter/100);
     const icmsEfV=pSI*(icmsEfPct/100),difalV=pSI*(difal/100);
     const pcSubvV=pSI*(pcSubvPct/100);
