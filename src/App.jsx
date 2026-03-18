@@ -1476,55 +1476,128 @@ function ModalCFVenda({onClose,onApply,data,setData}){
 }
 
 // ── Modal Registros ───────────────────────────────────────────────────────────
+const FOLDERS_KEY = "positec_calc_pastas";
+const loadPastas = () => { try { return JSON.parse(localStorage.getItem(FOLDERS_KEY)||"[]"); } catch { return []; } };
+const savePastas = (p) => localStorage.setItem(FOLDERS_KEY, JSON.stringify(p));
+
 function ModalRegistros({onClose, onLoad, currentD, currentCalcs, prodNome}){
   const [registros, setRegistros] = useState(loadRegistros);
+  const [pastas, setPastas] = useState(loadPastas);
   const [nome, setNome] = useState("");
+  const [pastaAtual, setPastaAtual] = useState(null); // null = raiz
+  const [view, setView] = useState("lista"); // "lista" | "nova-pasta" | "mover"
+  const [nomePasta, setNomePasta] = useState("");
+  const [registroMover, setRegistroMover] = useState(null);
   const [confirmDel, setConfirmDel] = useState(null);
+  const [confirmDelPasta, setConfirmDelPasta] = useState(null);
+  const [editNome, setEditNome] = useState(null); // id do registro em edição
+  const [editVal, setEditVal] = useState("");
+
+  const persist = (regs, pas) => {
+    saveRegistros(regs); setRegistros(regs);
+    if(pas!==undefined){savePastas(pas); setPastas(pas);}
+  };
 
   const handleSave = () => {
     const label = nome.trim() || prodNome;
-    const novo = {
-      id: Date.now(),
-      nome: label,
-      data: new Date().toLocaleString("pt-BR"),
-      d: currentD,
-      calcs: currentCalcs,
-    };
-    const updated = [novo, ...registros];
-    saveRegistros(updated);
-    setRegistros(updated);
+    const novo = { id: Date.now(), nome: label, pastaId: pastaAtual,
+      data: new Date().toLocaleString("pt-BR"), d: currentD, calcs: currentCalcs };
+    persist([novo, ...registros]);
     setNome("");
   };
 
   const handleDelete = (id) => {
-    const updated = registros.filter(r => r.id !== id);
-    saveRegistros(updated);
-    setRegistros(updated);
+    persist(registros.filter(r=>r.id!==id));
     setConfirmDel(null);
   };
 
+  const handleDeletePasta = (id) => {
+    // Move registros da pasta para raiz
+    const regs = registros.map(r=>r.pastaId===id?{...r,pastaId:null}:r);
+    persist(regs, pastas.filter(p=>p.id!==id));
+    setConfirmDelPasta(null);
+    if(pastaAtual===id) setPastaAtual(null);
+  };
+
+  const handleCriarPasta = () => {
+    if(!nomePasta.trim()) return;
+    const nova = {id: Date.now(), nome: nomePasta.trim()};
+    const updated = [...pastas, nova];
+    savePastas(updated); setPastas(updated);
+    setNomePasta(""); setView("lista");
+  };
+
+  const handleMover = (pastaDestino) => {
+    const regs = registros.map(r=>r.id===registroMover?{...r,pastaId:pastaDestino}:r);
+    persist(regs);
+    setRegistroMover(null); setView("lista");
+  };
+
+  const handleRenomear = (id) => {
+    if(!editVal.trim()) return;
+    persist(registros.map(r=>r.id===id?{...r,nome:editVal.trim()}:r));
+    setEditNome(null);
+  };
+
+  const regsNaPasta = registros.filter(r=>r.pastaId===(pastaAtual));
+  const pastasLista = pastas;
+
+  const btnStyle = (active) => ({
+    padding:"4px 12px",fontSize:10,fontWeight:700,cursor:"pointer",borderRadius:20,border:"1px solid",
+    background:active?"rgba(0,71,187,.25)":"rgba(255,255,255,.04)",
+    borderColor:active?"#0047BB":"rgba(255,255,255,.12)",
+    color:active?"#93c5fd":"#7a90b0"
+  });
+
+  // Tela de mover registro
+  if(view==="mover") return(
+    <div className="ov">
+      <div className="mb" style={{maxWidth:420}} onClick={e=>e.stopPropagation()}>
+        <div className="mh">
+          <span className="mt">Mover para pasta</span>
+          <button className="mc" onClick={()=>setView("lista")}>×</button>
+        </div>
+        <div className="mbody">
+          <div style={{fontSize:11,color:"#7a90b0",marginBottom:12}}>
+            Registro: <strong style={{color:"#dce7f7"}}>{registros.find(r=>r.id===registroMover)?.nome}</strong>
+          </div>
+          <div style={{display:"flex",flexDirection:"column",gap:6}}>
+            <div onClick={()=>handleMover(null)}
+              style={{padding:"10px 14px",background:"#2a3550",border:"1px solid rgba(255,255,255,.1)",borderRadius:4,cursor:"pointer",fontSize:12,color:"#dce7f7",display:"flex",alignItems:"center",gap:8}}>
+              <span style={{fontSize:14}}>🏠</span> Raiz (sem pasta)
+            </div>
+            {pastasLista.map(p=>(
+              <div key={p.id} onClick={()=>handleMover(p.id)}
+                style={{padding:"10px 14px",background:"#2a3550",border:"1px solid rgba(255,255,255,.1)",borderRadius:4,cursor:"pointer",fontSize:12,color:"#dce7f7",display:"flex",alignItems:"center",gap:8}}>
+                <span style={{fontSize:14}}>📁</span> {p.nome}
+                <span style={{fontSize:10,color:"#5a6a84",marginLeft:"auto"}}>{registros.filter(r=>r.pastaId===p.id).length} registros</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <div className="ov">
-      <div className="mb" style={{maxWidth:520}} onClick={e=>e.stopPropagation()}>
+      <div className="mb" style={{maxWidth:560}} onClick={e=>e.stopPropagation()}>
         <div className="mh">
-          <span className="mt">Registros Salvos</span>
+          <span className="mt">Registros</span>
           <button className="mc" onClick={onClose}>×</button>
         </div>
         <div className="mbody">
 
           {/* Salvar atual */}
-          <div style={{background:"rgba(0,71,187,.08)",border:"1px solid rgba(0,71,187,.25)",padding:"12px 14px",borderRadius:4}}>
-            <div style={{fontSize:11,fontWeight:700,color:"#93c5fd",marginBottom:8,letterSpacing:.5,textTransform:"uppercase"}}>Salvar precificação atual</div>
+          <div style={{background:"rgba(0,71,187,.08)",border:"1px solid rgba(0,71,187,.25)",padding:"10px 14px",borderRadius:4,marginBottom:12}}>
+            <div style={{fontSize:10,fontWeight:700,color:"#93c5fd",marginBottom:6,letterSpacing:.5,textTransform:"uppercase"}}>
+              Salvar em: {pastaAtual ? (pastasLista.find(p=>p.id===pastaAtual)?.nome||"?") : "Raiz"}
+            </div>
             <div style={{display:"flex",gap:8}}>
-              <div className="fw" style={{flex:1,minWidth:0}}>
-                <input
-                  type="text"
-                  placeholder={prodNome}
-                  value={nome}
-                  onChange={e=>setNome(e.target.value)}
+              <div className="fw" style={{flex:1}}>
+                <input type="text" placeholder={prodNome} value={nome} onChange={e=>setNome(e.target.value)}
                   onKeyDown={e=>e.key==="Enter"&&handleSave()}
-                  style={{background:"none",border:"none",outline:"none",fontFamily:"'IBM Plex Sans',sans-serif",fontSize:12,color:"#dce7f7",padding:"7px 10px",width:"100%"}}
-                />
+                  style={{background:"none",border:"none",outline:"none",fontFamily:"'IBM Plex Sans',sans-serif",fontSize:12,color:"#dce7f7",padding:"7px 10px",width:"100%"}}/>
               </div>
               <button className="mapp" style={{padding:"7px 18px",borderRadius:4,fontSize:12}} onClick={handleSave}>
                 💾 Salvar
@@ -1532,35 +1605,88 @@ function ModalRegistros({onClose, onLoad, currentD, currentCalcs, prodNome}){
             </div>
           </div>
 
-          {/* Lista */}
-          {registros.length === 0
-            ? <div style={{textAlign:"center",padding:"24px 0",fontFamily:"'DM Mono',monospace",fontSize:11,color:"#5a6a84"}}>Nenhum registro salvo ainda.</div>
-            : <div style={{display:"flex",flexDirection:"column",gap:4,maxHeight:380,overflowY:"auto"}}>
-                {registros.map(r=>(
-                  <div key={r.id} style={{display:"flex",alignItems:"center",gap:8,padding:"10px 12px",background:"#2a3550",border:"1px solid rgba(255,255,255,.08)",borderRadius:4}}>
-                    <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontSize:13,fontWeight:700,color:"#dce7f7",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{r.nome}</div>
-                      <div style={{fontSize:10,fontFamily:"'DM Mono',monospace",color:"#5a6a84",marginTop:2}}>
-                        {r.data} · {PRODUTOS.find(p=>p.id===r.d.prodId)?.uf||""} → {r.d.ufDestino} · M {r.d.margem}%
-                      </div>
+          {/* Navegação de pastas */}
+          <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:10,flexWrap:"wrap"}}>
+            <button style={btnStyle(pastaAtual===null)} onClick={()=>setPastaAtual(null)}>🏠 Raiz</button>
+            {pastasLista.map(p=>(
+              <button key={p.id} style={btnStyle(pastaAtual===p.id)} onClick={()=>setPastaAtual(p.id)}>
+                📁 {p.nome}
+                <span style={{fontSize:9,marginLeft:4,opacity:.7}}>{registros.filter(r=>r.pastaId===p.id).length}</span>
+              </button>
+            ))}
+            {view==="nova-pasta"
+              ? <div style={{display:"flex",gap:4,alignItems:"center"}}>
+                  <input autoFocus type="text" placeholder="Nome da pasta" value={nomePasta}
+                    onChange={e=>setNomePasta(e.target.value)}
+                    onKeyDown={e=>{if(e.key==="Enter")handleCriarPasta();if(e.key==="Escape")setView("lista");}}
+                    style={{background:"rgba(255,255,255,.06)",border:"1px solid rgba(255,255,255,.15)",color:"#dce7f7",padding:"4px 8px",fontSize:11,borderRadius:4,outline:"none",width:120}}/>
+                  <button onClick={handleCriarPasta} style={{...btnStyle(true),padding:"4px 8px"}}>✓</button>
+                  <button onClick={()=>setView("lista")} style={{...btnStyle(false),padding:"4px 8px"}}>✕</button>
+                </div>
+              : <button style={{...btnStyle(false),borderStyle:"dashed"}} onClick={()=>setView("nova-pasta")}>+ Nova pasta</button>
+            }
+            {pastaAtual!==null&&(
+              confirmDelPasta===pastaAtual
+                ? <div style={{display:"flex",gap:4,alignItems:"center",marginLeft:"auto"}}>
+                    <span style={{fontSize:10,color:"#f87171"}}>Excluir pasta?</span>
+                    <button onClick={()=>handleDeletePasta(pastaAtual)} style={{padding:"3px 8px",background:"#dc2626",border:"none",color:"#fff",fontSize:10,cursor:"pointer",borderRadius:3}}>Sim</button>
+                    <button onClick={()=>setConfirmDelPasta(null)} style={{padding:"3px 8px",background:"transparent",border:"1px solid rgba(255,255,255,.15)",color:"#94a3b8",fontSize:10,cursor:"pointer",borderRadius:3}}>Não</button>
+                  </div>
+                : <button onClick={()=>setConfirmDelPasta(pastaAtual)}
+                    style={{marginLeft:"auto",padding:"3px 8px",background:"rgba(220,38,38,.1)",border:"1px solid rgba(220,38,38,.25)",color:"#f87171",fontSize:10,cursor:"pointer",borderRadius:3}}>
+                    🗑 Excluir pasta
+                  </button>
+            )}
+          </div>
+
+          {/* Lista de registros */}
+          {regsNaPasta.length===0
+            ? <div style={{textAlign:"center",padding:"24px 0",fontFamily:"'DM Mono',monospace",fontSize:11,color:"#5a6a84"}}>
+                {pastaAtual ? "Nenhum registro nesta pasta." : "Nenhum registro salvo ainda."}
+              </div>
+            : <div style={{display:"flex",flexDirection:"column",gap:4,maxHeight:360,overflowY:"auto"}}>
+                {regsNaPasta.map(r=>(
+                  <div key={r.id} style={{padding:"10px 12px",background:"#2a3550",border:"1px solid rgba(255,255,255,.08)",borderRadius:4}}>
+                    <div style={{display:"flex",alignItems:"center",gap:8}}>
+                      {editNome===r.id
+                        ? <input autoFocus value={editVal} onChange={e=>setEditVal(e.target.value)}
+                            onKeyDown={e=>{if(e.key==="Enter")handleRenomear(r.id);if(e.key==="Escape")setEditNome(null);}}
+                            style={{flex:1,background:"rgba(255,255,255,.08)",border:"1px solid rgba(255,255,255,.2)",color:"#dce7f7",padding:"4px 8px",fontSize:12,borderRadius:3,outline:"none"}}/>
+                        : <div style={{flex:1,minWidth:0}}>
+                            <div style={{fontSize:13,fontWeight:700,color:"#dce7f7",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{r.nome}</div>
+                            <div style={{fontSize:10,fontFamily:"'DM Mono',monospace",color:"#5a6a84",marginTop:2}}>
+                              {r.data} · {r.d?.origem||""} → {r.d?.ufDestino||""} · ML {r.d?.margem||0}%
+                            </div>
+                          </div>
+                      }
+                      {confirmDel===r.id
+                        ? <div style={{display:"flex",gap:4,alignItems:"center",flexShrink:0}}>
+                            <span style={{fontSize:10,color:"#f87171"}}>Excluir?</span>
+                            <button onClick={()=>handleDelete(r.id)} style={{padding:"4px 8px",background:"#dc2626",border:"none",color:"#fff",fontSize:11,fontWeight:700,cursor:"pointer",borderRadius:3}}>Sim</button>
+                            <button onClick={()=>setConfirmDel(null)} style={{padding:"4px 8px",background:"transparent",border:"1px solid rgba(255,255,255,.15)",color:"#94a3b8",fontSize:11,cursor:"pointer",borderRadius:3}}>Não</button>
+                          </div>
+                        : <div style={{display:"flex",gap:4,flexShrink:0}}>
+                            <button onClick={()=>{onLoad(r.d,r.calcs,r.nome);onClose();}}
+                              style={{padding:"5px 12px",background:"#0047BB",border:"none",color:"#fff",fontSize:11,fontWeight:700,cursor:"pointer",borderRadius:3}}>
+                              ↩ Carregar
+                            </button>
+                            <button onClick={()=>{setEditNome(r.id);setEditVal(r.nome);}}
+                              title="Renomear"
+                              style={{padding:"5px 8px",background:"rgba(255,255,255,.05)",border:"1px solid rgba(255,255,255,.12)",color:"#a8b5cc",fontSize:11,cursor:"pointer",borderRadius:3}}>
+                              ✎
+                            </button>
+                            <button onClick={()=>{setRegistroMover(r.id);setView("mover");}}
+                              title="Mover para pasta"
+                              style={{padding:"5px 8px",background:"rgba(255,255,255,.05)",border:"1px solid rgba(255,255,255,.12)",color:"#a8b5cc",fontSize:11,cursor:"pointer",borderRadius:3}}>
+                              📁
+                            </button>
+                            <button onClick={()=>setConfirmDel(r.id)}
+                              style={{padding:"5px 8px",background:"rgba(220,38,38,.1)",border:"1px solid rgba(220,38,38,.25)",color:"#f87171",fontSize:11,cursor:"pointer",borderRadius:3}}>
+                              ✕
+                            </button>
+                          </div>
+                      }
                     </div>
-                    {confirmDel===r.id
-                      ? <div style={{display:"flex",gap:6,alignItems:"center"}}>
-                          <span style={{fontSize:11,color:"#f87171"}}>Excluir?</span>
-                          <button onClick={()=>handleDelete(r.id)} style={{padding:"4px 10px",background:"#dc2626",border:"none",color:"#fff",fontSize:11,fontWeight:700,cursor:"pointer",borderRadius:3}}>Sim</button>
-                          <button onClick={()=>setConfirmDel(null)} style={{padding:"4px 10px",background:"#2a3550",border:"1px solid rgba(255,255,255,.15)",color:"#94a3b8",fontSize:11,cursor:"pointer",borderRadius:3}}>Não</button>
-                        </div>
-                      : <div style={{display:"flex",gap:6}}>
-                          <button onClick={()=>{onLoad(r.d, r.calcs);onClose();}}
-                            style={{padding:"6px 14px",background:"#0047BB",border:"none",color:"#fff",fontSize:12,fontWeight:700,cursor:"pointer",borderRadius:3,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:.5}}>
-                            ↩ Carregar
-                          </button>
-                          <button onClick={()=>setConfirmDel(r.id)}
-                            style={{padding:"6px 10px",background:"rgba(220,38,38,.1)",border:"1px solid rgba(220,38,38,.25)",color:"#f87171",fontSize:12,cursor:"pointer",borderRadius:3}}>
-                            ✕
-                          </button>
-                        </div>
-                    }
                   </div>
                 ))}
               </div>
@@ -1688,9 +1814,9 @@ function BreakdownPanel({c,d,prod,ppbTot,calcs}){
         <Row l={`Comissão+Enc. (${pct(d.comis+c.comisXPct)})`} v={c.cmV}/>
         {(d.mkt||0)>0&&<Row l={`Marketing (${pct(d.mkt)})`} v={c.mktV||0}/>}
         {(d.rebate||0)>0&&<Row l={`Rebate (${pct(d.rebate)})`} v={c.rebateV||0}/>}
-        {(d.pdd||0)>0&&<Row l={`PDD (${pct(d.pdd)})`} v={c.pSI*(d.pdd/100)}/>}
-        {(d.vbExtra||0)>0&&<Row l={`Verba Extra (${pct(d.vbExtra)})`} v={c.pSI*(d.vbExtra/100)}/>}
-        {(d.vpc||0)>0&&<Row l={`VPC (${pct(d.vpc)})`} v={c.pSI*(d.vpc/100)}/>}
+        {(d.pdd||0)>0&&<Row l={`PDD (${pct(d.pdd)})`} v={c.pF*(d.pdd/100)}/>}
+        {(d.vbExtra||0)>0&&<Row l={`Verba Extra (${pct(d.vbExtra)})`} v={c.pF*(d.vbExtra/100)}/>}
+        {(d.vpc||0)>0&&<Row l={`VPC (${pct(d.vpc)})`} v={c.pF*(d.vpc/100)}/>}
       </Grp>
 
       {/* RESULTADO */}
@@ -2090,7 +2216,7 @@ input::-webkit-inner-spin-button,input::-webkit-outer-spin-button{-webkit-appear
 `;
 
 // ── APP ────────────────────────────────────────────────────────────────────────
-function Calculadora({user:currentUser, isAdmin=false}){
+function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=null}){
   const [d,setD]=useState(()=>({...DEF}));
   const [calcs,setCalcs]=useState(()=>({...CALC_DEF}));
   const [tab,setTab]=useState("perfil");
@@ -2246,23 +2372,23 @@ function Calculadora({user:currentUser, isAdmin=false}){
     const soma=(pcEf+pcSubvPct+icmsEfPct+difal+ftiPct+fcpPct+indPct+margGerPct+d.margem-ipiCreditoIOSPct)/100;
     const pSI=soma<1?cmvTotal/(1-soma):cmvTotal*99;
     const ipiV=pSI*(ipi/100),pCI=pSI+ipiV;
-    const ipiCreditoV=pSI*(ipiCreditoIOSPct/100); // valor monetário do crédito de IPI IOS
-    const pcV=pSI*(pcEf/100),icmsV=pSI*(aliqInter/100);
-    const icmsEfV=pSI*(icmsEfPct/100),difalV=pSI*(difal/100);
-    const pcSubvV=pSI*(pcSubvPct/100);
+    const icmsV=pSI*(aliqInter/100);
     const pcBaseRedPct=pcPct*(aliqInter/100);
-    const ftiV=pSI*(ftiPct/100),fcpV=pSI*(fcpPct/100);
-    // MG como valor isolado (para exibição no breakdown quando toggle ON)
-    const margGerV=pSI*(margGerPct/100);
-    // ML limpa — não inclui MG
-    const margV=pSI*(d.margem/100);
-    const pdV=pSI*(d.pd/100),cfxV=pSI*(d.cfixo/100);
-    const scV=pSI*(d.scrap/100),ryV=pSI*(d.royal/100);
-    const cfnV=pSI*(cfVendaEf/100),frV=pSI*(d.frete/100),cmV=pSI*((d.comis+comisXPct)/100);
-    const mktV=pSI*(d.mkt/100),rebateV=pSI*(d.rebate/100);
     let stV=0,stBase=0;
     if(d.stAtivo&&d.mva>0){stBase=pCI*(1+d.mva/100);stV=Math.max(0,stBase*(d.icmsDestST/100)-icmsV);}
     const pF=pCI+stV;
+
+    // Todos os valores monetários calculados sobre pF (preço final com IPI)
+    const ipiCreditoV=pF*(ipiCreditoIOSPct/100);
+    const pcV=pF*(pcEf/100),icmsEfV=pF*(icmsEfPct/100),difalV=pF*(difal/100);
+    const pcSubvV=pF*(pcSubvPct/100);
+    const ftiV=pF*(ftiPct/100),fcpV=pF*(fcpPct/100);
+    const margGerV=pF*(margGerPct/100);
+    const margV=pF*(d.margem/100);
+    const pdV=pF*(d.pd/100),cfxV=pF*(d.cfixo/100);
+    const scV=pF*(d.scrap/100),ryV=pF*(d.royal/100);
+    const cfnV=pF*(cfVendaEf/100),frV=pF*(d.frete/100),cmV=pF*((d.comis+comisXPct)/100);
+    const mktV=pF*(d.mkt/100),rebateV=pF*(d.rebate/100);
     const pUSD=(d.ptaxPreco||d.ptax)>0?pF/(d.ptaxPreco||d.ptax):0;
     const cargaTot=pcV+ipiV+icmsEfV+difalV+stV+fcpV;
     const cargaPct=pF>0?(cargaTot/pF)*100:0;
@@ -2312,13 +2438,13 @@ function Calculadora({user:currentUser, isAdmin=false}){
       onClose={()=>setModal(null)}
       currentD={d} currentCalcs={calcs}
       prodNome={prod.nome}
-      onLoad={(savedD, savedCalcs)=>{setD(savedD);setCalcs(savedCalcs);}}/>}
+      onLoad={(savedD, savedCalcs, nome)=>{setD(savedD);setCalcs(savedCalcs);if(onRenomear&&nome)onRenomear(nome);}}/>}
     {modal==="gestao"&&<ModalGestaoUsers onClose={()=>setModal(null)} currentUser={currentUser}/> }
 
     <div className="app">
     <style>{CSS}</style>
 
-      {/* sub-header: badges de contexto + botão Registros */}
+      {/* sub-header: badges de contexto + nome da aba + botões */}
       <div style={{display:"flex",alignItems:"center",gap:6,padding:"6px 16px",background:"#1e2a3d",borderBottom:"1px solid rgba(255,255,255,.07)",flexWrap:"wrap",flexShrink:0,flexBasis:"auto"}}>
         {isZFM&&<span className="buf zmf">ZFM / MAO</span>}
         {prodAtrib.uf==="BA"&&<span className="buf ios">IOS / BA</span>}
@@ -2326,6 +2452,12 @@ function Calculadora({user:currentUser, isAdmin=false}){
         {isCBU&&<span className="buf" style={{background:"rgba(220,38,38,.15)",color:"#f87171",border:"1px solid rgba(220,38,38,.3)"}}>CBU</span>}
         <span className="brt">{c.ufO} → {d.ufDestino}</span>
         <span className="bdf">{c.difal>0?`DIFAL ${pct(c.difal)}`:"DIFAL 0%"}</span>
+        {/* Nome do registro */}
+        {nomeAba&&(
+          <span style={{fontSize:11,fontWeight:600,color:"#93c5fd",padding:"2px 8px",background:"rgba(0,71,187,.15)",borderRadius:20,border:"1px solid rgba(0,71,187,.3)"}}>
+            {nomeAba}
+          </span>
+        )}
         <div style={{flex:1}}/>
         {/* Dólar Custo — PTAX para conversão de todos os custos USD */}
         <div style={{display:"flex",alignItems:"center",gap:6,padding:"3px 10px",background:"rgba(255,255,255,.04)",border:"1px solid rgba(255,255,255,.1)",borderRadius:8}}>
@@ -2345,7 +2477,7 @@ function Calculadora({user:currentUser, isAdmin=false}){
         <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:2}}>
           <span style={{fontSize:8,fontWeight:700,color:"#5a6a84",letterSpacing:.8,textTransform:"uppercase"}}>Registros</span>
           <div style={{display:"flex",gap:4}}>
-            <button onClick={()=>{setD({...DEF});setCalcs({...CALC_DEF});setTab("perfil");setIiStatus(null);}}
+            <button onClick={()=>{setD({...DEF});setCalcs({...CALC_DEF});setTab("perfil");setIiStatus(null);if(onRenomear)onRenomear("Nova Precificação");}}
               style={{padding:"4px 10px",background:"rgba(220,38,38,.15)",border:"1px solid rgba(220,38,38,.35)",color:"#f87171",fontFamily:"'Barlow Condensed',sans-serif",fontSize:11,fontWeight:700,letterSpacing:.5,cursor:"pointer",borderRadius:20}}>
               Novo
             </button>
@@ -2685,7 +2817,7 @@ function Calculadora({user:currentUser, isAdmin=false}){
                 <Box t="gray">Calculados por dentro do preço de venda.</Box>
                 {[["P&D","pd"],["Scrap","scrap"],["Frete venda","frete"]
                 ].map(([l,k])=>(
-                  <Field key={k} label={l} value={d[k]} onChange={S(k)} sfx="%" hint={`≈ ${brl(c.pSI*(d[k]/100))}`}/>
+                  <Field key={k} label={l} value={d[k]} onChange={S(k)} sfx="%" hint={`≈ ${brl(c.pF*(d[k]/100))}`}/>
                 ))}
                 {/* Royalties — % ou USD */}
                 <div style={{display:"flex",alignItems:"center",gap:6,padding:"4px 0",borderTop:"1px solid rgba(255,255,255,.06)",marginTop:2}}>
@@ -2744,7 +2876,7 @@ function Calculadora({user:currentUser, isAdmin=false}){
                 </div>
                 {[["Comissão","comis"],["Marketing","mkt"],["Rebate","rebate"],["PDD","pdd"],["Verba Extra","vbExtra"],["VPC","vpc"]
                 ].map(([l,k])=>(
-                  <Field key={k} label={l} value={d[k]||0} onChange={S(k)} sfx="%" hint={`≈ ${brl(c.pSI*((d[k]||0)/100))}`}/>
+                  <Field key={k} label={l} value={d[k]||0} onChange={S(k)} sfx="%" hint={`≈ ${brl(c.pF*((d[k]||0)/100))}`}/>
                 ))}
                 <div style={{display:"flex",alignItems:"flex-start",gap:8,justifyContent:"space-between"}}>
                   <div style={{flex:1}}>
@@ -2906,7 +3038,6 @@ function RevCalc({precoAlvo,onChange,c,margem}){
 // ── APP INTEGRADO ─────────────────────────────────────────────────────────────
 export default function App() {
   const [user, setUser] = useState(() => loadSession());
-
   const handleLogin = (u) => setUser(u);
   const handleLogout = () => { saveSession(null); setUser(null); };
 
@@ -2922,15 +3053,12 @@ export default function App() {
       <div className="dash">
         <div className="topbar">
           <div className="topbar-logo">
-              <img src="/logo-positivo-tecnologIA-mai-25.png" alt="Positivo Tecnologia" style={{height:30,objectFit:"contain",display:"block"}}/>
+            <img src="/logo-positivo-tecnologIA-mai-25.png" alt="Positivo Tecnologia" style={{height:30,objectFit:"contain",display:"block"}}/>
           </div>
           <div className="topbar-divider"/>
           <span className="topbar-title">
-            {isAdmin
-              ? (typeof window !== "undefined" && document.title, "Painel Administrativo")
-              : "Calculadora Tributária · PLAN_TRIB"}
+            {isAdmin ? "Painel Administrativo" : "Calculadora Tributária · PLAN_TRIB"}
           </span>
-          {!isAdmin && <div style={{display:"flex",gap:5,alignItems:"center",flexShrink:0}}/>}
           <div className="topbar-spacer"/>
           <div className="topbar-user">
             <div className="topbar-avatar" style={{ background: p.cor || "#0047BB" }}>{initials(user.nome)}</div>
@@ -2941,11 +3069,132 @@ export default function App() {
             <button className="btn-logout" onClick={handleLogout}>Sair</button>
           </div>
         </div>
-
         <div className="dash-body">
-          <Calculadora user={user} isAdmin={isAdmin}/>
+          {isAdmin
+            ? <PainelAdmin currentUser={user}/>
+            : <MultiTab user={user}/>
+          }
         </div>
       </div>
     </>
+  );
+}
+
+// ── MultiTab — sistema de abas de precificação ────────────────────────────────
+let _tabId = 1;
+function newTab(nome) {
+  return { id: _tabId++, nome: nome || `Precificação ${_tabId - 1}`, editando: false };
+}
+
+function MultiTab({ user }) {
+  const [abas, setAbas] = useState([newTab("Precificação 1")]);
+  const [abaAtiva, setAbaAtiva] = useState(0);
+  const [editandoIdx, setEditandoIdx] = useState(null);
+  const [nomeEdit, setNomeEdit] = useState("");
+
+  const addAba = () => {
+    const nova = newTab();
+    setAbas(p => [...p, nova]);
+    setAbaAtiva(abas.length);
+  };
+
+  const removeAba = (idx) => {
+    if (abas.length === 1) return;
+    const novas = abas.filter((_, i) => i !== idx);
+    setAbas(novas);
+    setAbaAtiva(Math.min(abaAtiva, novas.length - 1));
+  };
+
+  const startEdit = (idx) => {
+    setEditandoIdx(idx);
+    setNomeEdit(abas[idx].nome);
+  };
+
+  const confirmEdit = () => {
+    if (editandoIdx === null) return;
+    setAbas(p => p.map((a, i) => i === editandoIdx ? { ...a, nome: nomeEdit.trim() || a.nome } : a));
+    setEditandoIdx(null);
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
+      {/* Barra de abas */}
+      <div style={{
+        display: "flex", alignItems: "stretch", gap: 0,
+        background: "#0f1520", borderBottom: "1px solid rgba(255,255,255,.08)",
+        padding: "0 8px", overflowX: "auto", flexShrink: 0, minHeight: 38,
+      }}>
+        {abas.map((aba, idx) => (
+          <div key={aba.id}
+            onClick={() => setAbaAtiva(idx)}
+            style={{
+              display: "flex", alignItems: "center", gap: 6,
+              padding: "0 12px", cursor: "pointer", position: "relative",
+              borderRight: "1px solid rgba(255,255,255,.06)",
+              borderBottom: idx === abaAtiva ? "2px solid #0047BB" : "2px solid transparent",
+              background: idx === abaAtiva ? "#1e2a3d" : "transparent",
+              minWidth: 120, maxWidth: 200, flexShrink: 0,
+              transition: ".15s",
+            }}>
+            {editandoIdx === idx ? (
+              <input
+                autoFocus
+                value={nomeEdit}
+                onChange={e => setNomeEdit(e.target.value)}
+                onBlur={confirmEdit}
+                onKeyDown={e => { if (e.key === "Enter") confirmEdit(); if (e.key === "Escape") setEditandoIdx(null); }}
+                onClick={e => e.stopPropagation()}
+                style={{
+                  background: "none", border: "none", outline: "none",
+                  color: "#e8eaf0", fontSize: 11, fontWeight: 600,
+                  width: "100%", fontFamily: "'Instrument Sans', sans-serif",
+                }}
+              />
+            ) : (
+              <span
+                onDoubleClick={e => { e.stopPropagation(); startEdit(idx); }}
+                style={{
+                  fontSize: 11, fontWeight: idx === abaAtiva ? 600 : 400,
+                  color: idx === abaAtiva ? "#e8eaf0" : "#7a90b0",
+                  flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                  lineHeight: "38px",
+                }}
+                title="Duplo clique para renomear"
+              >
+                {aba.nome}
+              </span>
+            )}
+            {abas.length > 1 && (
+              <button
+                onClick={e => { e.stopPropagation(); removeAba(idx); }}
+                style={{
+                  background: "none", border: "none", cursor: "pointer",
+                  color: "#5a6a84", fontSize: 14, lineHeight: 1, padding: "0 2px",
+                  flexShrink: 0,
+                }}
+                title="Fechar aba">×</button>
+            )}
+          </div>
+        ))}
+        {/* Botão nova aba */}
+        <button
+          onClick={addAba}
+          style={{
+            background: "none", border: "none", cursor: "pointer",
+            color: "#5a6a84", fontSize: 18, padding: "0 12px",
+            flexShrink: 0, transition: ".15s",
+          }}
+          title="Nova precificação">+</button>
+      </div>
+
+      {/* Conteúdo da aba ativa */}
+      {abas.map((aba, idx) => (
+        <div key={aba.id} style={{ display: idx === abaAtiva ? "flex" : "none", flex: 1, overflow: "hidden" }}>
+          <Calculadora user={user} isAdmin={false} nomeAba={aba.nome} onRenomear={nome => {
+            setAbas(p => p.map((a, i) => i === idx ? { ...a, nome } : a));
+          }}/>
+        </div>
+      ))}
+    </div>
   );
 }
