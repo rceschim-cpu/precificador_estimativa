@@ -1367,6 +1367,88 @@ function ModalPCB({onClose,onApply,cfrImp,data,setData}){
   );
 }
 
+// ── Modal CRA / Crédito Federal ──────────────────────────────────────────────
+function ModalCRA({onClose, onApply, origem, c, d, prodAtrib}){
+  const [aba, setAba] = useState(origem==="IOS"?"ios":"mao");
+  const [conteudoLocal, setConteudoLocal] = useState(d.conteudoLocal||0);
+  const [plmPct, setPlmPct] = useState(d.plmPct||0);
+
+  // CRA (MAO)
+  const iiUSD = d.ptax>0 ? c.iiV/d.ptax : 0;
+  const craUSD = useMemo(()=>-((conteudoLocal/100)*iiUSD),[conteudoLocal,iiUSD]);
+
+  // Crédito Federal (IOS)
+  const cfImpUSD = d.ptax>0 ? d.cfImp/d.ptax : 0;
+  const despesasUSD = d.ptax>0 ? (d.despesasModo==="pct"?c.cfrBRL*d.despesasPct/100:d.despesas)/d.ptax : 0;
+  const seguroUSD = d.ptax>0 ? d.seguroBRL/d.ptax : 0;
+  const cfrExpandidoUSD = d.fobUSD + d.freteUSD + iiUSD + despesasUSD + cfImpUSD + seguroUSD;
+  const ppbPlacaUSD = d.ptax>0 ? (d.ppbVals?.placa||0)/d.ptax : 0;
+  const ppbMemoriaUSD = d.ptax>0 ? (d.ppbVals?.memoria||0)/d.ptax : 0;
+  const basePlacaUSD = useMemo(()=>(plmPct/100*cfrExpandidoUSD)+ppbPlacaUSD+ppbMemoriaUSD,[plmPct,cfrExpandidoUSD,ppbPlacaUSD,ppbMemoriaUSD]);
+  const fatorImposto = (-prodAtrib.ipi/100 + prodAtrib.icms/100*0.073);
+  const creditoIOS = useMemo(()=>fatorImposto*basePlacaUSD*(1+conteudoLocal/100),[fatorImposto,basePlacaUSD,conteudoLocal]);
+
+  const valor = aba==="mao" ? craUSD : creditoIOS;
+  const valorBRL = valor*(d.ptax||0);
+
+  return(
+    <div className="ov">
+      <div className="mb" onClick={e=>e.stopPropagation()}>
+        <div className="mh"><span className="mt">CRA / Crédito de Impostos</span><button className="mc" onClick={onClose}>x</button></div>
+        <div className="mbody">
+          {/* Tabs */}
+          <div style={{display:"flex",gap:4,marginBottom:12}}>
+            {[["mao","CRA (MAO)"],["ios","Crédito Federal (IOS)"]].map(([k,l])=>(
+              <button key={k} onClick={()=>setAba(k)}
+                style={{flex:1,padding:"6px",fontSize:11,fontWeight:700,cursor:"pointer",borderRadius:4,border:"1px solid",transition:".15s",
+                  background:aba===k?"rgba(0,71,187,.25)":"rgba(255,255,255,.04)",
+                  borderColor:aba===k?"#0047BB":"rgba(255,255,255,.1)",
+                  color:aba===k?"#93c5fd":"#7a90b0"}}>{l}</button>
+            ))}
+          </div>
+
+          {/* CRA — MAO */}
+          {aba==="mao"&&<>
+            <Box t="blue">{"CRA = % Conteúdo Local × II (USD)"}</Box>
+            <Field label="% Conteúdo Local" sfx="%" value={conteudoLocal} onChange={v=>setConteudoLocal(parseFloat(v)||0)}
+              hint="% de insumos nacionais sobre o produto"/>
+            <div className="pbase"><span>II (base)</span><span>{usd(iiUSD)}</span></div>
+            <div className="pdecomp">
+              <div><span>II (USD)</span><span>{usd(iiUSD)}</span></div>
+              <div><span>× {n3(conteudoLocal)}% (conteúdo local)</span><span>{usd(conteudoLocal/100*iiUSD)}</span></div>
+            </div>
+            <div className="pres"><span>CRA calculado</span><span>{usd(craUSD)}</span></div>
+          </>}
+
+          {/* Crédito Federal — IOS */}
+          {aba==="ios"&&<>
+            <Box t="blue">{"(-IPI% + ICMS%×7,3%) × (PLM%×CFRexp + PCB + Mem) × (1+%CL)"}</Box>
+            <Field label="% PLM sobre FOB" sfx="%" value={plmPct} onChange={v=>setPlmPct(parseFloat(v)||0)}
+              hint="Representatividade dos componentes da placa no FOB"/>
+            <Field label="% Conteúdo Local" sfx="%" value={conteudoLocal} onChange={v=>setConteudoLocal(parseFloat(v)||0)}/>
+            <div className="pbase"><span>CFR Expandido (base)</span><span>{usd(cfrExpandidoUSD)}</span></div>
+            <div className="pdecomp">
+              <div><span>FOB + Frete + II + Desp. + CF + Seguro</span><span>{usd(cfrExpandidoUSD)}</span></div>
+              <div><span>PLM ({n3(plmPct)}%) × CFR exp.</span><span>{usd(plmPct/100*cfrExpandidoUSD)}</span></div>
+              <div><span>+ PCB (PPB Placa)</span><span>{usd(ppbPlacaUSD)}</span></div>
+              <div><span>+ Memória (PPB Memória)</span><span>{usd(ppbMemoriaUSD)}</span></div>
+              <div><span>= Base Placa</span><span>{usd(basePlacaUSD)}</span></div>
+              <div><span>Fator (-{pct(prodAtrib.ipi)} + {pct(prodAtrib.icms)}×7,3%)</span><span>{n3(fatorImposto*100)}%</span></div>
+              <div><span>× (1 + {n3(conteudoLocal)}% CL)</span><span>{n3(1+conteudoLocal/100)}</span></div>
+            </div>
+            <div className="pres"><span>Crédito calculado</span><span>{usd(creditoIOS)}</span></div>
+          </>}
+
+          <div style={{fontSize:10,color:"#5a6a84",textAlign:"right",marginTop:4}}>= {brl(valorBRL)}</div>
+          <button className="mapp" onClick={()=>{onApply(valor, conteudoLocal, plmPct);}}>
+            Aplicar ao campo CRA / Créditos
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Modal CF Venda ────────────────────────────────────────────────────────────
 // Formula: (1 + taxa/30)^(prazo + 10) - 1
 // taxa em % (ex: 1.14 = 1,14% a.m.)
@@ -2188,6 +2270,12 @@ function Calculadora({user:currentUser, isAdmin=false}){
     {modal==="cfImp"&&<ModalCF onClose={()=>setModal(null)} fobUSD={d.fobUSD} ptax={d.ptax}
       data={calcs.cfImp} setData={v=>SC("cfImp")(v)}
       onApply={v=>{setD(p=>({...p,cfImp:v}));SC("cfImp")({applied:true});setModal(null);}}/>}
+    {modal==="cra"&&<ModalCRA onClose={()=>setModal(null)} origem={d.origem} c={c} d={d} prodAtrib={prodAtrib}
+      onApply={(valorUSD, cl, plm)=>{
+        const valorBRL = valorUSD*(d.ptax||0);
+        setD(p=>({...p, cra: valorBRL, conteudoLocal: cl, plmPct: plm}));
+        setModal(null);
+      }}/>}
     {modal==="frete"&&<ModalFrete onClose={()=>setModal(null)}
       data={calcs.frete} setData={v=>SC("frete")(v)}
       onApply={v=>{setD(p=>({...p,freteUSD:v}));SC("frete")({applied:true});setModal(null);}}/>}
@@ -2468,64 +2556,17 @@ function Calculadora({user:currentUser, isAdmin=false}){
                     :<Field label={`Despesas (${sfxM})`} sfx={sfxM} value={toDisp(d.despesas)} onChange={v=>S("despesas")(toStore(v))} hint="SISCOMEX+Despachante"/>
                   }
                 </Sec>
-                <Sec title={d.origem==="MAO"?"CF Importação + CRA":d.origem==="IOS"?"CF Importação + Crédito Federal":"CF Importação + Créditos"} tag="→ VPL">
+                <Sec title="CF Importação + CRA" tag="→ VPL">
                   <Field label={`CF Importação (${sfxM})`} sfx={sfxM} value={toDisp(d.cfImp)}
                     onChange={calcs.cfImp.applied?undefined:v=>S("cfImp")(toStore(v))}
                     locked={calcs.cfImp.applied} onUnlock={()=>SC("cfImp")({applied:false})}
                     hint="Juros/IOF — entra no VPL"
                     action={<button className={`cbtn ${calcs.cfImp.applied?"cactive":""}`}
                       title="Calcular CF" onClick={()=>setModal("cfImp")}>$</button>}/>
-
-                  {/* CRA — MAO */}
-                  {d.origem==="MAO"&&<>
-                    <div style={{borderTop:"1px solid rgba(255,255,255,.06)",marginTop:6,paddingTop:6}}>
-                      <div style={{fontSize:10,fontWeight:700,color:"#5a6a84",textTransform:"uppercase",letterSpacing:.5,marginBottom:6}}>CRA — Crédito de Regionalização</div>
-                      <Field label="% Conteúdo Local" sfx="%" value={d.conteudoLocal||0} onChange={S("conteudoLocal")}
-                        hint={`II = ${usd(c.iiUSD||0)} × ${n3(d.conteudoLocal||0)}%`}/>
-                      {(d.conteudoLocal||0)>0&&(
-                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:4}}>
-                          <span style={{fontSize:11,color:"#7a90b0"}}>CRA calculado</span>
-                          <span style={{fontFamily:"'DM Mono',monospace",fontSize:12,fontWeight:700,color:"#4ade80"}}>{usd(c.craCalcMAO)}</span>
-                        </div>
-                      )}
-                      <button style={{marginTop:6,width:"100%",padding:"5px",fontSize:10,fontWeight:700,cursor:"pointer",borderRadius:4,border:"1px solid rgba(74,222,128,.3)",background:"rgba(74,222,128,.08)",color:"#4ade80"}}
-                        onClick={()=>S("cra")(d.ptax>0?c.craCalcMAO*d.ptax:c.craCalcMAO)}>
-                        ↓ Aplicar ao campo CRA
-                      </button>
-                    </div>
-                    <Field label={`CRA / Créditos (${sfxM})`} sfx={sfxM} value={toDisp(d.cra)} onChange={v=>S("cra")(toStore(v))} hint="Entra no VPL"/>
-                  </>}
-
-                  {/* Crédito Federal — IOS */}
-                  {d.origem==="IOS"&&<>
-                    <div style={{borderTop:"1px solid rgba(255,255,255,.06)",marginTop:6,paddingTop:6}}>
-                      <div style={{fontSize:10,fontWeight:700,color:"#5a6a84",textTransform:"uppercase",letterSpacing:.5,marginBottom:6}}>Crédito de Impostos Federais</div>
-                      <Field label="% PLM sobre FOB" sfx="%" value={d.plmPct||0} onChange={S("plmPct")}
-                        hint={`Base placa = ${usd(c.basePlacaUSD||0)}`}/>
-                      <Field label="% Conteúdo Local" sfx="%" value={d.conteudoLocal||0} onChange={S("conteudoLocal")}/>
-                      {(d.plmPct||0)>0&&<>
-                        <div style={{fontSize:9,color:"#5a6a84",marginTop:4,lineHeight:1.6}}>
-                          CFR exp. = {usd(c.cfrExpandidoUSD||0)} · Base placa = {usd(c.basePlacaUSD||0)}<br/>
-                          (-{pct(prodAtrib.ipi)} + {pct(prodAtrib.icms)}×7,3%) × base × (1+{n3(d.conteudoLocal||0)}%)
-                        </div>
-                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:4}}>
-                          <span style={{fontSize:11,color:"#7a90b0"}}>Crédito calculado</span>
-                          <span style={{fontFamily:"'DM Mono',monospace",fontSize:12,fontWeight:700,color:"#4ade80"}}>{usd(c.creditoCalcIOS)}</span>
-                        </div>
-                        <button style={{marginTop:6,width:"100%",padding:"5px",fontSize:10,fontWeight:700,cursor:"pointer",borderRadius:4,border:"1px solid rgba(74,222,128,.3)",background:"rgba(74,222,128,.08)",color:"#4ade80"}}
-                          onClick={()=>S("cra")(d.ptax>0?c.creditoCalcIOS*d.ptax:c.creditoCalcIOS)}>
-                          ↓ Aplicar ao campo Créditos
-                        </button>
-                      </>}
-                    </div>
-                    <Field label={`Créditos (${sfxM})`} sfx={sfxM} value={toDisp(d.cra)} onChange={v=>S("cra")(toStore(v))} hint="Entra no VPL"/>
-                  </>}
-
-                  {/* CWB — sem crédito */}
-                  {d.origem==="CWB"&&(
-                    <Field label={`CRA / Créditos (${sfxM})`} sfx={sfxM} value={toDisp(d.cra)} onChange={v=>S("cra")(toStore(v))} hint="Entra no VPL"/>
-                  )}
-
+                  <Field label={`${d.origem==="IOS"?"Crédito Federal":"CRA / Créditos"} (${sfxM})`}
+                    sfx={sfxM} value={toDisp(d.cra)} onChange={v=>S("cra")(toStore(v))}
+                    hint="Entra no VPL"
+                    action={<button className="cbtn" title="Calcular CRA / Crédito" onClick={()=>setModal("cra")}>$</button>}/>
                   <DR label="CMV Importação" value={brl(c.cmvImp)} bold sep/>
                   <DR label="VPL" value={brl(c.vpl)} bold accent="blue"/>
                 </Sec>
