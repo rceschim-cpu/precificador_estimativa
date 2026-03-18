@@ -1,57 +1,59 @@
-// api/ii.js — Vercel Function (CommonJS)
-// Consulta o II (Imposto de Importação) do simulador da Receita Federal
-// pelo NCM informado como query param: /api/ii?ncm=8517.13.00
+// api/ii.js — Vercel Function (ES Module)
+import https from "https";
 
-module.exports = async function handler(req, res) {
-  // CORS para o domínio do app
+function httpsPost(url, body) {
+  return new Promise((resolve, reject) => {
+    const urlObj = new URL(url);
+    const options = {
+      hostname: urlObj.hostname,
+      path: urlObj.pathname,
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Content-Length": Buffer.byteLength(body),
+        "User-Agent": "Mozilla/5.0 (compatible; Positec/1.0)",
+        "Referer": "https://www4.receita.fazenda.gov.br/simulador/",
+      },
+    };
+    const req = https.request(options, (res) => {
+      let data = "";
+      res.setEncoding("latin1");
+      res.on("data", (chunk) => { data += chunk; });
+      res.on("end", () => resolve({ status: res.statusCode, body: data }));
+    });
+    req.on("error", reject);
+    req.write(body);
+    req.end();
+  });
+}
+
+export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET");
 
   const { ncm } = req.query;
-  if (!ncm) return res.status(400).json({ error: "NCM obrigatório" });
+  if (!ncm) return res.status(400).json({ error: "NCM obrigatorio" });
 
-  // Remove pontos para o simulador (ex: 8517.13.00 → 85171300)
   const ncmLimpo = ncm.replace(/\./g, "");
+  const body = `acao=simularTratamentoAdministrativo&txtNCM=${ncmLimpo}&txtValorAd=1000&txtMoeda=BRL`;
 
   try {
-    // POST para o simulador da Receita com valor fictício (R$ 1000)
-    const form = new URLSearchParams({
-      acao:          "simularTratamentoAdministrativo",
-      txtNCM:        ncmLimpo,
-      txtValorAd:    "1000",
-      txtMoeda:      "BRL",
-    });
+    const result = await httpsPost(
+      "https://www4.receita.fazenda.gov.br/simulador/Resultado.jsp",
+      body
+    );
 
-    const resp = await fetch("https://www4.receita.fazenda.gov.br/simulador/Resultado.jsp", {
-      method:  "POST",
-      headers: {
-        "Content-Type":  "application/x-www-form-urlencoded",
-        "User-Agent":    "Mozilla/5.0 (compatible; PositecPrecificador/1.0)",
-        "Referer":       "https://www4.receita.fazenda.gov.br/simulador/",
-        "Origin":        "https://www4.receita.fazenda.gov.br",
-      },
-      body: form.toString(),
-    });
+    const html = result.body;
 
-    if (!resp.ok) throw new Error(`Receita retornou ${resp.status}`);
+    // Padrao 1: <td>II</td><td>X,XX %</td>
+    const p1 = html.match(/>\s*II\s*<\/td>\s*<td[^>]*>\s*([\d]+[,\.][\d]+)\s*%/i);
+    if (p1) return res.status(200).json({ ii: parseFloat(p1[1].replace(",", ".")), ncm });
 
-    const html = await resp.text();
+    // Padrao 2: qualquer II seguido de numero%
+    const p2 = html.match(/II[^\d<]{0,20}([\d]+[,\.][\d]+)\s*%/i);
+    if (p2) return res.status(200).json({ ii: parseFloat(p2[1].replace(",", ".")), ncm });
 
-    // Extrai alíquota do II da tabela de resultado
-    // O HTML contém algo como: <td>II</td><td>X,XX %</td>
-    const match = html.match(/II[^<]*<\/td>\s*<td[^>]*>\s*([\d,\.]+)\s*%/i);
-    if (!match) {
-      // Segunda tentativa com padrão alternativo
-      const match2 = html.match(/Imposto de Importa[^<]*<\/[^>]+>\s*<[^>]+>\s*([\d,\.]+)\s*%/i);
-      if (!match2) {
-        return res.status(200).json({ ii: null, fonte: "receita", erro: "Alíquota não encontrada na resposta" });
-      }
-      const ii2 = parseFloat(match2[1].replace(",", "."));
-      return res.status(200).json({ ii: ii2, ncm, fonte: "receita" });
-    }
-
-    const ii = parseFloat(match[1].replace(",", "."));
-    return res.status(200).json({ ii, ncm, fonte: "receita" });
+    // Debug — retorna trecho do HTML
+    return res.status(200).json({ ii: null, ncm, debug: html.substring(0, 1000) });
 
   } catch (e) {
     return res.status(500).json({ error: e.message });
