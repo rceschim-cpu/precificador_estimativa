@@ -1663,6 +1663,7 @@ function BreakdownPanel({c,d,prod,ppbTot,calcs}){
       {/* IMPOSTOS DA VENDA */}
       <Grp id="impvenda" label="Impostos da Venda" total={totalImpVenda} color="#ef4444">
         {c.ipi>0&&<Row l={`IPI (${pct(c.ipi)})`} v={c.ipiV} acc="red"/>}
+        {c.ipiCreditoV>0&&<Row l={`  ↳ Crédito IPI IOS (-${pct(c.ipiCreditoIOSPct)})`} v={-c.ipiCreditoV} acc="green" indent sub/>}
         <Row l={`P/C efetivo (${pct(c.pcEf)})`} v={c.pcV} acc="red"/>
         {c.pcSubvPct>0.001&&<Row l={`P/C subvenção (${pct(c.pcSubvPct)})`} v={c.pcSubvV} acc="red" indent sub/>}
         {c.icmsEfPct>0&&<Row l={`ICMS efetivo (${pct(c.icmsEfPct)})`} v={c.icmsEfV} acc="red"/>}
@@ -2215,19 +2216,19 @@ function Calculadora({user:currentUser, isAdmin=false}){
     const ftiPct=(isZFM&&d.ftiAtivo)?prodAtrib.fti:0;
     const fcpPct=FCP[ufD]||0;
     const ipi=prodAtrib.ipi;
-    // Crédito de IPI na venda para IOS (BA) — 12,97% fixo sobre o IPI debitado na saída
-    // O crédito reduz o IPI efetivo de saída, impactando o preço final
-    const ipiCreditoIOSPct = d.origem==="IOS" ? 12.97 : 0;
-    const ipiEf = ipi * (1 - ipiCreditoIOSPct/100); // IPI efetivo após crédito
+    // Crédito de IPI na venda para IOS (BA) — 12,97% / (1 + IPI%) como índice negativo no soma
+    // Reduz a base total de índices/impostos, não a alíquota do IPI em si
+    const ipiCreditoIOSPct = d.origem==="IOS" && ipi>0 ? 12.97/(1+ipi/100) : 0;
+    const ipiEf = ipi; // IPI nominal inalterado — o crédito entra no soma
     const comisXPct=d.comis*(2/3);
     const indPct=d.pd+d.cfixo+d.scrap+d.royal+d.cfVenda+d.frete+d.comis+comisXPct+d.mkt+d.rebate;
     // MG é um índice independente — entra no soma como os outros índices
     // Valor negativo = crédito = eleva o preço (denominador menor)
     const margGerPct=(d.margGer||0);
-    const soma=(pcEf+pcSubvPct+icmsEfPct+difal+ftiPct+fcpPct+indPct+margGerPct+d.margem)/100;
+    const soma=(pcEf+pcSubvPct+icmsEfPct+difal+ftiPct+fcpPct+indPct+margGerPct+d.margem-ipiCreditoIOSPct)/100;
     const pSI=soma<1?cmvTotal/(1-soma):cmvTotal*99;
-    const ipiV=pSI*(ipiEf/100),pCI=pSI+ipiV;
-    const ipiCreditoV=pSI*(ipi/100)-ipiV; // valor do crédito de IPI (IOS)
+    const ipiV=pSI*(ipi/100),pCI=pSI+ipiV;
+    const ipiCreditoV=pSI*(ipiCreditoIOSPct/100); // valor monetário do crédito de IPI IOS
     const pcV=pSI*(pcEf/100),icmsV=pSI*(aliqInter/100);
     const icmsEfV=pSI*(icmsEfPct/100),difalV=pSI*(difal/100);
     const pcSubvV=pSI*(pcSubvPct/100);
@@ -2255,13 +2256,13 @@ function Calculadora({user:currentUser, isAdmin=false}){
     let margemAlvo=null;
     if(d.precoAlvo>0){
       const pSIa=d.precoAlvo/(1+ipi/100);
-      const sf=(pcEf+pcSubvPct+icmsEfPct+difal+ftiPct+fcpPct+indPct+margGerPct)/100;
+      const sf=(pcEf+pcSubvPct+icmsEfPct+difal+ftiPct+fcpPct+indPct+margGerPct-ipiCreditoIOSPct)/100;
       margemAlvo=pSIa>0?(1-cmvTotal/pSIa)*100-sf*100:null;
     }
     return{cfrUSD,cfrBRL,iiV,iiUSD,vpl,bkpV,bkpBase,cfrImp,cmvImp,cmvTotal,ppbTot,despesas,
       craCalcMAO,creditoCalcIOS,cfrExpandidoUSD,basePlacaUSD,
       pcPct,pcEf,pcLabel,pcV,pcSubvPct,pcSubvV,pcBaseRedPct,aliqInter,aliqDest,icmsEfPct,icmsV,icmsEfV,
-      difal,difalV,ftiPct,ftiV,fcpPct,fcpV,ipi,ipiV,pSI,pCI,
+      difal,difalV,ftiPct,ftiV,fcpPct,fcpV,ipi,ipiEf,ipiV,ipiCreditoV,ipiCreditoIOSPct,pSI,pCI,
       margV,indPct,pdV,cfxV,scV,ryV,cfnV,frV,cmV,mktV,rebateV,stV,stBase,pF,pUSD,
       cargaTot,cargaPct,margPct,mc,mkp,ufO,intra,deveDifal,margemAlvo,comisXPct,margGerPct,margGerV};
   },[d,prod,prodAtrib,isZFM,isCBU,pcEntry,ppbTot]);
@@ -2356,7 +2357,7 @@ function Calculadora({user:currentUser, isAdmin=false}){
                   <span style={{fontSize:18,fontWeight:400,color:"#0047BB",marginTop:6}}>R$</span>{n3(c.pF)}
                 </div>
                 <div style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:"#5a6a84",marginTop:4,lineHeight:1.6}}>
-                  {c.ipi>0&&`s/IPI ${brl(c.pSI)} · IPI ${brl(c.ipiV)} · `}
+                  {c.ipi>0&&`s/IPI ${brl(c.pSI)} · IPI ef. ${brl(c.ipiV)} · `}
                   {c.stV>0&&`ST ${brl(c.stV)} · `}
                   {c.difal>0&&`DIFAL ${brl(c.difalV)} · `}
                   {(d.ptaxPreco||d.ptax)>0&&<span style={{color:"#0047BB"}}>{usd(c.pUSD)}{d.ptaxPreco>0&&<span style={{fontSize:9,color:"#5a6a84",marginLeft:3}}>×{n3(d.ptaxPreco)}</span>}</span>}
@@ -2739,7 +2740,7 @@ function Calculadora({user:currentUser, isAdmin=false}){
                   <Box t="blue">Alíquotas carregadas do catálogo PLAN_TRIB 09/02/2026.</Box>
                   <div className="txgrid">
                     {[
-                      ["IPI Saida",pct(prodAtrib.ipi),prodAtrib.ipi===0],
+                      ["IPI Saída",pct(prodAtrib.ipi),prodAtrib.ipi===0],
                       ["P/C Debito",c.pcLabel,false],
                       ["P/C Ef. (base liq.)",pct(c.pcEf),false],
                       ["ICMS Destacado NF",pct(c.aliqInter),false],
@@ -2751,6 +2752,12 @@ function Calculadora({user:currentUser, isAdmin=false}){
                         <div className="txl">{l}</div><div className="txv">{v}</div>
                       </div>
                     ))}
+                    {c.ipiCreditoIOSPct>0&&(
+                      <div className="txc txok">
+                        <div className="txl">Crédito IPI IOS (12,97%÷1+IPI)</div>
+                        <div className="txv">-{pct(c.ipiCreditoIOSPct)}</div>
+                      </div>
+                    )}
                     {c.ftiPct>0&&<div className="txc txon"><div className="txl">FTI/UEA-AM</div><div className="txv">{pct(c.ftiPct)}</div></div>}
                     {c.fcpPct>0&&<div className="txc txwn"><div className="txl">Fundo Pobreza {d.ufDestino}</div><div className="txv">{pct(c.fcpPct)}</div></div>}
                   </div>
