@@ -3070,10 +3070,7 @@ export default function App() {
           </div>
         </div>
         <div className="dash-body">
-          {isAdmin
-            ? <PainelAdmin currentUser={user}/>
-            : <MultiTab user={user}/>
-          }
+          <MultiTab user={user}/>
         </div>
       </div>
     </>
