@@ -522,8 +522,7 @@ function AuthScreen({ onLogin }) {
       <div className="auth-box">
         <div className="auth-head">
           <div className="auth-logo">
-            <div className="auth-mark">PT</div>
-            <span className="auth-brand">POSITEC</span>
+              <img src="/logo-positivo-tecnologIA-mai-25.png" alt="Positivo Tecnologia" style={{height:40,objectFit:"contain"}}/>
           </div>
           <div>
             <div className="auth-title">Calculadora Tributária</div>
@@ -2881,8 +2880,7 @@ export default function App() {
       <div className="dash">
         <div className="topbar">
           <div className="topbar-logo">
-            <div className="topbar-mark">PT</div>
-            <span className="topbar-name">POSITEC</span>
+              <img src="/logo-positivo-tecnologIA-mai-25.png" alt="Positivo Tecnologia" style={{height:30,objectFit:"contain",display:"block"}}/>
           </div>
           <div className="topbar-divider"/>
           <span className="topbar-title">
