@@ -1129,6 +1129,7 @@ const DEF={
   fobUSD:0,freteUSD:0,ptax:0,seguroBRL:0,aliqII:0,
   despesas:0,despesasPct:0,despesasModo:"pct",
   cfImp:0,cra:0,
+  conteudoLocal:0, plmPct:0,
   ppbAtivos:{injecao:false,bateria:false,carregador:false,memoria:false,cabo:false,placa:false},
   ppbVals:{injecao:0,bateria:0,carregador:0,memoria:0,cabo:0,placa:0},
   producao:0,garantia:0,bkpPct:0,outrosBRL:0,embalagem:0,ftiAtivo:false,
@@ -1490,7 +1491,7 @@ function ModalRegistros({onClose, onLoad, currentD, currentCalcs, prodNome}){
 
 // ── Breakdown Panel ───────────────────────────────────────────────────────────
 function BreakdownPanel({c,d,prod,ppbTot,calcs}){
-  const [open,setOpen]=useState({imp:true,ppb:false,local:false,impvenda:false,iger:false,icom:false,res:true});
+  const [open,setOpen]=useState({imp:false,ppb:false,local:false,impvenda:false,iger:false,icom:false,res:false});
   const tog=k=>setOpen(p=>({...p,[k]:!p[k]}));
 
   const fobBRL=d.fobUSD*d.ptax;
@@ -2083,6 +2084,26 @@ function Calculadora({user:currentUser, isAdmin=false}){
     const despesas=d.despesasModo==="pct"?cfrBRL*d.despesasPct/100:d.despesas;
     const cfrImp=cfrBRL+iiV+despesas;
     const cmvImp=cfrBRL+iiV+despesas+d.seguroBRL;
+
+    // ── CRA (MAO) — % conteúdo local × II em USD ─────────────────────────────
+    const iiUSD = d.ptax>0 ? iiV/d.ptax : 0;
+    const craCalcMAO = d.origem==="MAO" ? -((d.conteudoLocal||0)/100 * iiUSD) : 0;
+
+    // ── Crédito Federal (IOS) ─────────────────────────────────────────────────
+    // CFR expandido em USD = FOB + Frete + II_USD + Despesas_USD + cfImp_USD + Seguro_USD
+    const cfImpUSD = d.ptax>0 ? d.cfImp/d.ptax : 0;
+    const despesasUSD = d.ptax>0 ? despesas/d.ptax : 0;
+    const seguroUSD = d.ptax>0 ? d.seguroBRL/d.ptax : 0;
+    const cfrExpandidoUSD = d.fobUSD + d.freteUSD + iiUSD + despesasUSD + cfImpUSD + seguroUSD;
+    // base da placa = (% PLM × CFR expandido) + custo PCB (ppb placa) + custo Memória (ppb memoria)
+    const ppbPlacaUSD = d.ptax>0 ? (d.ppbVals?.placa||0)/d.ptax : 0;
+    const ppbMemoriaUSD = d.ptax>0 ? (d.ppbVals?.memoria||0)/d.ptax : 0;
+    const basePlacaUSD = ((d.plmPct||0)/100 * cfrExpandidoUSD) + ppbPlacaUSD + ppbMemoriaUSD;
+    // crédito = (-IPI% + ICMS% × 7,3%) × base_placa × (1 + % conteúdo local)
+    const creditoCalcIOS = d.origem==="IOS"
+      ? (-prodAtrib.ipi/100 + prodAtrib.icms/100 * 0.073) * basePlacaUSD * (1 + (d.conteudoLocal||0)/100)
+      : 0;
+
     const vpl=cmvImp+d.cfImp+ppbTot+d.cra;
     const bkpBase=vpl+(d.embalagem||0)+d.outrosBRL;
     const bkpV=bkpBase*(d.bkpPct/100);
@@ -2151,7 +2172,8 @@ function Calculadora({user:currentUser, isAdmin=false}){
       const sf=(pcEf+pcSubvPct+icmsEfPct+difal+ftiPct+fcpPct+indPct+margGerPct)/100;
       margemAlvo=pSIa>0?(1-cmvTotal/pSIa)*100-sf*100:null;
     }
-    return{cfrUSD,cfrBRL,iiV,vpl,bkpV,bkpBase,cfrImp,cmvImp,cmvTotal,ppbTot,despesas,
+    return{cfrUSD,cfrBRL,iiV,iiUSD,vpl,bkpV,bkpBase,cfrImp,cmvImp,cmvTotal,ppbTot,despesas,
+      craCalcMAO,creditoCalcIOS,cfrExpandidoUSD,basePlacaUSD,
       pcPct,pcEf,pcLabel,pcV,pcSubvPct,pcSubvV,pcBaseRedPct,aliqInter,aliqDest,icmsEfPct,icmsV,icmsEfV,
       difal,difalV,ftiPct,ftiV,fcpPct,fcpV,ipi,ipiV,pSI,pCI,
       margV,indPct,pdV,cfxV,scV,ryV,cfnV,frV,cmV,mktV,rebateV,stV,stBase,pF,pUSD,
@@ -2208,10 +2230,24 @@ function Calculadora({user:currentUser, isAdmin=false}){
           <input type="number" step="0.01" value={d.ptaxPreco||d.ptax} onChange={e=>S("ptaxPreco")(parseFloat(e.target.value)||0)}
             style={{background:"none",border:"none",outline:"none",fontFamily:"'DM Mono',monospace",fontSize:12,fontWeight:700,color:"#60a5fa",width:52,textAlign:"right"}}/>
         </div>
-        <button onClick={()=>setModal("registros")}
-          style={{padding:"4px 12px",background:"rgba(0,71,187,.2)",border:"1px solid rgba(0,71,187,.45)",color:"#93c5fd",fontFamily:"'Barlow Condensed',sans-serif",fontSize:11,fontWeight:700,letterSpacing:.5,cursor:"pointer",borderRadius:20,display:"flex",alignItems:"center",gap:5}}>
-          💾 Registros
-        </button>
+        {/* Registros — Novo / Salvar / Carregar */}
+        <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:2}}>
+          <span style={{fontSize:8,fontWeight:700,color:"#5a6a84",letterSpacing:.8,textTransform:"uppercase"}}>Registros</span>
+          <div style={{display:"flex",gap:4}}>
+            <button onClick={()=>{setD({...DEF});setCalcs({...CALC_DEF});setTab("perfil");setIiStatus(null);}}
+              style={{padding:"4px 10px",background:"rgba(220,38,38,.15)",border:"1px solid rgba(220,38,38,.35)",color:"#f87171",fontFamily:"'Barlow Condensed',sans-serif",fontSize:11,fontWeight:700,letterSpacing:.5,cursor:"pointer",borderRadius:20}}>
+              Novo
+            </button>
+            <button onClick={()=>setModal("registros")}
+              style={{padding:"4px 10px",background:"rgba(0,71,187,.2)",border:"1px solid rgba(0,71,187,.45)",color:"#93c5fd",fontFamily:"'Barlow Condensed',sans-serif",fontSize:11,fontWeight:700,letterSpacing:.5,cursor:"pointer",borderRadius:20}}>
+              Salvar
+            </button>
+            <button onClick={()=>setModal("registros")}
+              style={{padding:"4px 10px",background:"rgba(255,255,255,.05)",border:"1px solid rgba(255,255,255,.15)",color:"#a8b5cc",fontFamily:"'Barlow Condensed',sans-serif",fontSize:11,fontWeight:700,letterSpacing:.5,cursor:"pointer",borderRadius:20}}>
+              Carregar
+            </button>
+          </div>
+        </div>
         {isAdmin&&<button onClick={()=>setModal("gestao")}
           style={{padding:"4px 12px",background:"rgba(5,150,105,.15)",border:"1px solid rgba(5,150,105,.4)",color:"#34d399",fontFamily:"'Barlow Condensed',sans-serif",fontSize:11,fontWeight:700,letterSpacing:.5,cursor:"pointer",borderRadius:20,display:"flex",alignItems:"center",gap:5}}>
           👥 Gestão de Usuários
@@ -2432,14 +2468,64 @@ function Calculadora({user:currentUser, isAdmin=false}){
                     :<Field label={`Despesas (${sfxM})`} sfx={sfxM} value={toDisp(d.despesas)} onChange={v=>S("despesas")(toStore(v))} hint="SISCOMEX+Despachante"/>
                   }
                 </Sec>
-                <Sec title="CF Importação + CRA" tag="→ VPL">
+                <Sec title={d.origem==="MAO"?"CF Importação + CRA":d.origem==="IOS"?"CF Importação + Crédito Federal":"CF Importação + Créditos"} tag="→ VPL">
                   <Field label={`CF Importação (${sfxM})`} sfx={sfxM} value={toDisp(d.cfImp)}
                     onChange={calcs.cfImp.applied?undefined:v=>S("cfImp")(toStore(v))}
                     locked={calcs.cfImp.applied} onUnlock={()=>SC("cfImp")({applied:false})}
                     hint="Juros/IOF — entra no VPL"
                     action={<button className={`cbtn ${calcs.cfImp.applied?"cactive":""}`}
                       title="Calcular CF" onClick={()=>setModal("cfImp")}>$</button>}/>
-                  <Field label={`CRA / Créditos (${sfxM})`} sfx={sfxM} value={toDisp(d.cra)} onChange={v=>S("cra")(toStore(v))} hint="Entram no VPL"/>
+
+                  {/* CRA — MAO */}
+                  {d.origem==="MAO"&&<>
+                    <div style={{borderTop:"1px solid rgba(255,255,255,.06)",marginTop:6,paddingTop:6}}>
+                      <div style={{fontSize:10,fontWeight:700,color:"#5a6a84",textTransform:"uppercase",letterSpacing:.5,marginBottom:6}}>CRA — Crédito de Regionalização</div>
+                      <Field label="% Conteúdo Local" sfx="%" value={d.conteudoLocal||0} onChange={S("conteudoLocal")}
+                        hint={`II = ${usd(c.iiUSD||0)} × ${n3(d.conteudoLocal||0)}%`}/>
+                      {(d.conteudoLocal||0)>0&&(
+                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:4}}>
+                          <span style={{fontSize:11,color:"#7a90b0"}}>CRA calculado</span>
+                          <span style={{fontFamily:"'DM Mono',monospace",fontSize:12,fontWeight:700,color:"#4ade80"}}>{usd(c.craCalcMAO)}</span>
+                        </div>
+                      )}
+                      <button style={{marginTop:6,width:"100%",padding:"5px",fontSize:10,fontWeight:700,cursor:"pointer",borderRadius:4,border:"1px solid rgba(74,222,128,.3)",background:"rgba(74,222,128,.08)",color:"#4ade80"}}
+                        onClick={()=>S("cra")(d.ptax>0?c.craCalcMAO*d.ptax:c.craCalcMAO)}>
+                        ↓ Aplicar ao campo CRA
+                      </button>
+                    </div>
+                    <Field label={`CRA / Créditos (${sfxM})`} sfx={sfxM} value={toDisp(d.cra)} onChange={v=>S("cra")(toStore(v))} hint="Entra no VPL"/>
+                  </>}
+
+                  {/* Crédito Federal — IOS */}
+                  {d.origem==="IOS"&&<>
+                    <div style={{borderTop:"1px solid rgba(255,255,255,.06)",marginTop:6,paddingTop:6}}>
+                      <div style={{fontSize:10,fontWeight:700,color:"#5a6a84",textTransform:"uppercase",letterSpacing:.5,marginBottom:6}}>Crédito de Impostos Federais</div>
+                      <Field label="% PLM sobre FOB" sfx="%" value={d.plmPct||0} onChange={S("plmPct")}
+                        hint={`Base placa = ${usd(c.basePlacaUSD||0)}`}/>
+                      <Field label="% Conteúdo Local" sfx="%" value={d.conteudoLocal||0} onChange={S("conteudoLocal")}/>
+                      {(d.plmPct||0)>0&&<>
+                        <div style={{fontSize:9,color:"#5a6a84",marginTop:4,lineHeight:1.6}}>
+                          CFR exp. = {usd(c.cfrExpandidoUSD||0)} · Base placa = {usd(c.basePlacaUSD||0)}<br/>
+                          (-{pct(prodAtrib.ipi)} + {pct(prodAtrib.icms)}×7,3%) × base × (1+{n3(d.conteudoLocal||0)}%)
+                        </div>
+                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:4}}>
+                          <span style={{fontSize:11,color:"#7a90b0"}}>Crédito calculado</span>
+                          <span style={{fontFamily:"'DM Mono',monospace",fontSize:12,fontWeight:700,color:"#4ade80"}}>{usd(c.creditoCalcIOS)}</span>
+                        </div>
+                        <button style={{marginTop:6,width:"100%",padding:"5px",fontSize:10,fontWeight:700,cursor:"pointer",borderRadius:4,border:"1px solid rgba(74,222,128,.3)",background:"rgba(74,222,128,.08)",color:"#4ade80"}}
+                          onClick={()=>S("cra")(d.ptax>0?c.creditoCalcIOS*d.ptax:c.creditoCalcIOS)}>
+                          ↓ Aplicar ao campo Créditos
+                        </button>
+                      </>}
+                    </div>
+                    <Field label={`Créditos (${sfxM})`} sfx={sfxM} value={toDisp(d.cra)} onChange={v=>S("cra")(toStore(v))} hint="Entra no VPL"/>
+                  </>}
+
+                  {/* CWB — sem crédito */}
+                  {d.origem==="CWB"&&(
+                    <Field label={`CRA / Créditos (${sfxM})`} sfx={sfxM} value={toDisp(d.cra)} onChange={v=>S("cra")(toStore(v))} hint="Entra no VPL"/>
+                  )}
+
                   <DR label="CMV Importação" value={brl(c.cmvImp)} bold sep/>
                   <DR label="VPL" value={brl(c.vpl)} bold accent="blue"/>
                 </Sec>
