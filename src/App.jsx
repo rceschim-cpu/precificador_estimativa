@@ -2032,28 +2032,45 @@ function Calculadora({user:currentUser, isAdmin=false}){
   const setProd=id=>{
     const p=PRODUTOS.find(x=>x.id===id)||PRODUTOS[0];
     setD(pv=>({...pv,prodId:id,stAtivo:p.mva>0,mva:p.mva,icmsDestST:p.aliqST}));
-    if(d.modalidade==="CBU") fetchIIParaProd(p.ncm);
+    if(d.modalidade==="CBU") aplicarIICBU(p.ncm);
   };
+  // ── Tabela TEC local — II por NCM (valores verificados na Receita Federal) ───
+  const TEC_II = {
+    "8470.50.10": 20,     // Terminal de Pagamento
+    "8471.30.11": 0,      // Tablet 7"
+    "8471.30.12": 16,     // Notebook/Tablet 8"-14"
+    "8471.30.19": 16,     // Notebook 15"+
+    "8471.49.00": 25,     // All In One / Servidor
+    "8471.50.10": 14.4,   // CPU Pequena Capacidade
+    "8471.60.52": 10.8,   // Teclado
+    "8471.60.80": 20,     // Totem
+    "8504.40.10": 18,     // Carregador Celular
+    "8508.11.00": 18,     // Robô Aspirador
+    "8517.13.00": 16,     // Smartphone
+    "8517.14.31": 20,     // Feature Phone
+    "8517.62.41": 16,     // Router Mesh
+    "8517.62.77": 20,     // Video Porteiro
+    "8517.62.94": 16,     // Gateway
+    "8518.22.00": 18,     // Caixa de Som Bluetooth
+    "8525.89.29": 20,     // Smart Camera WiFi
+    "8528.52.00": 10.8,   // Monitor
+    "8536.50.90": 16,     // Smart Plug
+    "8539.52.00": 10.8,   // Smart Lâmpada
+  };
+
   const setOrigem=origem=>setD(pv=>({...pv,origem}));
   const setModalidade=modalidade=>{
     setD(pv=>({...pv,modalidade}));
-    // Quando CBU selecionado, busca II automaticamente
-    if(modalidade==="CBU") fetchIIParaProd(prod.ncm);
+    if(modalidade==="CBU") aplicarIICBU(prod.ncm);
   };
 
-  const [iiStatus,setIiStatus]=useState(null); // null | "loading" | "ok" | "err"
-  const fetchIIParaProd=async(ncm)=>{
-    setIiStatus("loading");
-    try{
-      const r=await fetch(`/api/ii?ncm=${encodeURIComponent(ncm)}`);
-      const data=await r.json();
-      if(data.ii!=null){
-        setD(pv=>({...pv,aliqII:data.ii}));
-        setIiStatus("ok");
-      } else {
-        setIiStatus("err");
-      }
-    }catch(e){
+  const [iiStatus,setIiStatus]=useState(null);
+  const aplicarIICBU=(ncm)=>{
+    const ii = TEC_II[ncm];
+    if(ii !== undefined){
+      setD(pv=>({...pv,aliqII:ii}));
+      setIiStatus("ok");
+    } else {
       setIiStatus("err");
     }
   };
@@ -2295,10 +2312,9 @@ function Calculadora({user:currentUser, isAdmin=false}){
                         background: iiStatus==="ok"?"rgba(5,150,105,.1)":iiStatus==="err"?"rgba(220,38,38,.1)":"rgba(0,71,187,.08)",
                         border:`1px solid ${iiStatus==="ok"?"rgba(5,150,105,.3)":iiStatus==="err"?"rgba(220,38,38,.3)":"rgba(0,71,187,.2)"}`,
                         color: iiStatus==="ok"?"#34d399":iiStatus==="err"?"#f87171":"#93c5fd"}}>
-                        {iiStatus==="loading"&&"⏳ Consultando alíquota de II na Receita Federal..."}
-                        {iiStatus==="ok"&&`✓ II preenchido automaticamente (${n3(d.aliqII)}%) — confira na aba Importação.`}
-                        {iiStatus==="err"&&<>⚠️ Não foi possível buscar o II automaticamente. <button onClick={()=>fetchIIParaProd(prod.ncm)} style={{background:"none",border:"none",color:"#f87171",cursor:"pointer",textDecoration:"underline",fontSize:10}}>Tentar novamente</button></>}
-                        {!iiStatus&&"ℹ️ CBU selecionado — buscando II da Receita Federal..."}
+                        {iiStatus==="ok"&&`✓ II preenchido automaticamente (${n3(d.aliqII)}%) pela tabela TEC — confira na aba Importação.`}
+                        {iiStatus==="err"&&"⚠️ NCM não encontrado na tabela TEC local. Preencha o II manualmente na aba Importação."}
+                        {!iiStatus&&"ℹ️ Selecione o produto para preencher o II automaticamente."}
                       </div>
                     )}
                   </div>
