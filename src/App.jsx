@@ -2426,7 +2426,11 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
     const pcSubvVf=pFbase*(pcSubvPct/100);
     const ftiVf=pFbase*(ftiPct/100),fcpVf=pFbase*(fcpPct/100);
     const margGerVf=pFbase*(margGerPct/100);
-    const margVf=pFbase*(d.margem/100);
+    // No modo margem: ML real = margemSugerida (resultado do preço); no modo preço: ML = d.margem+margGerPct
+    const margPctEf = (d.modoCalc==="margem" && margemSugerida!==null)
+      ? margemSugerida
+      : (d.margem+margGerPct);
+    const margVf=pFbase*(margPctEf/100);
     const pdVf=pFbase*(d.pd/100),cfxVf=pFbase*(d.cfixo/100);
     const scVf=pFbase*(d.scrap/100),ryVf=pFbase*(d.royal/100);
     const cfnVf=pFbase*(cfVendaEf/100),frVf=pFbase*(d.frete/100),cmVf=pFbase*((d.comis+comisXPct)/100);
@@ -2435,8 +2439,8 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
     const pSIfinal = pFbase/(1+ipi/100);
     const cargaTotf=pcVf+ipiVf+icmsEfVf+difalVf+(stV||0)+fcpVf;
     const cargaPctf=pFbase>0?(cargaTotf/pFbase)*100:0;
-    const margPctf=pFbase>0?(margVf/pFbase)*100:0;
-    const mcf=pFbase>0?((margVf+cfxVf-(d.margGerAtivo?margGerVf:0))/pFbase)*100:0;
+    const margPctf=margPctEf;  // já é o valor correto para ambos os modos
+    const mcf=pFbase>0?((margVf+cfxVf)/pFbase)*100:0;  // MC = ML + CF sobre pFbase
     const mkpf=cmvTotal>0?pFbase/cmvTotal:0;
     const pUSDf=(d.ptaxPreco||d.ptax)>0?pFbase/(d.ptaxPreco||d.ptax):0;
     return{cfrUSD,cfrBRL,iiV:iiV,iiUSD,vpl,bkpV,bkpBase,cfrImp,cmvImp,cmvTotal,ppbTot,despesas,
