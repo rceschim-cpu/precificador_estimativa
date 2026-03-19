@@ -1139,6 +1139,7 @@ const DEF={
   royalModo:"pct",royalUSD:0,
   ptaxPreco:0,
   stAtivo:false,mva:0,icmsDestST:18,precoAlvo:0,
+  modoCalc:"preco", precoSugerido:0,
   moedaCusto:"BRL",
 };
 
@@ -2216,7 +2217,7 @@ input::-webkit-inner-spin-button,input::-webkit-outer-spin-button{-webkit-appear
 `;
 
 // ── APP ────────────────────────────────────────────────────────────────────────
-function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=null}){
+function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=null, onCalcsChange=null}){
   const [d,setD]=useState(()=>({...DEF}));
   const [calcs,setCalcs]=useState(()=>({...CALC_DEF}));
   const [tab,setTab]=useState("perfil");
@@ -2403,13 +2404,28 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
       const sf=(pcEf+pcSubvPct+icmsEfPct+difal+ftiPct+fcpPct+indPct+margGerPct-ipiCreditoIOSPct)/100;
       margemAlvo=pSIa>0?(1-cmvTotal/pSIa)*100-sf*100:null;
     }
+    // Modo margem: calcula margem resultante para o preço sugerido
+    let margemSugerida=null;
+    if(d.modoCalc==="margem"&&d.precoSugerido>0){
+      const pSIs=d.precoSugerido/(1+ipi/100);
+      const sf2=(pcEf+pcSubvPct+icmsEfPct+difal+ftiPct+fcpPct+indPct+margGerPct-ipiCreditoIOSPct)/100;
+      margemSugerida=pSIs>0?(1-cmvTotal/pSIs)*100-sf2*100:null;
+    }
+    // Modo margem: pF = precoSugerido (fixo), margem é calculada
+    const pFfinal = d.modoCalc==="margem" && d.precoSugerido>0 ? d.precoSugerido : pF;
     return{cfrUSD,cfrBRL,iiV,iiUSD,vpl,bkpV,bkpBase,cfrImp,cmvImp,cmvTotal,ppbTot,despesas,
       craCalcMAO,creditoCalcIOS,cfrExpandidoUSD,basePlacaUSD,
       pcPct,pcEf,pcLabel,pcV,pcSubvPct,pcSubvV,pcBaseRedPct,aliqInter,aliqDest,icmsEfPct,icmsV,icmsEfV,
       difal,difalV,ftiPct,ftiV,fcpPct,fcpV,ipi,ipiEfPct,ipiV,ipiCreditoV,ipiCreditoIOSPct,pSI,pCI,
-      margV,indPct,pdV,cfxV,scV,ryV,cfnV,cfVendaEf,cartaoPct,frV,cmV,mktV,rebateV,stV,stBase,pF,pUSD,
-      cargaTot,cargaPct,margPct,mc,mkp,ufO,intra,deveDifal,margemAlvo,comisXPct,margGerPct,margGerV};
+      margV,indPct,pdV,cfxV,scV,ryV,cfnV,cfVendaEf,cartaoPct,frV,cmV,mktV,rebateV,stV,stBase,
+      pF:pFfinal,pUSD,
+      cargaTot,cargaPct,margPct,mc,mkp,ufO,intra,deveDifal,margemAlvo,margemSugerida,comisXPct,margGerPct,margGerV};
   },[d,prod,prodAtrib,isZFM,isCBU,pcEntry,ppbTot]);
+
+  // Notifica o MultiTab sempre que os cálculos mudarem (para o painel comparativo)
+  useEffect(()=>{
+    if(onCalcsChange) onCalcsChange(c, d, prod.nome);
+  },[c]);
 
   const TABS=["perfil","importacao","ppb","producao","indices","venda","st"];
   const TLBL=["Perfil","Importacao","PPB","Producao","Indices","Venda","ST"];
@@ -2502,11 +2518,21 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
           <div className="pscroll">
             <div className="price-hero">
               <div>
-                <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:9,fontWeight:700,letterSpacing:2,color:"#7a90b0",marginBottom:4}}>PREÇO DE VENDA FINAL</div>
-                <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:44,fontWeight:800,color:"#f1f5f9",letterSpacing:-1.5,lineHeight:1,display:"flex",alignItems:"flex-start",gap:4}}>
-                  <span style={{fontSize:18,fontWeight:400,color:"#0047BB",marginTop:6}}>R$</span>{n3(c.pF)}
+                <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:9,fontWeight:700,letterSpacing:2,color:"#7a90b0",marginBottom:4}}>
+                  {d.modoCalc==="margem"?"MARGEM LÍQUIDA RESULTANTE":"PREÇO DE VENDA FINAL"}
                 </div>
+                {d.modoCalc==="margem"
+                  ? <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:44,fontWeight:800,letterSpacing:-1.5,lineHeight:1,display:"flex",alignItems:"flex-end",gap:4,
+                      color:c.margemSugerida!==null?(c.margemSugerida>=0?"#34d399":"#f87171"):"#f1f5f9"}}>
+                      {c.margemSugerida!==null?n3(c.margemSugerida):"—"}
+                      <span style={{fontSize:18,fontWeight:400,marginBottom:6}}>%</span>
+                    </div>
+                  : <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:44,fontWeight:800,color:"#f1f5f9",letterSpacing:-1.5,lineHeight:1,display:"flex",alignItems:"flex-start",gap:4}}>
+                      <span style={{fontSize:18,fontWeight:400,color:"#0047BB",marginTop:6}}>R$</span>{n3(c.pF)}
+                    </div>
+                }
                 <div style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:"#5a6a84",marginTop:4,lineHeight:1.6}}>
+                  {d.modoCalc==="margem"&&d.precoSugerido>0&&<span style={{color:"#34d399"}}>Preço: {brl(d.precoSugerido)} · </span>}
                   {c.ipi>0&&`s/IPI ${brl(c.pSI)} · IPI ef. ${brl(c.ipiV)} · `}
                   {c.stV>0&&`ST ${brl(c.stV)} · `}
                   {c.difal>0&&`DIFAL ${brl(c.difalV)} · `}
@@ -2929,7 +2955,39 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
                   <Field label="Custo Fixo" value={d.cfixo} onChange={S("cfixo")} sfx="%" hint={`≈ ${brl(c.cfxV)}`}/>
                 </Sec>
                 <Sec title="Margem Líquida (ML)" hl>
-                  <Field label="Margem Líquida desejada" value={d.margem} onChange={S("margem")} sfx="%" hint="% por dentro do preço"/>
+                  {/* Toggle modo de cálculo */}
+                  <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8,padding:"6px 10px",background:"rgba(255,255,255,.03)",borderRadius:6,border:"1px solid rgba(255,255,255,.08)"}}>
+                    <span style={{fontSize:10,fontWeight:700,color:"#5a6a84",flex:1,textTransform:"uppercase",letterSpacing:.5}}>Calcular</span>
+                    <button onClick={()=>S("modoCalc")("preco")}
+                      style={{padding:"4px 12px",fontSize:10,fontWeight:700,cursor:"pointer",borderRadius:20,border:"1px solid",transition:".15s",
+                        background:d.modoCalc==="preco"?"rgba(0,71,187,.3)":"rgba(255,255,255,.04)",
+                        borderColor:d.modoCalc==="preco"?"#0047BB":"rgba(255,255,255,.1)",
+                        color:d.modoCalc==="preco"?"#93c5fd":"#7a90b0"}}>
+                      Preço
+                    </button>
+                    <span style={{color:"#5a6a84",fontSize:12}}>⇄</span>
+                    <button onClick={()=>S("modoCalc")("margem")}
+                      style={{padding:"4px 12px",fontSize:10,fontWeight:700,cursor:"pointer",borderRadius:20,border:"1px solid",transition:".15s",
+                        background:d.modoCalc==="margem"?"rgba(5,150,105,.3)":"rgba(255,255,255,.04)",
+                        borderColor:d.modoCalc==="margem"?"#059669":"rgba(255,255,255,.1)",
+                        color:d.modoCalc==="margem"?"#34d399":"#7a90b0"}}>
+                      Margem
+                    </button>
+                  </div>
+                  {/* Campo ML — habilitado só no modo Preço */}
+                  <div style={{opacity:d.modoCalc==="preco"?1:.4,pointerEvents:d.modoCalc==="preco"?"auto":"none"}}>
+                    <Field label="Margem Líquida desejada" value={d.margem} onChange={S("margem")} sfx="%" hint="% por dentro do preço"/>
+                  </div>
+                  {/* Campo Preço Sugerido — habilitado só no modo Margem */}
+                  <div style={{opacity:d.modoCalc==="margem"?1:.4,pointerEvents:d.modoCalc==="margem"?"auto":"none",marginTop:4}}>
+                    <Field label="Preço sugerido (c/ IPI)" sfx="R$" value={d.precoSugerido||""} onChange={v=>S("precoSugerido")(parseFloat(String(v).replace(",","."))||0)}
+                      hint={d.modoCalc==="margem"&&c.margemSugerida!==null?`ML resultante: ${n3(c.margemSugerida)}%`:"informe o preço para calcular a ML"}/>
+                    {d.modoCalc==="margem"&&c.margemSugerida!==null&&(
+                      <div style={{fontSize:11,fontFamily:"'DM Mono',monospace",color:"#34d399",textAlign:"right",marginTop:2}}>
+                        ML = {n3(c.margemSugerida)}%
+                      </div>
+                    )}
+                  </div>
                   {/* Toggle: impactar MC com Margem Gerencial/Agnóstica */}
                   <div style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderTop:"1px solid rgba(255,255,255,.06)",marginTop:4}}>
                     <button onClick={()=>S("margGerAtivo")(!d.margGerAtivo)}
@@ -3083,11 +3141,120 @@ function newTab(nome) {
   return { id: _tabId++, nome: nome || `Precificação ${_tabId - 1}`, editando: false };
 }
 
+function PainelComparativo({abas, calcsMap, open, onToggle}){
+  const [expanded, setExpanded] = useState({imp:false,ppb:false,local:false,impvenda:false,iger:false,icom:false,res:false});
+  const tog = k => setExpanded(p=>({...p,[k]:!p[k]}));
+
+  const abasComDados = abas.filter(a=>calcsMap[a.id]);
+  if(abasComDados.length===0) return null;
+
+  const cores = ["#93c5fd","#34d399","#fbbf24","#f87171","#c084fc","#fb923c"];
+
+  const Linha = ({label, fn, format=brl, grp}) => (
+    <div style={{display:"flex",alignItems:"center",borderBottom:"1px solid rgba(255,255,255,.04)",padding:"3px 8px",background:grp?"rgba(255,255,255,.02)":"transparent"}}>
+      <span style={{flex:1,fontSize:10,color:grp?"#a8b5cc":"#7a90b0",fontWeight:grp?600:400,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{label}</span>
+      {abasComDados.map((a,i)=>{
+        const v = fn(calcsMap[a.id]);
+        return <span key={a.id} style={{width:72,textAlign:"right",fontFamily:"'DM Mono',monospace",fontSize:10,fontWeight:grp?700:400,color:grp?cores[i%cores.length]:"#a8b5cc",flexShrink:0,paddingLeft:6}}>{v}</span>;
+      })}
+    </div>
+  );
+
+  const Grp = ({id, label, fnTotal, children}) => (
+    <div style={{borderBottom:"1px solid rgba(255,255,255,.06)"}}>
+      <div onClick={()=>tog(id)} style={{display:"flex",alignItems:"center",padding:"5px 8px",cursor:"pointer",background:"rgba(255,255,255,.03)"}}>
+        <span style={{fontSize:8,color:"#5a6a84",marginRight:4}}>{expanded[id]?"▼":"▶"}</span>
+        <span style={{flex:1,fontSize:10,fontWeight:700,color:"#dce7f7",textTransform:"uppercase",letterSpacing:.5}}>{label}</span>
+        {abasComDados.map((a,i)=>(
+          <span key={a.id} style={{width:72,textAlign:"right",fontFamily:"'DM Mono',monospace",fontSize:10,fontWeight:700,color:cores[i%cores.length],flexShrink:0,paddingLeft:6}}>{brl(fnTotal(calcsMap[a.id]))}</span>
+        ))}
+      </div>
+      {expanded[id]&&<div>{children}</div>}
+    </div>
+  );
+
+  return(
+    <div style={{position:"fixed",right:0,top:"50%",transform:"translateY(-50%)",zIndex:200,display:"flex",alignItems:"stretch"}}>
+      {/* Tab de abertura */}
+      <button onClick={onToggle} style={{writingMode:"vertical-rl",textOrientation:"mixed",padding:"12px 6px",background:"#1e2a3d",border:"1px solid rgba(255,255,255,.1)",borderRight:"none",color:"#93c5fd",fontSize:10,fontWeight:700,cursor:"pointer",borderRadius:"6px 0 0 6px",letterSpacing:1}}>
+        {open?"▶ FECHAR":"◀ COMPARAR"}
+      </button>
+      {open&&(
+        <div style={{width:Math.min(80+abasComDados.length*80,500),background:"#131925",border:"1px solid rgba(255,255,255,.1)",borderRight:"none",display:"flex",flexDirection:"column",maxHeight:"80vh",borderRadius:"6px 0 0 6px",overflow:"hidden"}}>
+          {/* Header */}
+          <div style={{padding:"8px 8px 6px",borderBottom:"1px solid rgba(255,255,255,.08)",flexShrink:0}}>
+            <div style={{fontSize:9,fontWeight:700,color:"#5a6a84",letterSpacing:1,textTransform:"uppercase",marginBottom:6}}>Comparativo</div>
+            <div style={{display:"flex",alignItems:"center"}}>
+              <span style={{flex:1,fontSize:9,color:"#475569"}}></span>
+              {abasComDados.map((a,i)=>(
+                <span key={a.id} style={{width:72,textAlign:"right",fontSize:9,fontWeight:700,color:cores[i%cores.length],flexShrink:0,paddingLeft:6,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{a.nome}</span>
+              ))}
+            </div>
+          </div>
+          {/* Conteúdo scrollável */}
+          <div style={{overflowY:"auto",flex:1}}>
+            {/* Preço */}
+            <div style={{padding:"6px 8px",borderBottom:"1px solid rgba(255,255,255,.08)",background:"rgba(0,71,187,.08)"}}>
+              <div style={{display:"flex",alignItems:"center"}}>
+                <span style={{flex:1,fontSize:10,fontWeight:700,color:"#93c5fd",textTransform:"uppercase",letterSpacing:.5}}>Preço Final</span>
+                {abasComDados.map((a,i)=>(
+                  <span key={a.id} style={{width:72,textAlign:"right",fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:800,color:cores[i%cores.length],flexShrink:0,paddingLeft:6}}>{brl(calcsMap[a.id].c.pF)}</span>
+                ))}
+              </div>
+            </div>
+            {/* KPIs */}
+            <Linha label="FOB (USD)" fn={({c,d})=>usd(d.fobUSD)} format={v=>v}/>
+            <Linha label="VPL" fn={({c})=>brl(c.vpl)}/>
+            <Linha label="CMV Total" fn={({c})=>brl(c.cmvTotal)} grp/>
+            {/* Impostos de Venda */}
+            <Grp id="impvenda" label="Impostos de Venda" fnTotal={({c})=>c.cargaTot}>
+              <Linha label={`IPI`} fn={({c})=>c.ipi>0?brl(c.ipiV):"—"}/>
+              {abasComDados.some(a=>calcsMap[a.id].c.ipiCreditoV>0)&&<Linha label="Crédito IPI IOS" fn={({c})=>c.ipiCreditoV>0?brl(-c.ipiCreditoV):"—"}/>}
+              <Linha label="P/C Efetivo" fn={({c})=>brl(c.pcV)}/>
+              {abasComDados.some(a=>calcsMap[a.id].c.pcSubvV>0.01)&&<Linha label="P/C Subvenção" fn={({c})=>c.pcSubvV>0.01?brl(c.pcSubvV):"—"}/>}
+              <Linha label="ICMS Efetivo" fn={({c})=>brl(c.icmsEfV)}/>
+              {abasComDados.some(a=>calcsMap[a.id].c.difal>0)&&<Linha label="DIFAL" fn={({c})=>c.difal>0?brl(c.difalV):"—"}/>}
+            </Grp>
+            {/* Índices Gerais */}
+            <Grp id="iger" label="Índices Gerais" fnTotal={({c})=>c.pdV+c.scV+c.ryV+c.frV}>
+              <Linha label="P&D" fn={({c})=>brl(c.pdV)}/>
+              <Linha label="Scrap" fn={({c})=>brl(c.scV)}/>
+              <Linha label="Royalties" fn={({c})=>brl(c.ryV)}/>
+              <Linha label="Frete venda" fn={({c})=>brl(c.frV)}/>
+            </Grp>
+            {/* Índices Comerciais */}
+            <Grp id="icom" label="Índices Comerciais" fnTotal={({c})=>c.cfnV+c.cmV+(c.mktV||0)+(c.rebateV||0)}>
+              <Linha label="CF Venda" fn={({c})=>brl(c.cfnV)}/>
+              <Linha label="Comissão+Enc." fn={({c})=>brl(c.cmV)}/>
+              {abasComDados.some(a=>(calcsMap[a.id].d.mkt||0)>0)&&<Linha label="Marketing" fn={({c,d})=>brl(c.mktV||0)}/>}
+              {abasComDados.some(a=>(calcsMap[a.id].d.rebate||0)>0)&&<Linha label="Rebate" fn={({c,d})=>brl(c.rebateV||0)}/>}
+              {abasComDados.some(a=>(calcsMap[a.id].d.pdd||0)>0)&&<Linha label="PDD" fn={({c,d})=>brl(c.pF*(d.pdd/100))}/>}
+              {abasComDados.some(a=>(calcsMap[a.id].d.vbExtra||0)>0)&&<Linha label="Verba Extra" fn={({c,d})=>brl(c.pF*(d.vbExtra/100))}/>}
+              {abasComDados.some(a=>(calcsMap[a.id].d.vpc||0)>0)&&<Linha label="VPC" fn={({c,d})=>brl(c.pF*(d.vpc/100))}/>}
+            </Grp>
+            {/* Resultado */}
+            <Grp id="res" label="Resultado (MC)" fnTotal={({c})=>c.margV+c.cfxV}>
+              <Linha label="ML (%)" fn={({c})=>pct(c.margPct)} format={v=>v}/>
+              <Linha label="ML (R$)" fn={({c})=>brl(c.margV)}/>
+              <Linha label="CF (R$)" fn={({c})=>brl(c.cfxV)}/>
+              <Linha label="MC (%)" fn={({c})=>pct(c.mc)} format={v=>v}/>
+              {abasComDados.some(a=>calcsMap[a.id].d.margGer!==0)&&<Linha label="Marg. Ger./Agnóst." fn={({c})=>brl(c.margGerV)}/>}
+            </Grp>
+            <Linha label="Markup" fn={({c})=>n3(c.mkp)+"x"} format={v=>v} grp/>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function MultiTab({ user }) {
   const [abas, setAbas] = useState([newTab("Precificação 1")]);
   const [abaAtiva, setAbaAtiva] = useState(0);
   const [editandoIdx, setEditandoIdx] = useState(null);
   const [nomeEdit, setNomeEdit] = useState("");
+  const [calcsMap, setCalcsMap] = useState({});
+  const [comparOpen, setComparOpen] = useState(false);
 
   const addAba = () => {
     const nova = newTab();
@@ -3102,11 +3269,7 @@ function MultiTab({ user }) {
     setAbaAtiva(Math.min(abaAtiva, novas.length - 1));
   };
 
-  const startEdit = (idx) => {
-    setEditandoIdx(idx);
-    setNomeEdit(abas[idx].nome);
-  };
-
+  const startEdit = (idx) => { setEditandoIdx(idx); setNomeEdit(abas[idx].nome); };
   const confirmEdit = () => {
     if (editandoIdx === null) return;
     setAbas(p => p.map((a, i) => i === editandoIdx ? { ...a, nome: nomeEdit.trim() || a.nome } : a));
@@ -3130,68 +3293,49 @@ function MultiTab({ user }) {
               borderRight: "1px solid rgba(255,255,255,.06)",
               borderBottom: idx === abaAtiva ? "2px solid #0047BB" : "2px solid transparent",
               background: idx === abaAtiva ? "#1e2a3d" : "transparent",
-              minWidth: 120, maxWidth: 200, flexShrink: 0,
-              transition: ".15s",
+              minWidth: 120, maxWidth: 200, flexShrink: 0, transition: ".15s",
             }}>
             {editandoIdx === idx ? (
-              <input
-                autoFocus
-                value={nomeEdit}
+              <input autoFocus value={nomeEdit}
                 onChange={e => setNomeEdit(e.target.value)}
                 onBlur={confirmEdit}
                 onKeyDown={e => { if (e.key === "Enter") confirmEdit(); if (e.key === "Escape") setEditandoIdx(null); }}
                 onClick={e => e.stopPropagation()}
-                style={{
-                  background: "none", border: "none", outline: "none",
-                  color: "#e8eaf0", fontSize: 11, fontWeight: 600,
-                  width: "100%", fontFamily: "'Instrument Sans', sans-serif",
-                }}
-              />
+                style={{ background: "none", border: "none", outline: "none", color: "#e8eaf0", fontSize: 11, fontWeight: 600, width: "100%", fontFamily: "'Instrument Sans', sans-serif" }}/>
             ) : (
-              <span
-                onDoubleClick={e => { e.stopPropagation(); startEdit(idx); }}
-                style={{
-                  fontSize: 11, fontWeight: idx === abaAtiva ? 600 : 400,
-                  color: idx === abaAtiva ? "#e8eaf0" : "#7a90b0",
-                  flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                  lineHeight: "38px",
-                }}
-                title="Duplo clique para renomear"
-              >
-                {aba.nome}
-              </span>
+              <span onDoubleClick={e => { e.stopPropagation(); startEdit(idx); }}
+                style={{ fontSize: 11, fontWeight: idx === abaAtiva ? 600 : 400, color: idx === abaAtiva ? "#e8eaf0" : "#7a90b0", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", lineHeight: "38px" }}
+                title="Duplo clique para renomear">{aba.nome}</span>
             )}
             {abas.length > 1 && (
-              <button
-                onClick={e => { e.stopPropagation(); removeAba(idx); }}
-                style={{
-                  background: "none", border: "none", cursor: "pointer",
-                  color: "#5a6a84", fontSize: 14, lineHeight: 1, padding: "0 2px",
-                  flexShrink: 0,
-                }}
+              <button onClick={e => { e.stopPropagation(); removeAba(idx); }}
+                style={{ background: "none", border: "none", cursor: "pointer", color: "#5a6a84", fontSize: 14, lineHeight: 1, padding: "0 2px", flexShrink: 0 }}
                 title="Fechar aba">×</button>
             )}
           </div>
         ))}
-        {/* Botão nova aba */}
-        <button
-          onClick={addAba}
-          style={{
-            background: "none", border: "none", cursor: "pointer",
-            color: "#5a6a84", fontSize: 18, padding: "0 12px",
-            flexShrink: 0, transition: ".15s",
-          }}
+        <button onClick={addAba}
+          style={{ background: "none", border: "none", cursor: "pointer", color: "#5a6a84", fontSize: 18, padding: "0 12px", flexShrink: 0, transition: ".15s" }}
           title="Nova precificação">+</button>
       </div>
 
-      {/* Conteúdo da aba ativa */}
+      {/* Conteúdo das abas */}
       {abas.map((aba, idx) => (
         <div key={aba.id} style={{ display: idx === abaAtiva ? "flex" : "none", flex: 1, overflow: "hidden" }}>
-          <Calculadora user={user} isAdmin={false} nomeAba={aba.nome} onRenomear={nome => {
-            setAbas(p => p.map((a, i) => i === idx ? { ...a, nome } : a));
-          }}/>
+          <Calculadora user={user} isAdmin={false} nomeAba={aba.nome}
+            onRenomear={nome => setAbas(p => p.map((a, i) => i === idx ? { ...a, nome } : a))}
+            onCalcsChange={(c, d) => setCalcsMap(prev => ({...prev, [aba.id]: {c, d}}))}/>
         </div>
       ))}
+
+      {/* Painel comparativo flutuante */}
+      {abas.length > 1 && (
+        <PainelComparativo
+          abas={abas}
+          calcsMap={calcsMap}
+          open={comparOpen}
+          onToggle={()=>setComparOpen(p=>!p)}/>
+      )}
     </div>
   );
 }
