@@ -1476,12 +1476,255 @@ function ModalCFVenda({onClose,onApply,data,setData}){
   );
 }
 
-// ── Modal Registros ───────────────────────────────────────────────────────────
-const FOLDERS_KEY = "positec_calc_pastas";
-const loadPastas = () => { try { return JSON.parse(localStorage.getItem(FOLDERS_KEY)||"[]"); } catch { return []; } };
-const savePastas = (p) => localStorage.setItem(FOLDERS_KEY, JSON.stringify(p));
-
 function ModalRegistros({onClose, onLoad, currentD, currentCalcs, prodNome}){
+  const [registros, setRegistros] = useState(loadRegistros);
+  const [pastas, setPastas] = useState(loadPastas);
+  const [nome, setNome] = useState(prodNome||"");
+  const [pastaAtual, setPastaAtual] = useState(null);
+  const [view, setView] = useState("lista");
+  const [nomePasta, setNomePasta] = useState("");
+  const [pastaPaiNova, setPastaPaiNova] = useState(null); // para subpasta
+  const [registroMover, setRegistroMover] = useState(null);
+  const [confirmDel, setConfirmDel] = useState(null);
+  const [confirmDelPasta, setConfirmDelPasta] = useState(null);
+  const [editNome, setEditNome] = useState(null);
+  const [editVal, setEditVal] = useState("");
+  const [sobreescrever, setSobreescrever] = useState(null); // registro a sobrescrever
+
+  const persist = (regs, pas) => {
+    saveRegistros(regs); setRegistros(regs);
+    if(pas!==undefined){savePastas(pas); setPastas(pas);}
+  };
+
+  const handleSave = (overwriteId=null) => {
+    const label = nome.trim() || prodNome;
+    if(overwriteId){
+      const regs = registros.map(r=>r.id===overwriteId
+        ? {...r, nome:label, data:new Date().toLocaleString("pt-BR"), d:currentD, calcs:currentCalcs}
+        : r);
+      persist(regs);
+      setSobreescrever(null);
+    } else {
+      const novo = {id:Date.now(),nome:label,pastaId:pastaAtual,data:new Date().toLocaleString("pt-BR"),d:currentD,calcs:currentCalcs};
+      persist([novo,...registros]);
+    }
+    setNome("");
+  };
+
+  const handleDelete = (id) => { persist(registros.filter(r=>r.id!==id)); setConfirmDel(null); };
+
+  const handleDeletePasta = (id) => {
+    const regs = registros.map(r=>{
+      if(r.pastaId===id) return {...r,pastaId:getPastaPai(id,pastas)};
+      return r;
+    });
+    const removePastaEFilhas = (pas, pid) => {
+      const filhas = pas.filter(p=>p.pai===pid).map(p=>p.id);
+      let result = pas.filter(p=>p.id!==pid);
+      filhas.forEach(fid=>{ result = removePastaEFilhas(result,fid); });
+      return result;
+    };
+    persist(regs, removePastaEFilhas(pastas,id));
+    setConfirmDelPasta(null);
+    if(pastaAtual===id) setPastaAtual(getPastaPai(id,pastas));
+  };
+
+  const getPastaPai = (id,pas) => (pas.find(p=>p.id===id)?.pai??null);
+
+  const handleCriarPasta = () => {
+    if(!nomePasta.trim()) return;
+    const nova = {id:Date.now(), nome:nomePasta.trim(), pai:pastaPaiNova};
+    persist(registros, [...pastas, nova]);
+    setNomePasta(""); setView("lista"); setPastaPaiNova(null);
+  };
+
+  const handleMover = (pastaDestino) => {
+    persist(registros.map(r=>r.id===registroMover?{...r,pastaId:pastaDestino}:r));
+    setRegistroMover(null); setView("lista");
+  };
+
+  const handleRenomear = (id) => {
+    if(!editVal.trim()) return;
+    persist(registros.map(r=>r.id===id?{...r,nome:editVal.trim()}:r));
+    setEditNome(null);
+  };
+
+  // Pastas filhas da pasta atual
+  const pastasFilhas = pastas.filter(p=>p.pai===(pastaAtual??null)||(!p.pai&&pastaAtual===null&&p.pai===undefined));
+  const regsNaPasta = registros.filter(r=>(r.pastaId??null)===(pastaAtual));
+
+  // Breadcrumb
+  const getBreadcrumb = () => {
+    const crumbs = [];
+    let cur = pastaAtual;
+    while(cur!==null){
+      const p = pastas.find(x=>x.id===cur);
+      if(!p) break;
+      crumbs.unshift(p);
+      cur = p.pai??null;
+    }
+    return crumbs;
+  };
+
+  const btnStyle = (active, color="#0047BB") => ({
+    padding:"4px 10px",fontSize:10,fontWeight:700,cursor:"pointer",borderRadius:20,border:"1px solid",
+    background:active?`rgba(${color==="green"?"5,150,105":"0,71,187"},.25)`:"rgba(255,255,255,.04)",
+    borderColor:active?(color==="green"?"#059669":"#0047BB"):"rgba(255,255,255,.12)",
+    color:active?(color==="green"?"#34d399":"#93c5fd"):"#7a90b0"
+  });
+
+  // Tela de mover
+  if(view==="mover") return(
+    <div className="ov">
+      <div className="mb" style={{maxWidth:420}} onClick={e=>e.stopPropagation()}>
+        <div className="mh"><span className="mt">Mover para pasta</span><button className="mc" onClick={()=>setView("lista")}>×</button></div>
+        <div className="mbody">
+          <div style={{fontSize:11,color:"#7a90b0",marginBottom:12}}>
+            Registro: <strong style={{color:"#dce7f7"}}>{registros.find(r=>r.id===registroMover)?.nome}</strong>
+          </div>
+          <div style={{display:"flex",flexDirection:"column",gap:6}}>
+            <div onClick={()=>handleMover(null)} style={{padding:"10px 14px",background:"#2a3550",border:"1px solid rgba(255,255,255,.1)",borderRadius:4,cursor:"pointer",fontSize:12,color:"#dce7f7",display:"flex",alignItems:"center",gap:8}}>
+              <span>🏠</span> Raiz
+            </div>
+            {pastas.map(p=>(
+              <div key={p.id} onClick={()=>handleMover(p.id)} style={{padding:"10px 14px",background:"#2a3550",border:"1px solid rgba(255,255,255,.1)",borderRadius:4,cursor:"pointer",fontSize:12,color:"#dce7f7",display:"flex",alignItems:"center",gap:8}}>
+                <span>📁</span> {pastas.find(x=>x.id===p.pai)?.nome?`${pastas.find(x=>x.id===p.pai)?.nome} / `:""}{p.nome}
+                <span style={{fontSize:10,color:"#5a6a84",marginLeft:"auto"}}>{registros.filter(r=>r.pastaId===p.id).length}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const crumbs = getBreadcrumb();
+
+  return (
+    <div className="ov">
+      <div className="mb" style={{maxWidth:580}} onClick={e=>e.stopPropagation()}>
+        <div className="mh"><span className="mt">Registros</span><button className="mc" onClick={onClose}>×</button></div>
+        <div className="mbody">
+
+          {/* Salvar */}
+          <div style={{background:"rgba(0,71,187,.08)",border:"1px solid rgba(0,71,187,.25)",padding:"10px 14px",borderRadius:4,marginBottom:12}}>
+            <div style={{fontSize:10,fontWeight:700,color:"#93c5fd",marginBottom:6,letterSpacing:.5,textTransform:"uppercase"}}>
+              Salvar em: {pastaAtual ? (pastas.find(p=>p.id===pastaAtual)?.nome||"?") : "Raiz"}
+            </div>
+            <div style={{display:"flex",gap:8,marginBottom:sobreescrever?8:0}}>
+              <div className="fw" style={{flex:1}}>
+                <input type="text" placeholder={prodNome} value={nome} onChange={e=>setNome(e.target.value)}
+                  onKeyDown={e=>e.key==="Enter"&&handleSave()}
+                  style={{background:"none",border:"none",outline:"none",fontFamily:"'IBM Plex Sans',sans-serif",fontSize:12,color:"#dce7f7",padding:"7px 10px",width:"100%"}}/>
+              </div>
+              <button className="mapp" style={{padding:"7px 18px",borderRadius:4,fontSize:12}} onClick={()=>handleSave()}>💾 Salvar</button>
+            </div>
+            {/* Opção de sobrescrever registro existente */}
+            {regsNaPasta.length>0&&(
+              <div style={{fontSize:10,color:"#5a6a84"}}>
+                <span>Sobrescrever: </span>
+                <select value={sobreescrever||""} onChange={e=>setSobreescrever(e.target.value||null)}
+                  style={{background:"#1a2030",border:"1px solid rgba(255,255,255,.12)",color:"#a8b5cc",fontSize:10,padding:"2px 6px",borderRadius:3,marginLeft:4}}>
+                  <option value="">— novo registro —</option>
+                  {regsNaPasta.map(r=><option key={r.id} value={r.id}>{r.nome}</option>)}
+                </select>
+                {sobreescrever&&<button onClick={()=>handleSave(Number(sobreescrever))}
+                  style={{marginLeft:8,padding:"2px 10px",background:"rgba(251,191,36,.15)",border:"1px solid rgba(251,191,36,.3)",color:"#fbbf24",fontSize:10,cursor:"pointer",borderRadius:3}}>
+                  ↺ Sobrescrever
+                </button>}
+              </div>
+            )}
+          </div>
+
+          {/* Breadcrumb + navegação */}
+          <div style={{display:"flex",alignItems:"center",gap:4,marginBottom:8,flexWrap:"wrap"}}>
+            <button style={btnStyle(pastaAtual===null)} onClick={()=>setPastaAtual(null)}>🏠 Raiz</button>
+            {crumbs.map(c=>(
+              <><span style={{color:"#5a6a84",fontSize:10}}>›</span>
+              <button key={c.id} style={btnStyle(pastaAtual===c.id)} onClick={()=>setPastaAtual(c.id)}>📁 {c.nome}</button></>
+            ))}
+          </div>
+
+          {/* Subpastas */}
+          <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:10,flexWrap:"wrap"}}>
+            {pastasFilhas.map(p=>(
+              <button key={p.id} style={btnStyle(false)} onClick={()=>setPastaAtual(p.id)}>
+                📁 {p.nome}
+                <span style={{fontSize:9,marginLeft:4,opacity:.7}}>{registros.filter(r=>r.pastaId===p.id).length}</span>
+              </button>
+            ))}
+            {view==="nova-pasta"
+              ? <div style={{display:"flex",gap:4,alignItems:"center"}}>
+                  <input autoFocus type="text" placeholder="Nome da pasta" value={nomePasta}
+                    onChange={e=>setNomePasta(e.target.value)}
+                    onKeyDown={e=>{if(e.key==="Enter")handleCriarPasta();if(e.key==="Escape")setView("lista");}}
+                    style={{background:"rgba(255,255,255,.06)",border:"1px solid rgba(255,255,255,.15)",color:"#dce7f7",padding:"4px 8px",fontSize:11,borderRadius:4,outline:"none",width:120}}/>
+                  <button onClick={handleCriarPasta} style={{...btnStyle(true),padding:"4px 8px"}}>✓</button>
+                  <button onClick={()=>setView("lista")} style={{...btnStyle(false),padding:"4px 8px"}}>✕</button>
+                </div>
+              : <button style={{...btnStyle(false),borderStyle:"dashed"}} onClick={()=>{setView("nova-pasta");setPastaPaiNova(pastaAtual);}}>+ Subpasta</button>
+            }
+            {pastaAtual!==null&&(
+              confirmDelPasta===pastaAtual
+                ? <div style={{display:"flex",gap:4,alignItems:"center",marginLeft:"auto"}}>
+                    <span style={{fontSize:10,color:"#f87171"}}>Excluir pasta?</span>
+                    <button onClick={()=>handleDeletePasta(pastaAtual)} style={{padding:"3px 8px",background:"#dc2626",border:"none",color:"#fff",fontSize:10,cursor:"pointer",borderRadius:3}}>Sim</button>
+                    <button onClick={()=>setConfirmDelPasta(null)} style={{padding:"3px 8px",background:"transparent",border:"1px solid rgba(255,255,255,.15)",color:"#94a3b8",fontSize:10,cursor:"pointer",borderRadius:3}}>Não</button>
+                  </div>
+                : <button onClick={()=>setConfirmDelPasta(pastaAtual)}
+                    style={{marginLeft:"auto",padding:"3px 8px",background:"rgba(220,38,38,.1)",border:"1px solid rgba(220,38,38,.25)",color:"#f87171",fontSize:10,cursor:"pointer",borderRadius:3}}>
+                    🗑 Excluir pasta
+                  </button>
+            )}
+          </div>
+
+          {/* Lista de registros */}
+          {regsNaPasta.length===0
+            ? <div style={{textAlign:"center",padding:"24px 0",fontFamily:"'DM Mono',monospace",fontSize:11,color:"#5a6a84"}}>
+                {pastaAtual ? "Nenhum registro nesta pasta." : "Nenhum registro salvo ainda."}
+              </div>
+            : <div style={{display:"flex",flexDirection:"column",gap:4,maxHeight:320,overflowY:"auto"}}>
+                {regsNaPasta.map(r=>(
+                  <div key={r.id} style={{padding:"10px 12px",background:"#2a3550",border:"1px solid rgba(255,255,255,.08)",borderRadius:4}}>
+                    <div style={{display:"flex",alignItems:"center",gap:8}}>
+                      {editNome===r.id
+                        ? <input autoFocus value={editVal} onChange={e=>setEditVal(e.target.value)}
+                            onKeyDown={e=>{if(e.key==="Enter")handleRenomear(r.id);if(e.key==="Escape")setEditNome(null);}}
+                            style={{flex:1,background:"rgba(255,255,255,.08)",border:"1px solid rgba(255,255,255,.2)",color:"#dce7f7",padding:"4px 8px",fontSize:12,borderRadius:3,outline:"none"}}/>
+                        : <div style={{flex:1,minWidth:0}}>
+                            <div style={{fontSize:13,fontWeight:700,color:"#dce7f7",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{r.nome}</div>
+                            <div style={{fontSize:10,fontFamily:"'DM Mono',monospace",color:"#5a6a84",marginTop:2}}>
+                              {r.data} · {r.d?.origem||""} → {r.d?.ufDestino||""} · ML {r.d?.margem||0}%
+                            </div>
+                          </div>
+                      }
+                      {confirmDel===r.id
+                        ? <div style={{display:"flex",gap:4,alignItems:"center",flexShrink:0}}>
+                            <span style={{fontSize:10,color:"#f87171"}}>Excluir?</span>
+                            <button onClick={()=>handleDelete(r.id)} style={{padding:"4px 8px",background:"#dc2626",border:"none",color:"#fff",fontSize:11,fontWeight:700,cursor:"pointer",borderRadius:3}}>Sim</button>
+                            <button onClick={()=>setConfirmDel(null)} style={{padding:"4px 8px",background:"transparent",border:"1px solid rgba(255,255,255,.15)",color:"#94a3b8",fontSize:11,cursor:"pointer",borderRadius:3}}>Não</button>
+                          </div>
+                        : <div style={{display:"flex",gap:4,flexShrink:0}}>
+                            <button onClick={()=>{onLoad(r.d,r.calcs,r.nome);onClose();}}
+                              style={{padding:"5px 12px",background:"#0047BB",border:"none",color:"#fff",fontSize:11,fontWeight:700,cursor:"pointer",borderRadius:3}}>↩ Carregar</button>
+                            <button onClick={()=>{setEditNome(r.id);setEditVal(r.nome);}} title="Renomear"
+                              style={{padding:"5px 8px",background:"rgba(255,255,255,.05)",border:"1px solid rgba(255,255,255,.12)",color:"#a8b5cc",fontSize:11,cursor:"pointer",borderRadius:3}}>✎</button>
+                            <button onClick={()=>{setRegistroMover(r.id);setView("mover");}} title="Mover"
+                              style={{padding:"5px 8px",background:"rgba(255,255,255,.05)",border:"1px solid rgba(255,255,255,.12)",color:"#a8b5cc",fontSize:11,cursor:"pointer",borderRadius:3}}>📁</button>
+                            <button onClick={()=>setConfirmDel(r.id)}
+                              style={{padding:"5px 8px",background:"rgba(220,38,38,.1)",border:"1px solid rgba(220,38,38,.25)",color:"#f87171",fontSize:11,cursor:"pointer",borderRadius:3}}>✕</button>
+                          </div>
+                      }
+                    </div>
+                  </div>
+                ))}
+              </div>
+          }
+        </div>
+      </div>
+    </div>
+  );
+}
   const [registros, setRegistros] = useState(loadRegistros);
   const [pastas, setPastas] = useState(loadPastas);
   const [nome, setNome] = useState("");
@@ -2223,6 +2466,13 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
   const [tab,setTab]=useState("perfil");
   const [modal,setModal]=useState(null);
 
+  // Escuta evento do botão Gestão no topbar
+  useEffect(()=>{
+    const handler = () => setModal("gestao");
+    document.addEventListener("openGestao", handler);
+    return () => document.removeEventListener("openGestao", handler);
+  }, []);
+
   // Reset completo ao montar (novo login sempre começa zerado)
   useEffect(()=>{
     setD({...DEF});
@@ -2404,22 +2654,43 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
       const sf=(pcEf+pcSubvPct+icmsEfPct+difal+ftiPct+fcpPct+indPct+margGerPct-ipiCreditoIOSPct)/100;
       margemAlvo=pSIa>0?(1-cmvTotal/pSIa)*100-sf*100:null;
     }
-    // Modo margem: calcula margem resultante para o preço sugerido
+
+    // Modo margem: usa precoSugerido como pF base para todos os cálculos
     let margemSugerida=null;
-    if(d.modoCalc==="margem"&&d.precoSugerido>0){
+    const pFfinal = d.modoCalc==="margem" && d.precoSugerido>0 ? d.precoSugerido : pF;
+    if(d.modoCalc==="margem" && d.precoSugerido>0){
       const pSIs=d.precoSugerido/(1+ipi/100);
       const sf2=(pcEf+pcSubvPct+icmsEfPct+difal+ftiPct+fcpPct+indPct+margGerPct-ipiCreditoIOSPct)/100;
       margemSugerida=pSIs>0?(1-cmvTotal/pSIs)*100-sf2*100:null;
     }
-    // Modo margem: pF = precoSugerido (fixo), margem é calculada
-    const pFfinal = d.modoCalc==="margem" && d.precoSugerido>0 ? d.precoSugerido : pF;
-    return{cfrUSD,cfrBRL,iiV,iiUSD,vpl,bkpV,bkpBase,cfrImp,cmvImp,cmvTotal,ppbTot,despesas,
+
+    // Se modo margem com preço sugerido, recalcula todos os valores monetários sobre pFfinal
+    const pFbase = pFfinal;
+    const ipiCreditoVf=pFbase*(ipiCreditoIOSPct/100);
+    const pcVf=pFbase*(pcEf/100),icmsEfVf=pFbase*(icmsEfPct/100),difalVf=pFbase*(difal/100);
+    const pcSubvVf=pFbase*(pcSubvPct/100);
+    const ftiVf=pFbase*(ftiPct/100),fcpVf=pFbase*(fcpPct/100);
+    const margGerVf=pFbase*(margGerPct/100);
+    const margVf=pFbase*(d.margem/100);
+    const pdVf=pFbase*(d.pd/100),cfxVf=pFbase*(d.cfixo/100);
+    const scVf=pFbase*(d.scrap/100),ryVf=pFbase*(d.royal/100);
+    const cfnVf=pFbase*(cfVendaEf/100),frVf=pFbase*(d.frete/100),cmVf=pFbase*((d.comis+comisXPct)/100);
+    const mktVf=pFbase*(d.mkt/100),rebateVf=pFbase*(d.rebate/100);
+    const ipiVf=pFbase/(1+ipi/100)*(ipi/100); // ipiV sobre pSI derivado de pFfinal
+    const pSIfinal = pFbase/(1+ipi/100);
+    const cargaTotf=pcVf+ipiVf+icmsEfVf+difalVf+(stV||0)+fcpVf;
+    const cargaPctf=pFbase>0?(cargaTotf/pFbase)*100:0;
+    const margPctf=pFbase>0?(margVf/pFbase)*100:0;
+    const mcf=pFbase>0?((margVf+cfxVf-(d.margGerAtivo?margGerVf:0))/pFbase)*100:0;
+    const mkpf=cmvTotal>0?pFbase/cmvTotal:0;
+    const pUSDf=(d.ptaxPreco||d.ptax)>0?pFbase/(d.ptaxPreco||d.ptax):0;
+    return{cfrUSD,cfrBRL,iiV:iiV,iiUSD,vpl,bkpV,bkpBase,cfrImp,cmvImp,cmvTotal,ppbTot,despesas,
       craCalcMAO,creditoCalcIOS,cfrExpandidoUSD,basePlacaUSD,
-      pcPct,pcEf,pcLabel,pcV,pcSubvPct,pcSubvV,pcBaseRedPct,aliqInter,aliqDest,icmsEfPct,icmsV,icmsEfV,
-      difal,difalV,ftiPct,ftiV,fcpPct,fcpV,ipi,ipiEfPct,ipiV,ipiCreditoV,ipiCreditoIOSPct,pSI,pCI,
-      margV,indPct,pdV,cfxV,scV,ryV,cfnV,cfVendaEf,cartaoPct,frV,cmV,mktV,rebateV,stV,stBase,
-      pF:pFfinal,pUSD,
-      cargaTot,cargaPct,margPct,mc,mkp,ufO,intra,deveDifal,margemAlvo,margemSugerida,comisXPct,margGerPct,margGerV};
+      pcPct,pcEf,pcLabel,pcV:pcVf,pcSubvPct,pcSubvV:pcSubvVf,pcBaseRedPct,aliqInter,aliqDest,icmsEfPct,icmsV,icmsEfV:icmsEfVf,
+      difal,difalV:difalVf,ftiPct,ftiV:ftiVf,fcpPct,fcpV:fcpVf,ipi,ipiEfPct,ipiV:ipiVf,ipiCreditoV:ipiCreditoVf,ipiCreditoIOSPct,pSI:pSIfinal,pCI,
+      margV:margVf,indPct,pdV:pdVf,cfxV:cfxVf,scV:scVf,ryV:ryVf,cfnV:cfnVf,cfVendaEf,cartaoPct,frV:frVf,cmV:cmVf,mktV:mktVf,rebateV:rebateVf,stV,stBase,
+      pF:pFfinal,pUSD:pUSDf,
+      cargaTot:cargaTotf,cargaPct:cargaPctf,margPct:margPctf,mc:mcf,mkp:mkpf,ufO,intra,deveDifal,margemAlvo,margemSugerida,comisXPct,margGerPct,margGerV:margGerVf};
   },[d,prod,prodAtrib,isZFM,isCBU,pcEntry,ppbTot]);
 
   // Notifica o MultiTab sempre que os cálculos mudarem (para o painel comparativo)
@@ -2453,7 +2724,7 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
     {modal==="registros"&&<ModalRegistros
       onClose={()=>setModal(null)}
       currentD={d} currentCalcs={calcs}
-      prodNome={prod.nome}
+      prodNome={nomeAba||prod.nome}
       onLoad={(savedD, savedCalcs, nome)=>{setD(savedD);setCalcs(savedCalcs);if(onRenomear&&nome)onRenomear(nome);}}/>}
     {modal==="gestao"&&<ModalGestaoUsers onClose={()=>setModal(null)} currentUser={currentUser}/> }
 
@@ -2490,7 +2761,7 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
             style={{background:"none",border:"none",outline:"none",fontFamily:"'DM Mono',monospace",fontSize:12,fontWeight:700,color:"#60a5fa",width:52,textAlign:"right"}}/>
         </div>
         {/* Registros — Novo / Salvar / Carregar */}
-        <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:2}}>
+        <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
           <span style={{fontSize:8,fontWeight:700,color:"#5a6a84",letterSpacing:.8,textTransform:"uppercase"}}>Registros</span>
           <div style={{display:"flex",gap:4}}>
             <button onClick={()=>{setD({...DEF});setCalcs({...CALC_DEF});setTab("perfil");setIiStatus(null);if(onRenomear)onRenomear("Nova Precificação");}}
@@ -3124,6 +3395,10 @@ export default function App() {
               <div className="topbar-uname">{user.nome.split(" ")[0]} {user.nome.split(" ").slice(-1)[0]}</div>
               <div className="topbar-uperfil">{p.icone} {p.label}</div>
             </div>
+            {isAdmin&&<button onClick={()=>document.dispatchEvent(new CustomEvent("openGestao"))}
+              style={{padding:"4px 10px",background:"rgba(5,150,105,.15)",border:"1px solid rgba(5,150,105,.4)",color:"#34d399",fontFamily:"'Barlow Condensed',sans-serif",fontSize:10,fontWeight:700,letterSpacing:.5,cursor:"pointer",borderRadius:20}}>
+              👥 Gestão
+            </button>}
             <button className="btn-logout" onClick={handleLogout}>Sair</button>
           </div>
         </div>
@@ -3146,27 +3421,27 @@ function PainelComparativo({abas, calcsMap, open, onToggle}){
   const tog = k => setExpanded(p=>({...p,[k]:!p[k]}));
 
   const abasComDados = abas.filter(a=>calcsMap[a.id]);
-  if(abasComDados.length===0) return null;
+  if(!open || abasComDados.length===0) return null;
 
   const cores = ["#93c5fd","#34d399","#fbbf24","#f87171","#c084fc","#fb923c"];
 
-  const Linha = ({label, fn, format=brl, grp}) => (
-    <div style={{display:"flex",alignItems:"center",borderBottom:"1px solid rgba(255,255,255,.04)",padding:"3px 8px",background:grp?"rgba(255,255,255,.02)":"transparent"}}>
-      <span style={{flex:1,fontSize:10,color:grp?"#a8b5cc":"#7a90b0",fontWeight:grp?600:400,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{label}</span>
+  const Linha = ({label, fn, grp}) => (
+    <div style={{display:"flex",alignItems:"center",borderBottom:"1px solid rgba(255,255,255,.04)",padding:"4px 12px",background:grp?"rgba(255,255,255,.02)":"transparent"}}>
+      <span style={{flex:1,fontSize:11,color:grp?"#a8b5cc":"#7a90b0",fontWeight:grp?600:400}}>{label}</span>
       {abasComDados.map((a,i)=>{
         const v = fn(calcsMap[a.id]);
-        return <span key={a.id} style={{width:72,textAlign:"right",fontFamily:"'DM Mono',monospace",fontSize:10,fontWeight:grp?700:400,color:grp?cores[i%cores.length]:"#a8b5cc",flexShrink:0,paddingLeft:6}}>{v}</span>;
+        return <span key={a.id} style={{width:90,textAlign:"right",fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:grp?700:400,color:grp?cores[i%cores.length]:"#a8b5cc",flexShrink:0}}>{v}</span>;
       })}
     </div>
   );
 
   const Grp = ({id, label, fnTotal, children}) => (
     <div style={{borderBottom:"1px solid rgba(255,255,255,.06)"}}>
-      <div onClick={()=>tog(id)} style={{display:"flex",alignItems:"center",padding:"5px 8px",cursor:"pointer",background:"rgba(255,255,255,.03)"}}>
-        <span style={{fontSize:8,color:"#5a6a84",marginRight:4}}>{expanded[id]?"▼":"▶"}</span>
-        <span style={{flex:1,fontSize:10,fontWeight:700,color:"#dce7f7",textTransform:"uppercase",letterSpacing:.5}}>{label}</span>
+      <div onClick={()=>tog(id)} style={{display:"flex",alignItems:"center",padding:"6px 12px",cursor:"pointer",background:"rgba(255,255,255,.03)"}}>
+        <span style={{fontSize:9,color:"#5a6a84",marginRight:6}}>{expanded[id]?"▼":"▶"}</span>
+        <span style={{flex:1,fontSize:11,fontWeight:700,color:"#dce7f7",textTransform:"uppercase",letterSpacing:.5}}>{label}</span>
         {abasComDados.map((a,i)=>(
-          <span key={a.id} style={{width:72,textAlign:"right",fontFamily:"'DM Mono',monospace",fontSize:10,fontWeight:700,color:cores[i%cores.length],flexShrink:0,paddingLeft:6}}>{brl(fnTotal(calcsMap[a.id]))}</span>
+          <span key={a.id} style={{width:90,textAlign:"right",fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:700,color:cores[i%cores.length],flexShrink:0}}>{brl(fnTotal(calcsMap[a.id]))}</span>
         ))}
       </div>
       {expanded[id]&&<div>{children}</div>}
@@ -3174,76 +3449,71 @@ function PainelComparativo({abas, calcsMap, open, onToggle}){
   );
 
   return(
-    <div style={{position:"fixed",right:0,top:"50%",transform:"translateY(-50%)",zIndex:200,display:"flex",alignItems:"stretch"}}>
-      {/* Tab de abertura */}
-      <button onClick={onToggle} style={{writingMode:"vertical-rl",textOrientation:"mixed",padding:"12px 6px",background:"#1e2a3d",border:"1px solid rgba(255,255,255,.1)",borderRight:"none",color:"#93c5fd",fontSize:10,fontWeight:700,cursor:"pointer",borderRadius:"6px 0 0 6px",letterSpacing:1}}>
-        {open?"▶ FECHAR":"◀ COMPARAR"}
-      </button>
-      {open&&(
-        <div style={{width:Math.min(80+abasComDados.length*80,500),background:"#131925",border:"1px solid rgba(255,255,255,.1)",borderRight:"none",display:"flex",flexDirection:"column",maxHeight:"80vh",borderRadius:"6px 0 0 6px",overflow:"hidden"}}>
-          {/* Header */}
-          <div style={{padding:"8px 8px 6px",borderBottom:"1px solid rgba(255,255,255,.08)",flexShrink:0}}>
-            <div style={{fontSize:9,fontWeight:700,color:"#5a6a84",letterSpacing:1,textTransform:"uppercase",marginBottom:6}}>Comparativo</div>
+    <div className="ov" onClick={onToggle}>
+      <div style={{background:"#131925",border:"1px solid rgba(255,255,255,.12)",borderRadius:8,maxWidth:Math.min(200+abasComDados.length*100,900),width:"95%",maxHeight:"90vh",display:"flex",flexDirection:"column",overflow:"hidden"}} onClick={e=>e.stopPropagation()}>
+        {/* Header */}
+        <div style={{display:"flex",alignItems:"center",padding:"14px 16px",borderBottom:"1px solid rgba(255,255,255,.08)",flexShrink:0}}>
+          <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:700,color:"#dce7f7",letterSpacing:.5,flex:1}}>Comparativo de Precificações</span>
+          <button onClick={()=>window.print()}
+            style={{padding:"6px 14px",background:"rgba(0,71,187,.2)",border:"1px solid rgba(0,71,187,.45)",color:"#93c5fd",fontFamily:"'Barlow Condensed',sans-serif",fontSize:11,fontWeight:700,cursor:"pointer",borderRadius:20,marginRight:8}}>
+            🖨️ Imprimir / PDF
+          </button>
+          <button onClick={onToggle} style={{background:"none",border:"none",color:"#7a90b0",fontSize:20,cursor:"pointer",lineHeight:1}}>×</button>
+        </div>
+        {/* Cabeçalho das colunas */}
+        <div style={{display:"flex",alignItems:"center",padding:"8px 12px",borderBottom:"1px solid rgba(255,255,255,.08)",flexShrink:0,background:"rgba(255,255,255,.02)"}}>
+          <span style={{flex:1,fontSize:10,color:"#5a6a84"}}></span>
+          {abasComDados.map((a,i)=>(
+            <span key={a.id} style={{width:90,textAlign:"right",fontSize:10,fontWeight:700,color:cores[i%cores.length],flexShrink:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{a.nome}</span>
+          ))}
+        </div>
+        {/* Conteúdo scrollável */}
+        <div style={{overflowY:"auto",flex:1}}>
+          {/* Preço Final */}
+          <div style={{padding:"10px 12px",borderBottom:"1px solid rgba(255,255,255,.08)",background:"rgba(0,71,187,.06)"}}>
             <div style={{display:"flex",alignItems:"center"}}>
-              <span style={{flex:1,fontSize:9,color:"#475569"}}></span>
+              <span style={{flex:1,fontSize:12,fontWeight:700,color:"#93c5fd",textTransform:"uppercase",letterSpacing:.5}}>Preço Final</span>
               {abasComDados.map((a,i)=>(
-                <span key={a.id} style={{width:72,textAlign:"right",fontSize:9,fontWeight:700,color:cores[i%cores.length],flexShrink:0,paddingLeft:6,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{a.nome}</span>
+                <span key={a.id} style={{width:90,textAlign:"right",fontFamily:"'DM Mono',monospace",fontSize:13,fontWeight:800,color:cores[i%cores.length],flexShrink:0}}>{brl(calcsMap[a.id].c.pF)}</span>
               ))}
             </div>
           </div>
-          {/* Conteúdo scrollável */}
-          <div style={{overflowY:"auto",flex:1}}>
-            {/* Preço */}
-            <div style={{padding:"6px 8px",borderBottom:"1px solid rgba(255,255,255,.08)",background:"rgba(0,71,187,.08)"}}>
-              <div style={{display:"flex",alignItems:"center"}}>
-                <span style={{flex:1,fontSize:10,fontWeight:700,color:"#93c5fd",textTransform:"uppercase",letterSpacing:.5}}>Preço Final</span>
-                {abasComDados.map((a,i)=>(
-                  <span key={a.id} style={{width:72,textAlign:"right",fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:800,color:cores[i%cores.length],flexShrink:0,paddingLeft:6}}>{brl(calcsMap[a.id].c.pF)}</span>
-                ))}
-              </div>
-            </div>
-            {/* KPIs */}
-            <Linha label="FOB (USD)" fn={({c,d})=>usd(d.fobUSD)} format={v=>v}/>
-            <Linha label="VPL" fn={({c})=>brl(c.vpl)}/>
-            <Linha label="CMV Total" fn={({c})=>brl(c.cmvTotal)} grp/>
-            {/* Impostos de Venda */}
-            <Grp id="impvenda" label="Impostos de Venda" fnTotal={({c})=>c.cargaTot}>
-              <Linha label={`IPI`} fn={({c})=>c.ipi>0?brl(c.ipiV):"—"}/>
-              {abasComDados.some(a=>calcsMap[a.id].c.ipiCreditoV>0)&&<Linha label="Crédito IPI IOS" fn={({c})=>c.ipiCreditoV>0?brl(-c.ipiCreditoV):"—"}/>}
-              <Linha label="P/C Efetivo" fn={({c})=>brl(c.pcV)}/>
-              {abasComDados.some(a=>calcsMap[a.id].c.pcSubvV>0.01)&&<Linha label="P/C Subvenção" fn={({c})=>c.pcSubvV>0.01?brl(c.pcSubvV):"—"}/>}
-              <Linha label="ICMS Efetivo" fn={({c})=>brl(c.icmsEfV)}/>
-              {abasComDados.some(a=>calcsMap[a.id].c.difal>0)&&<Linha label="DIFAL" fn={({c})=>c.difal>0?brl(c.difalV):"—"}/>}
-            </Grp>
-            {/* Índices Gerais */}
-            <Grp id="iger" label="Índices Gerais" fnTotal={({c})=>c.pdV+c.scV+c.ryV+c.frV}>
-              <Linha label="P&D" fn={({c})=>brl(c.pdV)}/>
-              <Linha label="Scrap" fn={({c})=>brl(c.scV)}/>
-              <Linha label="Royalties" fn={({c})=>brl(c.ryV)}/>
-              <Linha label="Frete venda" fn={({c})=>brl(c.frV)}/>
-            </Grp>
-            {/* Índices Comerciais */}
-            <Grp id="icom" label="Índices Comerciais" fnTotal={({c})=>c.cfnV+c.cmV+(c.mktV||0)+(c.rebateV||0)}>
-              <Linha label="CF Venda" fn={({c})=>brl(c.cfnV)}/>
-              <Linha label="Comissão+Enc." fn={({c})=>brl(c.cmV)}/>
-              {abasComDados.some(a=>(calcsMap[a.id].d.mkt||0)>0)&&<Linha label="Marketing" fn={({c,d})=>brl(c.mktV||0)}/>}
-              {abasComDados.some(a=>(calcsMap[a.id].d.rebate||0)>0)&&<Linha label="Rebate" fn={({c,d})=>brl(c.rebateV||0)}/>}
-              {abasComDados.some(a=>(calcsMap[a.id].d.pdd||0)>0)&&<Linha label="PDD" fn={({c,d})=>brl(c.pF*(d.pdd/100))}/>}
-              {abasComDados.some(a=>(calcsMap[a.id].d.vbExtra||0)>0)&&<Linha label="Verba Extra" fn={({c,d})=>brl(c.pF*(d.vbExtra/100))}/>}
-              {abasComDados.some(a=>(calcsMap[a.id].d.vpc||0)>0)&&<Linha label="VPC" fn={({c,d})=>brl(c.pF*(d.vpc/100))}/>}
-            </Grp>
-            {/* Resultado */}
-            <Grp id="res" label="Resultado (MC)" fnTotal={({c})=>c.margV+c.cfxV}>
-              <Linha label="ML (%)" fn={({c})=>pct(c.margPct)} format={v=>v}/>
-              <Linha label="ML (R$)" fn={({c})=>brl(c.margV)}/>
-              <Linha label="CF (R$)" fn={({c})=>brl(c.cfxV)}/>
-              <Linha label="MC (%)" fn={({c})=>pct(c.mc)} format={v=>v}/>
-              {abasComDados.some(a=>calcsMap[a.id].d.margGer!==0)&&<Linha label="Marg. Ger./Agnóst." fn={({c})=>brl(c.margGerV)}/>}
-            </Grp>
-            <Linha label="Markup" fn={({c})=>n3(c.mkp)+"x"} format={v=>v} grp/>
-          </div>
+          <Linha label="FOB (USD)" fn={({d})=>usd(d.fobUSD)}/>
+          <Linha label="VPL" fn={({c})=>brl(c.vpl)}/>
+          <Linha label="CMV Total" fn={({c})=>brl(c.cmvTotal)} grp/>
+          <Grp id="impvenda" label="Impostos de Venda" fnTotal={({c})=>c.cargaTot}>
+            <Linha label="IPI" fn={({c})=>c.ipi>0?brl(c.ipiV):"—"}/>
+            {abasComDados.some(a=>calcsMap[a.id].c.ipiCreditoV>0)&&<Linha label="Crédito IPI IOS" fn={({c})=>c.ipiCreditoV>0?brl(-c.ipiCreditoV):"—"}/>}
+            <Linha label="P/C Efetivo" fn={({c})=>brl(c.pcV)}/>
+            {abasComDados.some(a=>calcsMap[a.id].c.pcSubvV>0.01)&&<Linha label="P/C Subvenção" fn={({c})=>c.pcSubvV>0.01?brl(c.pcSubvV):"—"}/>}
+            <Linha label="ICMS Efetivo" fn={({c})=>brl(c.icmsEfV)}/>
+            {abasComDados.some(a=>calcsMap[a.id].c.difal>0)&&<Linha label="DIFAL" fn={({c})=>c.difal>0?brl(c.difalV):"—"}/>}
+          </Grp>
+          <Grp id="iger" label="Índices Gerais" fnTotal={({c})=>c.pdV+c.scV+c.ryV+c.frV}>
+            <Linha label="P&D" fn={({c})=>brl(c.pdV)}/>
+            <Linha label="Scrap" fn={({c})=>brl(c.scV)}/>
+            <Linha label="Royalties" fn={({c})=>brl(c.ryV)}/>
+            <Linha label="Frete venda" fn={({c})=>brl(c.frV)}/>
+          </Grp>
+          <Grp id="icom" label="Índices Comerciais" fnTotal={({c})=>c.cfnV+c.cmV+(c.mktV||0)+(c.rebateV||0)}>
+            <Linha label="CF Venda" fn={({c})=>brl(c.cfnV)}/>
+            <Linha label="Comissão+Enc." fn={({c})=>brl(c.cmV)}/>
+            {abasComDados.some(a=>(calcsMap[a.id].d.mkt||0)>0)&&<Linha label="Marketing" fn={({c,d})=>brl(c.mktV||0)}/>}
+            {abasComDados.some(a=>(calcsMap[a.id].d.rebate||0)>0)&&<Linha label="Rebate" fn={({c})=>brl(c.rebateV||0)}/>}
+            {abasComDados.some(a=>(calcsMap[a.id].d.pdd||0)>0)&&<Linha label="PDD" fn={({c,d})=>brl(c.pF*(d.pdd/100))}/>}
+            {abasComDados.some(a=>(calcsMap[a.id].d.vbExtra||0)>0)&&<Linha label="Verba Extra" fn={({c,d})=>brl(c.pF*(d.vbExtra/100))}/>}
+            {abasComDados.some(a=>(calcsMap[a.id].d.vpc||0)>0)&&<Linha label="VPC" fn={({c,d})=>brl(c.pF*(d.vpc/100))}/>}
+          </Grp>
+          <Grp id="res" label="Resultado (MC)" fnTotal={({c})=>c.margV+c.cfxV}>
+            <Linha label="ML (%)" fn={({c})=>pct(c.margPct)}/>
+            <Linha label="ML (R$)" fn={({c})=>brl(c.margV)}/>
+            <Linha label="CF (R$)" fn={({c})=>brl(c.cfxV)}/>
+            <Linha label="MC (%)" fn={({c})=>pct(c.mc)}/>
+            {abasComDados.some(a=>calcsMap[a.id].d.margGer!==0)&&<Linha label="Marg. Gerencial" fn={({c})=>brl(c.margGerV)}/>}
+          </Grp>
+          <Linha label="Markup" fn={({c})=>n3(c.mkp)+"x"} grp/>
         </div>
-      )}
+      </div>
     </div>
   );
 }
@@ -3317,6 +3587,12 @@ function MultiTab({ user }) {
         <button onClick={addAba}
           style={{ background: "none", border: "none", cursor: "pointer", color: "#5a6a84", fontSize: 18, padding: "0 12px", flexShrink: 0, transition: ".15s" }}
           title="Nova precificação">+</button>
+        {abas.length > 1 && (
+          <button onClick={()=>setComparOpen(true)}
+            style={{marginLeft:"auto",padding:"0 14px",background:"rgba(0,71,187,.2)",border:"none",borderLeft:"1px solid rgba(255,255,255,.06)",color:"#93c5fd",fontSize:11,fontWeight:700,cursor:"pointer",letterSpacing:.5,fontFamily:"'Barlow Condensed',sans-serif",flexShrink:0}}>
+            ⇄ Comparar
+          </button>
+        )}
       </div>
 
       {/* Conteúdo das abas */}
