@@ -2477,7 +2477,7 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
       onClose={()=>setModal(null)}
       currentD={d} currentCalcs={calcs}
       prodNome={nomeAba||prod.nome}
-      onLoad={(savedD, savedCalcs, nome)=>{setD(savedD);setCalcs(savedCalcs);if(onRenomear&&nome)onRenomear(nome);}}/>}
+      onLoad={(savedD, savedCalcs, nome)=>{setD(p=>({...DEF,...savedD}));setCalcs(c=>({...CALC_DEF,...savedCalcs}));if(onRenomear&&nome)onRenomear(nome);}}/>}
     {modal==="gestao"&&<ModalGestaoUsers onClose={()=>setModal(null)} currentUser={currentUser}/> }
 
     <div className="app">
