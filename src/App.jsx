@@ -3255,12 +3255,12 @@ function newTab(nome) {
   return { id: _tabId++, nome: nome || `Precificação ${_tabId - 1}`, editando: false };
 }
 
-function PainelComparativo({abas, calcsMap, open, onToggle}){
+function PainelComparativo({abas, calcsMap, selecionadas, open, onToggle}){
   const [expanded, setExpanded] = useState({imp:false,ppb:false,local:false,impvenda:false,iger:false,icom:false,res:false});
   const [view, setView] = useState("tabela"); // "tabela" | "relatorio"
   const tog = k => setExpanded(p=>({...p,[k]:!p[k]}));
 
-  const abasComDados = abas.filter(a=>calcsMap[a.id]);
+  const abasComDados = abas.filter(a=>calcsMap[a.id] && selecionadas.has(a.id));
   if(!open || abasComDados.length===0) return null;
 
   const cores = ["#93c5fd","#34d399","#fbbf24","#f87171","#c084fc","#fb923c"];
@@ -3517,24 +3517,39 @@ function PainelComparativo({abas, calcsMap, open, onToggle}){
 }
 
 function MultiTab({ user }) {
-  const [abas, setAbas] = useState([newTab("Precificação 1")]);
+  const _initTab = useState(() => newTab("Precificação 1"))[0];
+  const [abas, setAbas] = useState([_initTab]);
   const [abaAtiva, setAbaAtiva] = useState(0);
   const [editandoIdx, setEditandoIdx] = useState(null);
   const [nomeEdit, setNomeEdit] = useState("");
   const [calcsMap, setCalcsMap] = useState({});
   const [comparOpen, setComparOpen] = useState(false);
+  const [selecionadas, setSelecionadas] = useState(() => new Set([_initTab.id]));
+
+  const toggleSelecionada = (id, e) => {
+    e.stopPropagation();
+    setSelecionadas(prev => {
+      const s = new Set(prev);
+      if (s.has(id)) { s.delete(id); return s; }
+      if (s.size >= 3) return prev;
+      s.add(id); return s;
+    });
+  };
 
   const addAba = () => {
     const nova = newTab();
     setAbas(p => [...p, nova]);
     setAbaAtiva(abas.length);
+    setSelecionadas(prev => prev.size < 3 ? new Set([...prev, nova.id]) : prev);
   };
 
   const removeAba = (idx) => {
     if (abas.length === 1) return;
+    const removedId = abas[idx].id;
     const novas = abas.filter((_, i) => i !== idx);
     setAbas(novas);
     setAbaAtiva(Math.min(abaAtiva, novas.length - 1));
+    setSelecionadas(prev => { const s = new Set(prev); s.delete(removedId); return s; });
   };
 
   const startEdit = (idx) => { setEditandoIdx(idx); setNomeEdit(abas[idx].nome); };
@@ -3552,17 +3567,34 @@ function MultiTab({ user }) {
         background: "#0f1520", borderBottom: "1px solid rgba(255,255,255,.08)",
         padding: "0 8px", overflowX: "auto", flexShrink: 0, minHeight: 38,
       }}>
-        {abas.map((aba, idx) => (
+        {abas.map((aba, idx) => {
+          const sel = selecionadas.has(aba.id);
+          const podeSelecionar = sel || selecionadas.size < 3;
+          return (
           <div key={aba.id}
             onClick={() => setAbaAtiva(idx)}
             style={{
               display: "flex", alignItems: "center", gap: 6,
-              padding: "0 12px", cursor: "pointer", position: "relative",
+              padding: "0 10px", cursor: "pointer", position: "relative",
               borderRight: "1px solid rgba(255,255,255,.06)",
               borderBottom: idx === abaAtiva ? "2px solid #0047BB" : "2px solid transparent",
               background: idx === abaAtiva ? "#1e2a3d" : "transparent",
               minWidth: 120, maxWidth: 200, flexShrink: 0, transition: ".15s",
             }}>
+            {/* Checkbox de seleção para comparar */}
+            {abas.length > 1 && (
+              <div onClick={e => podeSelecionar ? toggleSelecionada(aba.id, e) : e.stopPropagation()}
+                title={sel ? "Remover do comparativo" : selecionadas.size >= 3 ? "Máximo 3 produtos" : "Incluir no comparativo"}
+                style={{
+                  width:13,height:13,borderRadius:3,flexShrink:0,
+                  border:`1.5px solid ${sel?"#0047BB":podeSelecionar?"rgba(255,255,255,.2)":"rgba(255,255,255,.07)"}`,
+                  background:sel?"#0047BB":"transparent",
+                  cursor:podeSelecionar?"pointer":"not-allowed",
+                  display:"flex",alignItems:"center",justifyContent:"center",transition:".15s",
+                }}>
+                {sel&&<span style={{color:"#fff",fontSize:8,lineHeight:1,fontWeight:700}}>✓</span>}
+              </div>
+            )}
             {editandoIdx === idx ? (
               <input autoFocus value={nomeEdit}
                 onChange={e => setNomeEdit(e.target.value)}
@@ -3581,14 +3613,15 @@ function MultiTab({ user }) {
                 title="Fechar aba">×</button>
             )}
           </div>
-        ))}
+          );
+        })}
         <button onClick={addAba}
           style={{ background: "none", border: "none", cursor: "pointer", color: "#5a6a84", fontSize: 18, padding: "0 12px", flexShrink: 0, transition: ".15s" }}
           title="Nova precificação">+</button>
-        {abas.length > 1 && (
+        {selecionadas.size >= 2 && (
           <button onClick={()=>setComparOpen(true)}
             style={{marginLeft:"auto",padding:"0 14px",background:"rgba(0,71,187,.2)",border:"none",borderLeft:"1px solid rgba(255,255,255,.06)",color:"#93c5fd",fontSize:11,fontWeight:700,cursor:"pointer",letterSpacing:.5,fontFamily:"'Barlow Condensed',sans-serif",flexShrink:0}}>
-            ⇄ Comparar
+            ⇄ Comparar ({selecionadas.size})
           </button>
         )}
       </div>
@@ -3603,10 +3636,11 @@ function MultiTab({ user }) {
       ))}
 
       {/* Painel comparativo flutuante */}
-      {abas.length > 1 && (
+      {selecionadas.size >= 2 && (
         <PainelComparativo
           abas={abas}
           calcsMap={calcsMap}
+          selecionadas={selecionadas}
           open={comparOpen}
           onToggle={()=>setComparOpen(p=>!p)}/>
       )}
