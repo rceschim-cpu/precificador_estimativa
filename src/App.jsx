@@ -2338,7 +2338,14 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
     "8539.52.00": 10.8,   // Smart Lâmpada
   };
 
-  const setOrigem=origem=>setD(pv=>({...pv,origem}));
+  const setOrigem=origem=>setD(pv=>{
+    const reset={};
+    // CRA é exclusivo de MAO/ZFM; zerar ao sair de MAO
+    if(pv.origem==="MAO" && origem!=="MAO") reset.cra=0;
+    // cfImp é exclusivo de IOS; zerar ao sair de IOS
+    if(pv.origem==="IOS" && origem!=="IOS") reset.cfImp=0;
+    return {...pv,origem,...reset};
+  });
   const setModalidade=modalidade=>{
     setD(pv=>({...pv,modalidade}));
     if(modalidade==="CBU") aplicarIICBU(prod.ncm);
