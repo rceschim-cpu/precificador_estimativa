@@ -3257,13 +3257,19 @@ function newTab(nome) {
 
 function PainelComparativo({abas, calcsMap, open, onToggle}){
   const [expanded, setExpanded] = useState({imp:false,ppb:false,local:false,impvenda:false,iger:false,icom:false,res:false});
+  const [view, setView] = useState("tabela"); // "tabela" | "relatorio"
   const tog = k => setExpanded(p=>({...p,[k]:!p[k]}));
 
   const abasComDados = abas.filter(a=>calcsMap[a.id]);
   if(!open || abasComDados.length===0) return null;
 
   const cores = ["#93c5fd","#34d399","#fbbf24","#f87171","#c084fc","#fb923c"];
+  const coresBg = ["rgba(147,197,253,.08)","rgba(52,211,153,.08)","rgba(251,191,36,.08)","rgba(248,113,113,.08)","rgba(192,132,252,.08)","rgba(251,146,60,.08)"];
+  const coresBorder = ["rgba(147,197,253,.25)","rgba(52,211,153,.25)","rgba(251,191,36,.25)","rgba(248,113,113,.25)","rgba(192,132,252,.25)","rgba(251,146,60,.25)"];
 
+  const origemLabel = o => ({MAO:"Manaus · ZFM", IOS:"Ilhéus · BA", CWB:"Curitiba · PR"}[o]||o);
+
+  /* ── VIEW TABELA (original) ── */
   const Linha = ({label, fn, grp}) => (
     <div style={{display:"flex",alignItems:"center",borderBottom:"1px solid rgba(255,255,255,.04)",padding:"4px 12px",background:grp?"rgba(255,255,255,.02)":"transparent"}}>
       <span style={{flex:1,fontSize:11,color:grp?"#a8b5cc":"#7a90b0",fontWeight:grp?600:400}}>{label}</span>
@@ -3287,71 +3293,218 @@ function PainelComparativo({abas, calcsMap, open, onToggle}){
     </div>
   );
 
+  /* ── VIEW RELATÓRIO ── */
+  const CardLinha = ({label, valor, destaque, cor}) => (
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"4px 0",borderBottom:"1px solid rgba(255,255,255,.04)"}}>
+      <span style={{fontSize:destaque?12:11,color:destaque?"#dce7f7":"#7a90b0",fontWeight:destaque?600:400}}>{label}</span>
+      <span style={{fontFamily:"'DM Mono',monospace",fontSize:destaque?13:11,fontWeight:destaque?700:500,color:cor||(destaque?"#e8eaf0":"#a8b5cc")}}>{valor}</span>
+    </div>
+  );
+
+  const CardSecao = ({titulo}) => (
+    <div style={{marginTop:10,marginBottom:4}}>
+      <span style={{fontSize:9,fontWeight:700,color:"#5a6a84",textTransform:"uppercase",letterSpacing:1}}>{titulo}</span>
+    </div>
+  );
+
+  const CardProduto = ({aba, idx}) => {
+    const {c, d, prodNome} = calcsMap[aba.id];
+    const cor = cores[idx % cores.length];
+    const corBg = coresBg[idx % coresBg.length];
+    const corBorder = coresBorder[idx % coresBorder.length];
+    const mlPct = c.margPct||0;
+    const mcPct = c.mc||0;
+    const mlOk = mlPct >= 8;
+    const corML = mlPct >= 10 ? "#34d399" : mlPct >= 6 ? "#fbbf24" : "#f87171";
+    const corMC = mcPct >= 15 ? "#34d399" : mcPct >= 10 ? "#fbbf24" : "#f87171";
+
+    return (
+      <div style={{flex:"1 1 260px",minWidth:240,maxWidth:400,background:"#0e1622",border:`1px solid ${corBorder}`,borderRadius:10,overflow:"hidden",display:"flex",flexDirection:"column"}}>
+        {/* Topo colorido */}
+        <div style={{background:corBg,borderBottom:`1px solid ${corBorder}`,padding:"12px 16px"}}>
+          <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:8}}>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:13,fontWeight:700,color:"#e8eaf0",lineHeight:1.3,wordBreak:"break-word"}}>{aba.nome}</div>
+              {prodNome && prodNome !== aba.nome && (
+                <div style={{fontSize:10,color:"#7a90b0",marginTop:2,lineHeight:1.3}}>{prodNome}</div>
+              )}
+            </div>
+            <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:3,flexShrink:0}}>
+              <span style={{fontSize:9,fontWeight:700,color:cor,background:`rgba(0,0,0,.3)`,padding:"2px 7px",borderRadius:10,letterSpacing:.5}}>{origemLabel(d.origem)}</span>
+              <span style={{fontSize:9,fontWeight:600,color:"#7a90b0",background:"rgba(0,0,0,.25)",padding:"2px 7px",borderRadius:10,letterSpacing:.5}}>{d.modalidade||"CKD"}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Preço em destaque */}
+        <div style={{padding:"16px",background:"rgba(0,0,0,.2)",borderBottom:`1px solid ${corBorder}`,textAlign:"center"}}>
+          <div style={{fontSize:10,color:"#5a6a84",textTransform:"uppercase",letterSpacing:1,marginBottom:4}}>Preço Final</div>
+          <div style={{fontFamily:"'DM Mono',monospace",fontSize:28,fontWeight:800,color:cor,lineHeight:1}}>{brl(c.pF)}</div>
+          {d.fobUSD>0&&<div style={{fontSize:10,color:"#5a6a84",marginTop:5,fontFamily:"'DM Mono',monospace"}}>FOB {usd(d.fobUSD)}</div>}
+        </div>
+
+        {/* Corpo do card */}
+        <div style={{padding:"12px 16px",flex:1,display:"flex",flexDirection:"column",gap:0}}>
+
+          {/* Custo */}
+          <CardSecao titulo="Custo"/>
+          <CardLinha label="VPL" valor={brl(c.vpl)}/>
+          <CardLinha label="CMV Total" valor={brl(c.cmvTotal)} destaque/>
+
+          {/* Impostos de Venda */}
+          <CardSecao titulo="Impostos de Venda"/>
+          {c.ipi>0&&<CardLinha label="IPI" valor={brl(c.ipiV)}/>}
+          {c.ipiCreditoV>0&&<CardLinha label="Crédito IPI" valor={brl(-c.ipiCreditoV)}/>}
+          <CardLinha label="P/C Efetivo" valor={brl(c.pcV)}/>
+          {c.pcSubvV>0.01&&<CardLinha label="P/C Subvenção" valor={brl(c.pcSubvV)}/>}
+          <CardLinha label="ICMS Efetivo" valor={brl(c.icmsEfV)}/>
+          {c.difal>0&&<CardLinha label="DIFAL" valor={brl(c.difalV)}/>}
+          <CardLinha label="Total Impostos" valor={brl(c.cargaTot)} destaque/>
+
+          {/* Índices */}
+          <CardSecao titulo="Índices"/>
+          {c.pdV>0&&<CardLinha label="P&D" valor={brl(c.pdV)}/>}
+          {c.scV>0&&<CardLinha label="Scrap" valor={brl(c.scV)}/>}
+          {c.ryV>0&&<CardLinha label="Royalties" valor={brl(c.ryV)}/>}
+          {c.frV>0&&<CardLinha label="Frete venda" valor={brl(c.frV)}/>}
+          {c.cfnV>0&&<CardLinha label="CF Venda" valor={brl(c.cfnV)}/>}
+          {c.cmV>0&&<CardLinha label="Comissão+Enc." valor={brl(c.cmV)}/>}
+          {(c.mktV||0)>0&&<CardLinha label="Marketing" valor={brl(c.mktV)}/>}
+          {(c.rebateV||0)>0&&<CardLinha label="Rebate" valor={brl(c.rebateV)}/>}
+          {(d.pdd||0)>0&&<CardLinha label="PDD" valor={brl(c.pF*(d.pdd/100))}/>}
+          {(d.vbExtra||0)>0&&<CardLinha label="Verba Extra" valor={brl(c.pF*(d.vbExtra/100))}/>}
+          {(d.vpc||0)>0&&<CardLinha label="VPC" valor={brl(c.pF*(d.vpc/100))}/>}
+
+          {/* Resultado — em destaque total */}
+          <CardSecao titulo="Resultado"/>
+          <div style={{background:"rgba(255,255,255,.03)",border:"1px solid rgba(255,255,255,.06)",borderRadius:6,padding:"10px 12px",marginTop:4,display:"flex",flexDirection:"column",gap:6}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <span style={{fontSize:10,color:"#7a90b0",fontWeight:600}}>ML</span>
+              <div style={{display:"flex",gap:10,alignItems:"center"}}>
+                <span style={{fontFamily:"'DM Mono',monospace",fontSize:14,fontWeight:800,color:corML}}>{pct(mlPct)}</span>
+                <span style={{fontFamily:"'DM Mono',monospace",fontSize:12,fontWeight:600,color:corML,opacity:.85}}>{brl(c.margV)}</span>
+              </div>
+            </div>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <span style={{fontSize:10,color:"#7a90b0",fontWeight:600}}>MC</span>
+              <div style={{display:"flex",gap:10,alignItems:"center"}}>
+                <span style={{fontFamily:"'DM Mono',monospace",fontSize:14,fontWeight:800,color:corMC}}>{pct(mcPct)}</span>
+                <span style={{fontFamily:"'DM Mono',monospace",fontSize:12,fontWeight:600,color:corMC,opacity:.85}}>{brl(c.cfxV)}</span>
+              </div>
+            </div>
+            {calcsMap[aba.id].d.margGer!==0&&(
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <span style={{fontSize:10,color:"#7a90b0",fontWeight:600}}>Mg. Gerencial</span>
+                <span style={{fontFamily:"'DM Mono',monospace",fontSize:12,fontWeight:600,color:"#a8b5cc"}}>{brl(c.margGerV)}</span>
+              </div>
+            )}
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",borderTop:"1px solid rgba(255,255,255,.06)",paddingTop:6,marginTop:2}}>
+              <span style={{fontSize:10,color:"#5a6a84"}}>Markup</span>
+              <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:"#7a90b0"}}>{n3(c.mkp)}x</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const modalWidth = view==="relatorio"
+    ? Math.min(120 + abasComDados.length*300, 1100)
+    : Math.min(200+abasComDados.length*100, 900);
+
   return(
     <div className="ov" onClick={onToggle}>
-      <div style={{background:"#131925",border:"1px solid rgba(255,255,255,.12)",borderRadius:8,maxWidth:Math.min(200+abasComDados.length*100,900),width:"95%",maxHeight:"90vh",display:"flex",flexDirection:"column",overflow:"hidden"}} onClick={e=>e.stopPropagation()}>
+      <div style={{background:"#131925",border:"1px solid rgba(255,255,255,.12)",borderRadius:8,width:"95%",maxWidth:modalWidth,maxHeight:"90vh",display:"flex",flexDirection:"column",overflow:"hidden"}} onClick={e=>e.stopPropagation()}>
         {/* Header */}
-        <div style={{display:"flex",alignItems:"center",padding:"14px 16px",borderBottom:"1px solid rgba(255,255,255,.08)",flexShrink:0}}>
+        <div style={{display:"flex",alignItems:"center",padding:"12px 16px",borderBottom:"1px solid rgba(255,255,255,.08)",flexShrink:0,gap:8}}>
           <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:700,color:"#dce7f7",letterSpacing:.5,flex:1}}>Comparativo de Precificações</span>
+          {/* Toggle view */}
+          <div style={{display:"flex",background:"rgba(255,255,255,.05)",borderRadius:6,padding:2,gap:2}}>
+            <button onClick={()=>setView("tabela")}
+              style={{padding:"4px 12px",background:view==="tabela"?"rgba(0,71,187,.4)":"transparent",border:"none",color:view==="tabela"?"#93c5fd":"#5a6a84",fontSize:10,fontWeight:700,cursor:"pointer",borderRadius:4,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:.5,transition:".15s"}}>
+              Tabela
+            </button>
+            <button onClick={()=>setView("relatorio")}
+              style={{padding:"4px 12px",background:view==="relatorio"?"rgba(0,71,187,.4)":"transparent",border:"none",color:view==="relatorio"?"#93c5fd":"#5a6a84",fontSize:10,fontWeight:700,cursor:"pointer",borderRadius:4,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:.5,transition:".15s"}}>
+              Relatório
+            </button>
+          </div>
           <button onClick={()=>window.print()}
-            style={{padding:"6px 14px",background:"rgba(0,71,187,.2)",border:"1px solid rgba(0,71,187,.45)",color:"#93c5fd",fontFamily:"'Barlow Condensed',sans-serif",fontSize:11,fontWeight:700,cursor:"pointer",borderRadius:20,marginRight:8}}>
-            🖨️ Imprimir / PDF
+            style={{padding:"5px 12px",background:"rgba(0,71,187,.2)",border:"1px solid rgba(0,71,187,.45)",color:"#93c5fd",fontFamily:"'Barlow Condensed',sans-serif",fontSize:10,fontWeight:700,cursor:"pointer",borderRadius:20}}>
+            Imprimir / PDF
           </button>
           <button onClick={onToggle} style={{background:"none",border:"none",color:"#7a90b0",fontSize:20,cursor:"pointer",lineHeight:1}}>×</button>
         </div>
-        {/* Cabeçalho das colunas */}
-        <div style={{display:"flex",alignItems:"center",padding:"8px 12px",borderBottom:"1px solid rgba(255,255,255,.08)",flexShrink:0,background:"rgba(255,255,255,.02)"}}>
-          <span style={{flex:1,fontSize:10,color:"#5a6a84"}}></span>
-          {abasComDados.map((a,i)=>(
-            <span key={a.id} style={{width:90,textAlign:"right",fontSize:10,fontWeight:700,color:cores[i%cores.length],flexShrink:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{a.nome}</span>
-          ))}
-        </div>
-        {/* Conteúdo scrollável */}
-        <div style={{overflowY:"auto",flex:1}}>
-          {/* Preço Final */}
-          <div style={{padding:"10px 12px",borderBottom:"1px solid rgba(255,255,255,.08)",background:"rgba(0,71,187,.06)"}}>
-            <div style={{display:"flex",alignItems:"center"}}>
-              <span style={{flex:1,fontSize:12,fontWeight:700,color:"#93c5fd",textTransform:"uppercase",letterSpacing:.5}}>Preço Final</span>
+
+        {/* VIEW TABELA */}
+        {view==="tabela"&&<>
+          <div style={{display:"flex",alignItems:"center",padding:"8px 12px",borderBottom:"1px solid rgba(255,255,255,.08)",flexShrink:0,background:"rgba(255,255,255,.02)"}}>
+            <span style={{flex:1,fontSize:10,color:"#5a6a84"}}></span>
+            {abasComDados.map((a,i)=>(
+              <span key={a.id} style={{width:90,textAlign:"right",fontSize:10,fontWeight:700,color:cores[i%cores.length],flexShrink:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{a.nome}</span>
+            ))}
+          </div>
+          <div style={{overflowY:"auto",flex:1}}>
+            <div style={{padding:"10px 12px",borderBottom:"1px solid rgba(255,255,255,.08)",background:"rgba(0,71,187,.06)"}}>
+              <div style={{display:"flex",alignItems:"center"}}>
+                <span style={{flex:1,fontSize:12,fontWeight:700,color:"#93c5fd",textTransform:"uppercase",letterSpacing:.5}}>Preço Final</span>
+                {abasComDados.map((a,i)=>(
+                  <span key={a.id} style={{width:90,textAlign:"right",fontFamily:"'DM Mono',monospace",fontSize:13,fontWeight:800,color:cores[i%cores.length],flexShrink:0}}>{brl(calcsMap[a.id].c.pF)}</span>
+                ))}
+              </div>
+            </div>
+            <Linha label="FOB (USD)" fn={({d})=>usd(d.fobUSD)}/>
+            <Linha label="VPL" fn={({c})=>brl(c.vpl)}/>
+            <Linha label="CMV Total" fn={({c})=>brl(c.cmvTotal)} grp/>
+            <Grp id="impvenda" label="Impostos de Venda" fnTotal={({c})=>c.cargaTot}>
+              <Linha label="IPI" fn={({c})=>c.ipi>0?brl(c.ipiV):"—"}/>
+              {abasComDados.some(a=>calcsMap[a.id].c.ipiCreditoV>0)&&<Linha label="Crédito IPI IOS" fn={({c})=>c.ipiCreditoV>0?brl(-c.ipiCreditoV):"—"}/>}
+              <Linha label="P/C Efetivo" fn={({c})=>brl(c.pcV)}/>
+              {abasComDados.some(a=>calcsMap[a.id].c.pcSubvV>0.01)&&<Linha label="P/C Subvenção" fn={({c})=>c.pcSubvV>0.01?brl(c.pcSubvV):"—"}/>}
+              <Linha label="ICMS Efetivo" fn={({c})=>brl(c.icmsEfV)}/>
+              {abasComDados.some(a=>calcsMap[a.id].c.difal>0)&&<Linha label="DIFAL" fn={({c})=>c.difal>0?brl(c.difalV):"—"}/>}
+            </Grp>
+            <Grp id="iger" label="Índices Gerais" fnTotal={({c})=>c.pdV+c.scV+c.ryV+c.frV}>
+              <Linha label="P&D" fn={({c})=>brl(c.pdV)}/>
+              <Linha label="Scrap" fn={({c})=>brl(c.scV)}/>
+              <Linha label="Royalties" fn={({c})=>brl(c.ryV)}/>
+              <Linha label="Frete venda" fn={({c})=>brl(c.frV)}/>
+            </Grp>
+            <Grp id="icom" label="Índices Comerciais" fnTotal={({c})=>c.cfnV+c.cmV+(c.mktV||0)+(c.rebateV||0)}>
+              <Linha label="CF Venda" fn={({c})=>brl(c.cfnV)}/>
+              <Linha label="Comissão+Enc." fn={({c})=>brl(c.cmV)}/>
+              {abasComDados.some(a=>(calcsMap[a.id].d.mkt||0)>0)&&<Linha label="Marketing" fn={({c,d})=>brl(c.mktV||0)}/>}
+              {abasComDados.some(a=>(calcsMap[a.id].d.rebate||0)>0)&&<Linha label="Rebate" fn={({c})=>brl(c.rebateV||0)}/>}
+              {abasComDados.some(a=>(calcsMap[a.id].d.pdd||0)>0)&&<Linha label="PDD" fn={({c,d})=>brl(c.pF*(d.pdd/100))}/>}
+              {abasComDados.some(a=>(calcsMap[a.id].d.vbExtra||0)>0)&&<Linha label="Verba Extra" fn={({c,d})=>brl(c.pF*(d.vbExtra/100))}/>}
+              {abasComDados.some(a=>(calcsMap[a.id].d.vpc||0)>0)&&<Linha label="VPC" fn={({c,d})=>brl(c.pF*(d.vpc/100))}/>}
+            </Grp>
+            <Grp id="res" label="Resultado (MC)" fnTotal={({c})=>c.margV+c.cfxV}>
+              <Linha label="ML (%)" fn={({c})=>pct(c.margPct)}/>
+              <Linha label="ML (R$)" fn={({c})=>brl(c.margV)}/>
+              <Linha label="CF (R$)" fn={({c})=>brl(c.cfxV)}/>
+              <Linha label="MC (%)" fn={({c})=>pct(c.mc)}/>
+              {abasComDados.some(a=>calcsMap[a.id].d.margGer!==0)&&<Linha label="Marg. Gerencial" fn={({c})=>brl(c.margGerV)}/>}
+            </Grp>
+            <Linha label="Markup" fn={({c})=>n3(c.mkp)+"x"} grp/>
+          </div>
+        </>}
+
+        {/* VIEW RELATÓRIO */}
+        {view==="relatorio"&&(
+          <div style={{overflowY:"auto",flex:1,padding:"16px"}}>
+            {/* Data do relatório */}
+            <div style={{fontSize:9,color:"#3a4a60",textAlign:"right",marginBottom:12,fontFamily:"'DM Mono',monospace"}}>
+              Relatório gerado em {new Date().toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"})}
+            </div>
+            {/* Cards lado a lado */}
+            <div style={{display:"flex",flexWrap:"wrap",gap:14,alignItems:"flex-start"}}>
               {abasComDados.map((a,i)=>(
-                <span key={a.id} style={{width:90,textAlign:"right",fontFamily:"'DM Mono',monospace",fontSize:13,fontWeight:800,color:cores[i%cores.length],flexShrink:0}}>{brl(calcsMap[a.id].c.pF)}</span>
+                <CardProduto key={a.id} aba={a} idx={i}/>
               ))}
             </div>
           </div>
-          <Linha label="FOB (USD)" fn={({d})=>usd(d.fobUSD)}/>
-          <Linha label="VPL" fn={({c})=>brl(c.vpl)}/>
-          <Linha label="CMV Total" fn={({c})=>brl(c.cmvTotal)} grp/>
-          <Grp id="impvenda" label="Impostos de Venda" fnTotal={({c})=>c.cargaTot}>
-            <Linha label="IPI" fn={({c})=>c.ipi>0?brl(c.ipiV):"—"}/>
-            {abasComDados.some(a=>calcsMap[a.id].c.ipiCreditoV>0)&&<Linha label="Crédito IPI IOS" fn={({c})=>c.ipiCreditoV>0?brl(-c.ipiCreditoV):"—"}/>}
-            <Linha label="P/C Efetivo" fn={({c})=>brl(c.pcV)}/>
-            {abasComDados.some(a=>calcsMap[a.id].c.pcSubvV>0.01)&&<Linha label="P/C Subvenção" fn={({c})=>c.pcSubvV>0.01?brl(c.pcSubvV):"—"}/>}
-            <Linha label="ICMS Efetivo" fn={({c})=>brl(c.icmsEfV)}/>
-            {abasComDados.some(a=>calcsMap[a.id].c.difal>0)&&<Linha label="DIFAL" fn={({c})=>c.difal>0?brl(c.difalV):"—"}/>}
-          </Grp>
-          <Grp id="iger" label="Índices Gerais" fnTotal={({c})=>c.pdV+c.scV+c.ryV+c.frV}>
-            <Linha label="P&D" fn={({c})=>brl(c.pdV)}/>
-            <Linha label="Scrap" fn={({c})=>brl(c.scV)}/>
-            <Linha label="Royalties" fn={({c})=>brl(c.ryV)}/>
-            <Linha label="Frete venda" fn={({c})=>brl(c.frV)}/>
-          </Grp>
-          <Grp id="icom" label="Índices Comerciais" fnTotal={({c})=>c.cfnV+c.cmV+(c.mktV||0)+(c.rebateV||0)}>
-            <Linha label="CF Venda" fn={({c})=>brl(c.cfnV)}/>
-            <Linha label="Comissão+Enc." fn={({c})=>brl(c.cmV)}/>
-            {abasComDados.some(a=>(calcsMap[a.id].d.mkt||0)>0)&&<Linha label="Marketing" fn={({c,d})=>brl(c.mktV||0)}/>}
-            {abasComDados.some(a=>(calcsMap[a.id].d.rebate||0)>0)&&<Linha label="Rebate" fn={({c})=>brl(c.rebateV||0)}/>}
-            {abasComDados.some(a=>(calcsMap[a.id].d.pdd||0)>0)&&<Linha label="PDD" fn={({c,d})=>brl(c.pF*(d.pdd/100))}/>}
-            {abasComDados.some(a=>(calcsMap[a.id].d.vbExtra||0)>0)&&<Linha label="Verba Extra" fn={({c,d})=>brl(c.pF*(d.vbExtra/100))}/>}
-            {abasComDados.some(a=>(calcsMap[a.id].d.vpc||0)>0)&&<Linha label="VPC" fn={({c,d})=>brl(c.pF*(d.vpc/100))}/>}
-          </Grp>
-          <Grp id="res" label="Resultado (MC)" fnTotal={({c})=>c.margV+c.cfxV}>
-            <Linha label="ML (%)" fn={({c})=>pct(c.margPct)}/>
-            <Linha label="ML (R$)" fn={({c})=>brl(c.margV)}/>
-            <Linha label="CF (R$)" fn={({c})=>brl(c.cfxV)}/>
-            <Linha label="MC (%)" fn={({c})=>pct(c.mc)}/>
-            {abasComDados.some(a=>calcsMap[a.id].d.margGer!==0)&&<Linha label="Marg. Gerencial" fn={({c})=>brl(c.margGerV)}/>}
-          </Grp>
-          <Linha label="Markup" fn={({c})=>n3(c.mkp)+"x"} grp/>
-        </div>
+        )}
       </div>
     </div>
   );
@@ -3439,7 +3592,7 @@ function MultiTab({ user }) {
         <div key={aba.id} style={{ display: idx === abaAtiva ? "flex" : "none", flex: 1, overflow: "hidden" }}>
           <Calculadora user={user} isAdmin={false} nomeAba={aba.nome}
             onRenomear={nome => setAbas(p => p.map((a, i) => i === idx ? { ...a, nome } : a))}
-            onCalcsChange={(c, d) => setCalcsMap(prev => ({...prev, [aba.id]: {c, d}}))}/>
+            onCalcsChange={(c, d, prodNome) => setCalcsMap(prev => ({...prev, [aba.id]: {c, d, prodNome}}))}/>
         </div>
       ))}
 
