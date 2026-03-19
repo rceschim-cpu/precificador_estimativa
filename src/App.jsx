@@ -1481,27 +1481,59 @@ function ModalCFVenda({onClose,onApply,data,setData}){
 
 function ModalRegistros({onClose, onLoad, currentD, currentCalcs, prodNome}){
   const [registros, setRegistros] = useState(loadRegistros);
-  const [pastas, setPastas] = useState(loadPastas);
-  const [nome, setNome] = useState("");
-  const [pastaAtual, setPastaAtual] = useState(null); // null = raiz
-  const [view, setView] = useState("lista"); // "lista" | "nova-pasta" | "mover"
+  const [pastas, setPastas]       = useState(loadPastas);
+  const [nome, setNome]           = useState(prodNome||"");
+  const [pastaAtual, setPastaAtual] = useState(null); // id da pasta aberta (null = raiz)
+  const [view, setView]           = useState("lista"); // "lista" | "nova-pasta" | "mover"
   const [nomePasta, setNomePasta] = useState("");
+  const [pastaPaiCriacao, setPastaPaiCriacao] = useState(null); // pai da nova subpasta
   const [registroMover, setRegistroMover] = useState(null);
-  const [confirmDel, setConfirmDel] = useState(null);
+  const [confirmDel, setConfirmDel]         = useState(null);
   const [confirmDelPasta, setConfirmDelPasta] = useState(null);
-  const [editNome, setEditNome] = useState(null); // id do registro em edição
-  const [editVal, setEditVal] = useState("");
+  const [editNome, setEditNome]   = useState(null);
+  const [editVal, setEditVal]     = useState("");
+  const [sobrescrever, setSobrescrever] = useState(null); // id do registro a sobrescrever
 
   const persist = (regs, pas) => {
     saveRegistros(regs); setRegistros(regs);
-    if(pas!==undefined){savePastas(pas); setPastas(pas);}
+    if(pas!==undefined){ savePastas(pas); setPastas(pas); }
   };
 
+  // Breadcrumb: caminho da pasta atual
+  const breadcrumb = (pastaId) => {
+    const path = [];
+    let cur = pastaId;
+    const visited = new Set();
+    while(cur !== null && cur !== undefined){
+      if(visited.has(cur)) break;
+      visited.add(cur);
+      const p = pastas.find(x=>x.id===cur);
+      if(!p) break;
+      path.unshift(p);
+      cur = p.pai ?? null;
+    }
+    return path;
+  };
+  const caminho = breadcrumb(pastaAtual);
+
+  // Subpastas da pasta atual
+  const subpastasAtuais = pastas.filter(p=>(p.pai??null)===pastaAtual);
+  const regsNaPasta     = registros.filter(r=>(r.pastaId??null)===pastaAtual);
+
   const handleSave = () => {
-    const label = nome.trim() || prodNome;
-    const novo = { id: Date.now(), nome: label, pastaId: pastaAtual,
-      data: new Date().toLocaleString("pt-BR"), d: currentD, calcs: currentCalcs };
-    persist([novo, ...registros]);
+    const label = nome.trim() || prodNome || "Sem nome";
+    if(sobrescrever){
+      // Sobrescrever registro existente
+      const regs = registros.map(r=>r.id===sobrescrever
+        ? {...r, nome:label, data:new Date().toLocaleString("pt-BR"), d:currentD, calcs:currentCalcs}
+        : r);
+      persist(regs);
+      setSobrescrever(null);
+    } else {
+      const novo = {id:Date.now(), nome:label, pastaId:pastaAtual,
+        data:new Date().toLocaleString("pt-BR"), d:currentD, calcs:currentCalcs};
+      persist([novo, ...registros]);
+    }
     setNome("");
   };
 
@@ -1511,19 +1543,22 @@ function ModalRegistros({onClose, onLoad, currentD, currentCalcs, prodNome}){
   };
 
   const handleDeletePasta = (id) => {
-    // Move registros da pasta para raiz
+    // Move registros e subpastas para raiz
     const regs = registros.map(r=>r.pastaId===id?{...r,pastaId:null}:r);
-    persist(regs, pastas.filter(p=>p.id!==id));
+    const novaPastas = pastas
+      .filter(p=>p.id!==id)
+      .map(p=>p.pai===id?{...p,pai:null}:p);
+    persist(regs, novaPastas);
     setConfirmDelPasta(null);
     if(pastaAtual===id) setPastaAtual(null);
   };
 
   const handleCriarPasta = () => {
     if(!nomePasta.trim()) return;
-    const nova = {id: Date.now(), nome: nomePasta.trim()};
+    const nova = {id:Date.now(), nome:nomePasta.trim(), pai:pastaPaiCriacao??pastaAtual??null};
     const updated = [...pastas, nova];
     savePastas(updated); setPastas(updated);
-    setNomePasta(""); setView("lista");
+    setNomePasta(""); setView("lista"); setPastaPaiCriacao(null);
   };
 
   const handleMover = (pastaDestino) => {
@@ -1538,23 +1573,21 @@ function ModalRegistros({onClose, onLoad, currentD, currentCalcs, prodNome}){
     setEditNome(null);
   };
 
-  const regsNaPasta = registros.filter(r=>(r.pastaId??null)===(pastaAtual));
-  const pastasLista = pastas;
-
   const btnStyle = (active) => ({
-    padding:"4px 12px",fontSize:10,fontWeight:700,cursor:"pointer",borderRadius:20,border:"1px solid",
+    padding:"4px 10px", fontSize:10, fontWeight:700, cursor:"pointer", borderRadius:20,
+    border:"1px solid", flexShrink:0,
     background:active?"rgba(0,71,187,.25)":"rgba(255,255,255,.04)",
     borderColor:active?"#0047BB":"rgba(255,255,255,.12)",
     color:active?"#93c5fd":"#7a90b0"
   });
 
-  // Tela de mover registro
+  // ── Tela de mover ──────────────────────────────────────────────────────────
   if(view==="mover") return(
     <div className="ov">
       <div className="mb" style={{maxWidth:420}} onClick={e=>e.stopPropagation()}>
         <div className="mh">
           <span className="mt">Mover para pasta</span>
-          <button className="mc" onClick={()=>setView("lista")}>×</button>
+          <button className="mc_btn" onClick={()=>setView("lista")}>×</button>
         </div>
         <div className="mbody">
           <div style={{fontSize:11,color:"#7a90b0",marginBottom:12}}>
@@ -1563,13 +1596,15 @@ function ModalRegistros({onClose, onLoad, currentD, currentCalcs, prodNome}){
           <div style={{display:"flex",flexDirection:"column",gap:6}}>
             <div onClick={()=>handleMover(null)}
               style={{padding:"10px 14px",background:"#2a3550",border:"1px solid rgba(255,255,255,.1)",borderRadius:4,cursor:"pointer",fontSize:12,color:"#dce7f7",display:"flex",alignItems:"center",gap:8}}>
-              <span style={{fontSize:14}}>🏠</span> Raiz (sem pasta)
+              <span>🏠</span> Raiz (sem pasta)
             </div>
-            {pastasLista.map(p=>(
+            {pastas.map(p=>(
               <div key={p.id} onClick={()=>handleMover(p.id)}
-                style={{padding:"10px 14px",background:"#2a3550",border:"1px solid rgba(255,255,255,.1)",borderRadius:4,cursor:"pointer",fontSize:12,color:"#dce7f7",display:"flex",alignItems:"center",gap:8}}>
-                <span style={{fontSize:14}}>📁</span> {p.nome}
-                <span style={{fontSize:10,color:"#5a6a84",marginLeft:"auto"}}>{registros.filter(r=>r.pastaId===p.id).length} registros</span>
+                style={{padding:"10px 14px",background:"#2a3550",border:"1px solid rgba(255,255,255,.1)",borderRadius:4,cursor:"pointer",fontSize:12,color:"#dce7f7",display:"flex",alignItems:"center",gap:8,
+                  paddingLeft: p.pai ? 28 : 14}}>
+                <span>{p.pai?"└ 📂":"📁"}</span>
+                {p.pai ? (pastas.find(x=>x.id===p.pai)?.nome||"") + " / " : ""}{p.nome}
+                <span style={{fontSize:10,color:"#5a6a84",marginLeft:"auto"}}>{registros.filter(r=>r.pastaId===p.id).length} reg.</span>
               </div>
             ))}
           </div>
@@ -1578,74 +1613,108 @@ function ModalRegistros({onClose, onLoad, currentD, currentCalcs, prodNome}){
     </div>
   );
 
+  // ── Tela principal ─────────────────────────────────────────────────────────
   return (
     <div className="ov">
-      <div className="mb" style={{maxWidth:560}} onClick={e=>e.stopPropagation()}>
+      <div className="mb" style={{maxWidth:580}} onClick={e=>e.stopPropagation()}>
         <div className="mh">
-          <span className="mt">Registros</span>
-          <button className="mc" onClick={onClose}>×</button>
+          <span className="mt">📋 Registros</span>
+          <button className="mc_btn" onClick={onClose}>×</button>
         </div>
         <div className="mbody">
 
-          {/* Salvar atual */}
+          {/* ── Salvar ── */}
           <div style={{background:"rgba(0,71,187,.08)",border:"1px solid rgba(0,71,187,.25)",padding:"10px 14px",borderRadius:4,marginBottom:12}}>
-            <div style={{fontSize:10,fontWeight:700,color:"#93c5fd",marginBottom:6,letterSpacing:.5,textTransform:"uppercase"}}>
-              Salvar em: {pastaAtual ? (pastasLista.find(p=>p.id===pastaAtual)?.nome||"?") : "Raiz"}
+            <div style={{fontSize:10,fontWeight:700,color:"#93c5fd",marginBottom:8,letterSpacing:.5,textTransform:"uppercase"}}>
+              Salvar em: {caminho.length>0 ? caminho.map(p=>p.nome).join(" / ") : "Raiz"}
             </div>
-            <div style={{display:"flex",gap:8}}>
+            <div style={{display:"flex",gap:8,marginBottom:6}}>
               <div className="fw" style={{flex:1}}>
-                <input type="text" placeholder={prodNome} value={nome} onChange={e=>setNome(e.target.value)}
+                <input type="text" placeholder={prodNome||"Nome do registro"} value={nome}
+                  onChange={e=>setNome(e.target.value)}
                   onKeyDown={e=>e.key==="Enter"&&handleSave()}
                   style={{background:"none",border:"none",outline:"none",fontFamily:"'IBM Plex Sans',sans-serif",fontSize:12,color:"#dce7f7",padding:"7px 10px",width:"100%"}}/>
               </div>
-              <button className="mapp" style={{padding:"7px 18px",borderRadius:4,fontSize:12}} onClick={handleSave}>
-                💾 Salvar
+              <button className="mapp" style={{padding:"7px 16px",borderRadius:4,fontSize:12,flexShrink:0}} onClick={handleSave}>
+                {sobrescrever ? "↺ Sobrescrever" : "💾 Salvar novo"}
               </button>
+            </div>
+            {/* Sobrescrever dropdown */}
+            <div style={{display:"flex",alignItems:"center",gap:8}}>
+              <span style={{fontSize:10,color:"#5a6a84",flexShrink:0}}>Ou sobrescrever:</span>
+              <select value={sobrescrever||""}
+                onChange={e=>setSobrescrever(e.target.value ? +e.target.value : null)}
+                style={{flex:1,background:"#1a2030",border:"1px solid rgba(255,255,255,.12)",color:sobrescrever?"#fbbf24":"#7a90b0",padding:"4px 8px",fontSize:11,borderRadius:3,outline:"none"}}>
+                <option value="">— selecionar registro —</option>
+                {registros.map(r=>(
+                  <option key={r.id} value={r.id}>{r.nome} ({r.data})</option>
+                ))}
+              </select>
+              {sobrescrever&&<button onClick={()=>setSobrescrever(null)}
+                style={{padding:"3px 8px",background:"none",border:"1px solid rgba(255,255,255,.1)",color:"#7a90b0",fontSize:10,cursor:"pointer",borderRadius:3}}>✕</button>}
             </div>
           </div>
 
-          {/* Navegação de pastas */}
-          <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:10,flexWrap:"wrap"}}>
-            <button style={btnStyle(pastaAtual===null)} onClick={()=>setPastaAtual(null)}>🏠 Raiz</button>
-            {pastasLista.map(p=>(
-              <button key={p.id} style={btnStyle(pastaAtual===p.id)} onClick={()=>setPastaAtual(p.id)}>
+          {/* ── Navegação de pastas com breadcrumb ── */}
+          <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8,flexWrap:"wrap"}}>
+            {/* Breadcrumb */}
+            <button style={btnStyle(pastaAtual===null)} onClick={()=>setPastaAtual(null)}>🏠</button>
+            {caminho.map((p,i)=>(
+              <span key={p.id} style={{display:"flex",alignItems:"center",gap:4}}>
+                <span style={{color:"#3d5070",fontSize:10}}>/</span>
+                <button style={btnStyle(i===caminho.length-1)} onClick={()=>setPastaAtual(p.id)}>
+                  📂 {p.nome}
+                </button>
+              </span>
+            ))}
+
+            {/* Subpastas da pasta atual */}
+            {subpastasAtuais.map(p=>(
+              <button key={p.id} style={btnStyle(false)} onClick={()=>setPastaAtual(p.id)}>
                 📁 {p.nome}
-                <span style={{fontSize:9,marginLeft:4,opacity:.7}}>{registros.filter(r=>r.pastaId===p.id).length}</span>
+                <span style={{fontSize:9,marginLeft:3,opacity:.6}}>{registros.filter(r=>r.pastaId===p.id).length}</span>
               </button>
             ))}
+
+            {/* Nova pasta / subpasta */}
             {view==="nova-pasta"
               ? <div style={{display:"flex",gap:4,alignItems:"center"}}>
                   <input autoFocus type="text" placeholder="Nome da pasta" value={nomePasta}
                     onChange={e=>setNomePasta(e.target.value)}
-                    onKeyDown={e=>{if(e.key==="Enter")handleCriarPasta();if(e.key==="Escape")setView("lista");}}
-                    style={{background:"rgba(255,255,255,.06)",border:"1px solid rgba(255,255,255,.15)",color:"#dce7f7",padding:"4px 8px",fontSize:11,borderRadius:4,outline:"none",width:120}}/>
-                  <button onClick={handleCriarPasta} style={{...btnStyle(true),padding:"4px 8px"}}>✓</button>
-                  <button onClick={()=>setView("lista")} style={{...btnStyle(false),padding:"4px 8px"}}>✕</button>
+                    onKeyDown={e=>{if(e.key==="Enter")handleCriarPasta();if(e.key==="Escape"){setView("lista");setNomePasta("");}}}
+                    style={{background:"rgba(255,255,255,.06)",border:"1px solid rgba(255,255,255,.15)",color:"#dce7f7",padding:"4px 8px",fontSize:11,borderRadius:4,outline:"none",width:110}}/>
+                  <button onClick={handleCriarPasta} style={{...btnStyle(true),padding:"3px 8px"}}>✓</button>
+                  <button onClick={()=>{setView("lista");setNomePasta("");}} style={{...btnStyle(false),padding:"3px 8px"}}>✕</button>
                 </div>
-              : <button style={{...btnStyle(false),borderStyle:"dashed"}} onClick={()=>setView("nova-pasta")}>+ Nova pasta</button>
+              : <button style={{...btnStyle(false),borderStyle:"dashed"}}
+                  onClick={()=>{setPastaPaiCriacao(pastaAtual);setView("nova-pasta");}}>
+                  + {pastaAtual ? "Subpasta" : "Pasta"}
+                </button>
             }
+
+            {/* Excluir pasta atual */}
             {pastaAtual!==null&&(
               confirmDelPasta===pastaAtual
                 ? <div style={{display:"flex",gap:4,alignItems:"center",marginLeft:"auto"}}>
-                    <span style={{fontSize:10,color:"#f87171"}}>Excluir pasta?</span>
+                    <span style={{fontSize:10,color:"#f87171"}}>Excluir?</span>
                     <button onClick={()=>handleDeletePasta(pastaAtual)} style={{padding:"3px 8px",background:"#dc2626",border:"none",color:"#fff",fontSize:10,cursor:"pointer",borderRadius:3}}>Sim</button>
                     <button onClick={()=>setConfirmDelPasta(null)} style={{padding:"3px 8px",background:"transparent",border:"1px solid rgba(255,255,255,.15)",color:"#94a3b8",fontSize:10,cursor:"pointer",borderRadius:3}}>Não</button>
                   </div>
                 : <button onClick={()=>setConfirmDelPasta(pastaAtual)}
                     style={{marginLeft:"auto",padding:"3px 8px",background:"rgba(220,38,38,.1)",border:"1px solid rgba(220,38,38,.25)",color:"#f87171",fontSize:10,cursor:"pointer",borderRadius:3}}>
-                    🗑 Excluir pasta
+                    🗑
                   </button>
             )}
           </div>
 
-          {/* Lista de registros */}
-          {regsNaPasta.length===0
+          {/* ── Lista de registros ── */}
+          {regsNaPasta.length===0&&subpastasAtuais.length===0
             ? <div style={{textAlign:"center",padding:"24px 0",fontFamily:"'DM Mono',monospace",fontSize:11,color:"#5a6a84"}}>
-                {pastaAtual ? "Nenhum registro nesta pasta." : "Nenhum registro salvo ainda."}
+                {pastaAtual ? "Pasta vazia." : "Nenhum registro salvo ainda."}
               </div>
-            : <div style={{display:"flex",flexDirection:"column",gap:4,maxHeight:360,overflowY:"auto"}}>
+            : <div style={{display:"flex",flexDirection:"column",gap:4,maxHeight:340,overflowY:"auto"}}>
                 {regsNaPasta.map(r=>(
-                  <div key={r.id} style={{padding:"10px 12px",background:"#2a3550",border:"1px solid rgba(255,255,255,.08)",borderRadius:4}}>
+                  <div key={r.id} style={{padding:"9px 12px",background:"#2a3550",border:"1px solid rgba(255,255,255,.08)",borderRadius:4}}>
                     <div style={{display:"flex",alignItems:"center",gap:8}}>
                       {editNome===r.id
                         ? <input autoFocus value={editVal} onChange={e=>setEditVal(e.target.value)}
@@ -1654,7 +1723,7 @@ function ModalRegistros({onClose, onLoad, currentD, currentCalcs, prodNome}){
                         : <div style={{flex:1,minWidth:0}}>
                             <div style={{fontSize:13,fontWeight:700,color:"#dce7f7",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{r.nome}</div>
                             <div style={{fontSize:10,fontFamily:"'DM Mono',monospace",color:"#5a6a84",marginTop:2}}>
-                              {r.data} · {r.d?.origem||""} → {r.d?.ufDestino||""} · ML {r.d?.margem||0}%
+                              {r.data} · {r.d?.ufDestino||""} · ML {r.d?.margem||0}%
                             </div>
                           </div>
                       }
@@ -1664,25 +1733,17 @@ function ModalRegistros({onClose, onLoad, currentD, currentCalcs, prodNome}){
                             <button onClick={()=>handleDelete(r.id)} style={{padding:"4px 8px",background:"#dc2626",border:"none",color:"#fff",fontSize:11,fontWeight:700,cursor:"pointer",borderRadius:3}}>Sim</button>
                             <button onClick={()=>setConfirmDel(null)} style={{padding:"4px 8px",background:"transparent",border:"1px solid rgba(255,255,255,.15)",color:"#94a3b8",fontSize:11,cursor:"pointer",borderRadius:3}}>Não</button>
                           </div>
-                        : <div style={{display:"flex",gap:4,flexShrink:0}}>
+                        : <div style={{display:"flex",gap:3,flexShrink:0}}>
                             <button onClick={()=>{onLoad(r.d,r.calcs,r.nome);onClose();}}
-                              style={{padding:"5px 12px",background:"#0047BB",border:"none",color:"#fff",fontSize:11,fontWeight:700,cursor:"pointer",borderRadius:3}}>
-                              ↩ Carregar
-                            </button>
+                              style={{padding:"5px 11px",background:"#0047BB",border:"none",color:"#fff",fontSize:11,fontWeight:700,cursor:"pointer",borderRadius:3}}>↩ Carregar</button>
                             <button onClick={()=>{setEditNome(r.id);setEditVal(r.nome);}}
                               title="Renomear"
-                              style={{padding:"5px 8px",background:"rgba(255,255,255,.05)",border:"1px solid rgba(255,255,255,.12)",color:"#a8b5cc",fontSize:11,cursor:"pointer",borderRadius:3}}>
-                              ✎
-                            </button>
+                              style={{padding:"5px 8px",background:"rgba(255,255,255,.05)",border:"1px solid rgba(255,255,255,.12)",color:"#a8b5cc",fontSize:11,cursor:"pointer",borderRadius:3}}>✎</button>
                             <button onClick={()=>{setRegistroMover(r.id);setView("mover");}}
-                              title="Mover para pasta"
-                              style={{padding:"5px 8px",background:"rgba(255,255,255,.05)",border:"1px solid rgba(255,255,255,.12)",color:"#a8b5cc",fontSize:11,cursor:"pointer",borderRadius:3}}>
-                              📁
-                            </button>
+                              title="Mover"
+                              style={{padding:"5px 8px",background:"rgba(255,255,255,.05)",border:"1px solid rgba(255,255,255,.12)",color:"#a8b5cc",fontSize:11,cursor:"pointer",borderRadius:3}}>📁</button>
                             <button onClick={()=>setConfirmDel(r.id)}
-                              style={{padding:"5px 8px",background:"rgba(220,38,38,.1)",border:"1px solid rgba(220,38,38,.25)",color:"#f87171",fontSize:11,cursor:"pointer",borderRadius:3}}>
-                              ✕
-                            </button>
+                              style={{padding:"5px 8px",background:"rgba(220,38,38,.1)",border:"1px solid rgba(220,38,38,.25)",color:"#f87171",fontSize:11,cursor:"pointer",borderRadius:3}}>✕</button>
                           </div>
                       }
                     </div>
@@ -1696,7 +1757,6 @@ function ModalRegistros({onClose, onLoad, currentD, currentCalcs, prodNome}){
   );
 }
 
-// ── Breakdown Panel ───────────────────────────────────────────────────────────
 function BreakdownPanel({c,d,prod,ppbTot,calcs}){
   const [open,setOpen]=useState({imp:false,ppb:false,local:false,impvenda:false,iger:false,icom:false,res:false});
   const tog=k=>setOpen(p=>({...p,[k]:!p[k]}));
@@ -2164,6 +2224,7 @@ input::-webkit-inner-spin-button,input::-webkit-outer-spin-button{-webkit-appear
 .mh{padding:13px 17px;background:#2a3550;border-bottom:1px solid rgba(0,71,187,.3);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:1;border-radius:8px 8px 0 0}
 .mt{font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:#f0f4ff}
 .mc{background:none;border:none;color:#7a90b0;font-size:18px;cursor:pointer;padding:2px 6px;line-height:1}
+.mc_btn{background:none;border:none;color:#7a90b0;font-size:18px;cursor:pointer;padding:2px 6px;line-height:1}
 .mc:hover{color:#dce7f7}
 .mbody{padding:15px;display:flex;flex-direction:column;gap:10px}
 .pbase{display:flex;justify-content:space-between;align-items:center;padding:7px 11px;background:#1a2030;border:1px solid rgba(255,255,255,.08);font-family:'DM Mono',monospace;font-size:11px;color:#7a90b0;border-radius:4px}
@@ -2399,9 +2460,9 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
     const cargaTot=pcV+ipiV+icmsEfV+difalV+stV+fcpV;
     const cargaPct=pF>0?(cargaTot/pF)*100:0;
     const margPct=pF>0?(margV/pF)*100:0;
-    // MC: toggle OFF → sem MG
-    //     toggle ON  → MG negativa reduz MC (é um crédito/benefício)
-    const mc=pF>0?((margV+cfxV-(d.margGerAtivo?margGerV:0))/pF)*100:0;
+    // MC: toggle OFF → MG não entra na MC (abaixo da linha)
+    //     toggle ON  → MG entra na MC junto com ML e CF
+    const mc=pF>0?((margV+cfxV+(d.margGerAtivo?margGerV:0))/pF)*100:0;
     const mkp=cmvTotal>0?pF/cmvTotal:0;
     let margemAlvo=null;
     if(d.precoAlvo>0){
@@ -2440,7 +2501,7 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
     const cargaTotf=pcVf+ipiVf+icmsEfVf+difalVf+(stV||0)+fcpVf;
     const cargaPctf=pFbase>0?(cargaTotf/pFbase)*100:0;
     const margPctf=margPctEf;  // já é o valor correto para ambos os modos
-    const mcf=pFbase>0?((margVf+cfxVf)/pFbase)*100:0;  // MC = ML + CF sobre pFbase
+    const mcf=pFbase>0?((margVf+cfxVf+(d.margGerAtivo?margGerVf:0))/pFbase)*100:0;
     const mkpf=cmvTotal>0?pFbase/cmvTotal:0;
     const pUSDf=(d.ptaxPreco||d.ptax)>0?pFbase/(d.ptaxPreco||d.ptax):0;
     return{cfrUSD,cfrBRL,iiV:iiV,iiUSD,vpl,bkpV,bkpBase,cfrImp,cmvImp,cmvTotal,ppbTot,despesas,
