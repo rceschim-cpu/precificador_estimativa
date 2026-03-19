@@ -1152,8 +1152,11 @@ const CALC_DEF={
 
 // ── Storage de Registros ──────────────────────────────────────────────────────
 const STORAGE_KEY = "positec_calc_registros";
+const STORAGE_PASTAS = "positec_calc_pastas";
 const loadRegistros = () => { try { return JSON.parse(localStorage.getItem(STORAGE_KEY)||"[]"); } catch { return []; } };
 const saveRegistros = (list) => localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+const loadPastas = () => { try { return JSON.parse(localStorage.getItem(STORAGE_PASTAS)||"[]"); } catch { return []; } };
+const savePastas = (list) => localStorage.setItem(STORAGE_PASTAS, JSON.stringify(list));
 
 // ── NInput ────────────────────────────────────────────────────────────────────
 function NInput({value,onChange,readOnly,width=80}){
@@ -2477,7 +2480,26 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
       onClose={()=>setModal(null)}
       currentD={d} currentCalcs={calcs}
       prodNome={nomeAba||prod.nome}
-      onLoad={(savedD, savedCalcs, nome)=>{setD(p=>({...DEF,...savedD}));setCalcs(c=>({...CALC_DEF,...savedCalcs}));if(onRenomear&&nome)onRenomear(nome);}}/>}
+      onLoad={(savedD, savedCalcs, nome)=>{
+        const safeD={
+          ...DEF,
+          ...savedD,
+          // campos aninhados: merge explícito para não perder sub-campos
+          ppbAtivos:{...DEF.ppbAtivos,...(savedD?.ppbAtivos||{})},
+          ppbVals:{...DEF.ppbVals,...(savedD?.ppbVals||{})},
+          // campos que o DEF novo tem mas saves antigos podem não ter
+          origem:savedD?.origem||savedD?.planta||DEF.origem,
+          modalidade:savedD?.modalidade||DEF.modalidade,
+          moedaCusto:savedD?.moedaCusto||DEF.moedaCusto,
+          margGer:savedD?.margGer??DEF.margGer,
+          margGerAtivo:savedD?.margGerAtivo??DEF.margGerAtivo,
+          modoCalc:savedD?.modoCalc||DEF.modoCalc,
+        };
+        const safeCalcs={...CALC_DEF,...(savedCalcs||{})};
+        setD(safeD);
+        setCalcs(safeCalcs);
+        if(onRenomear&&nome)onRenomear(nome);
+      }}/>}
     {modal==="gestao"&&<ModalGestaoUsers onClose={()=>setModal(null)} currentUser={currentUser}/> }
 
     <div className="app">
