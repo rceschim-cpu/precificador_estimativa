@@ -3375,33 +3375,39 @@ function PainelComparativo({abas, calcsMap, open, onToggle}){
           {(d.vbExtra||0)>0&&<CardLinha label="Verba Extra" valor={brl(c.pF*(d.vbExtra/100))}/>}
           {(d.vpc||0)>0&&<CardLinha label="VPC" valor={brl(c.pF*(d.vpc/100))}/>}
 
-          {/* Resultado — em destaque total */}
-          <CardSecao titulo="Resultado"/>
-          <div style={{background:"rgba(255,255,255,.03)",border:"1px solid rgba(255,255,255,.06)",borderRadius:6,padding:"10px 12px",marginTop:4,display:"flex",flexDirection:"column",gap:6}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-              <span style={{fontSize:10,color:"#7a90b0",fontWeight:600}}>ML</span>
-              <div style={{display:"flex",gap:10,alignItems:"center"}}>
-                <span style={{fontFamily:"'DM Mono',monospace",fontSize:14,fontWeight:800,color:corML}}>{pct(mlPct)}</span>
-                <span style={{fontFamily:"'DM Mono',monospace",fontSize:12,fontWeight:600,color:corML,opacity:.85}}>{brl(c.margV)}</span>
+          {/* Resultado — painel de margem em destaque */}
+          <div style={{marginTop:14,borderRadius:8,overflow:"hidden",border:`1px solid ${corBorder}`}}>
+            {/* ML — bloco principal */}
+            <div style={{background:`linear-gradient(135deg, ${corML}18 0%, ${corML}08 100%)`,borderBottom:`1px solid ${corML}30`,padding:"14px 14px 12px"}}>
+              <div style={{fontSize:9,fontWeight:700,color:"#5a6a84",textTransform:"uppercase",letterSpacing:1,marginBottom:8}}>Margem Líquida</div>
+              <div style={{display:"flex",alignItems:"flex-end",justifyContent:"space-between",gap:8}}>
+                <span style={{fontFamily:"'DM Mono',monospace",fontSize:36,fontWeight:800,color:corML,lineHeight:1}}>{pct(mlPct)}</span>
+                <span style={{fontFamily:"'DM Mono',monospace",fontSize:15,fontWeight:700,color:corML,opacity:.8,paddingBottom:4}}>{brl(c.margV)}</span>
               </div>
             </div>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-              <span style={{fontSize:10,color:"#7a90b0",fontWeight:600}}>MC</span>
-              <div style={{display:"flex",gap:10,alignItems:"center"}}>
-                <span style={{fontFamily:"'DM Mono',monospace",fontSize:14,fontWeight:800,color:corMC}}>{pct(mcPct)}</span>
-                <span style={{fontFamily:"'DM Mono',monospace",fontSize:12,fontWeight:600,color:corMC,opacity:.85}}>{brl(c.cfxV)}</span>
+            {/* MC — bloco secundário */}
+            <div style={{background:`linear-gradient(135deg, ${corMC}12 0%, ${corMC}05 100%)`,borderBottom:calcsMap[aba.id].d.margGer!==0?`1px solid rgba(255,255,255,.05)`:"none",padding:"10px 14px"}}>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                <div>
+                  <div style={{fontSize:9,fontWeight:700,color:"#5a6a84",textTransform:"uppercase",letterSpacing:1,marginBottom:4}}>Margem de Contribuição</div>
+                  <div style={{display:"flex",alignItems:"baseline",gap:8}}>
+                    <span style={{fontFamily:"'DM Mono',monospace",fontSize:22,fontWeight:800,color:corMC,lineHeight:1}}>{pct(mcPct)}</span>
+                    <span style={{fontFamily:"'DM Mono',monospace",fontSize:12,fontWeight:600,color:corMC,opacity:.75}}>{brl(c.cfxV)}</span>
+                  </div>
+                </div>
+                <div style={{textAlign:"right"}}>
+                  <div style={{fontSize:9,color:"#3a4a60",marginBottom:3}}>Markup</div>
+                  <div style={{fontFamily:"'DM Mono',monospace",fontSize:13,fontWeight:700,color:"#5a6a84"}}>{n3(c.mkp)}x</div>
+                </div>
               </div>
             </div>
+            {/* Margem Gerencial (condicional) */}
             {calcsMap[aba.id].d.margGer!==0&&(
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                <span style={{fontSize:10,color:"#7a90b0",fontWeight:600}}>Mg. Gerencial</span>
+              <div style={{background:"rgba(255,255,255,.02)",padding:"8px 14px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <span style={{fontSize:9,fontWeight:700,color:"#5a6a84",textTransform:"uppercase",letterSpacing:1}}>Mg. Gerencial</span>
                 <span style={{fontFamily:"'DM Mono',monospace",fontSize:12,fontWeight:600,color:"#a8b5cc"}}>{brl(c.margGerV)}</span>
               </div>
             )}
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",borderTop:"1px solid rgba(255,255,255,.06)",paddingTop:6,marginTop:2}}>
-              <span style={{fontSize:10,color:"#5a6a84"}}>Markup</span>
-              <span style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:"#7a90b0"}}>{n3(c.mkp)}x</span>
-            </div>
           </div>
         </div>
       </div>
