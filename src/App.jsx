@@ -2436,7 +2436,11 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
     // MG é um índice independente — entra no soma como os outros índices
     // Valor negativo = crédito = eleva o preço (denominador menor)
     const margGerPct=(d.margGer||0);
-    const soma=(pcEf+pcSubvPct+icmsEfPct+difal+ftiPct+fcpPct+indPct+margGerPct+d.margem-ipiCreditoIOSPct)/100;
+    // Para IOS com IPI > 0: todos os índices foram calculados como % do pF (Sell In com IPI).
+    // O soma trabalha em % do pSI, então multiplica por (1+IPI%) para converter.
+    // Para MAO/CWB (IPI=0): ipiF=1, sem alteração.
+    const ipiF = d.origem==="IOS" && ipi>0 ? (1+ipi/100) : 1;
+    const soma=ipiF*(pcEf+pcSubvPct+icmsEfPct+difal+ftiPct+fcpPct+indPct+margGerPct+d.margem-ipiCreditoIOSPct)/100;
     const pSI=soma<1?cmvTotal/(1-soma):cmvTotal*99;
     const ipiV=pSI*(ipi/100),pCI=pSI+ipiV;
     const icmsV=pSI*(aliqInter/100);
@@ -2467,8 +2471,8 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
     let margemAlvo=null;
     if(d.precoAlvo>0){
       const pSIa=d.precoAlvo/(1+ipi/100);
-      const sf=(pcEf+pcSubvPct+icmsEfPct+difal+ftiPct+fcpPct+indPct+margGerPct-ipiCreditoIOSPct)/100;
-      margemAlvo=pSIa>0?(1-cmvTotal/pSIa)*100-sf*100:null;
+      const sfBase=pcEf+pcSubvPct+icmsEfPct+difal+ftiPct+fcpPct+indPct+margGerPct-ipiCreditoIOSPct;
+      margemAlvo=pSIa>0?(1-cmvTotal/pSIa)*100/ipiF-sfBase:null;
     }
 
     // Modo margem: usa precoSugerido como pF base para todos os cálculos
@@ -2476,8 +2480,8 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
     const pFfinal = d.modoCalc==="margem" && d.precoSugerido>0 ? d.precoSugerido : pF;
     if(d.modoCalc==="margem" && d.precoSugerido>0){
       const pSIs=d.precoSugerido/(1+ipi/100);
-      const sf2=(pcEf+pcSubvPct+icmsEfPct+difal+ftiPct+fcpPct+indPct+margGerPct-ipiCreditoIOSPct)/100;
-      margemSugerida=pSIs>0?(1-cmvTotal/pSIs)*100-sf2*100:null;
+      const sfBase2=pcEf+pcSubvPct+icmsEfPct+difal+ftiPct+fcpPct+indPct+margGerPct-ipiCreditoIOSPct;
+      margemSugerida=pSIs>0?(1-cmvTotal/pSIs)*100/ipiF-sfBase2:null;
     }
 
     // Se modo margem com preço sugerido, recalcula todos os valores monetários sobre pFfinal
