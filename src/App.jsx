@@ -33,6 +33,12 @@ const db = {
   insertProduto:  (p)        => sbFetch("produtos_catalogo", { method: "POST", body: JSON.stringify(p) }),
   updateProduto:  (id, data) => sbFetch(`produtos_catalogo?id=eq.${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(data) }),
   deleteProduto:  (id)       => sbFetch(`produtos_catalogo?id=eq.${encodeURIComponent(id)}`, { method: "DELETE", prefer: "return=minimal" }),
+  getCategorias:              ()        => sbFetch("categorias_produto?ativo=eq.true&select=*&order=nome.asc"),
+  insertCategoria:            (data)    => sbFetch("categorias_produto", { method:"POST", body:JSON.stringify(data) }),
+  getSolicitacoesCategorias:  ()        => sbFetch("solicitacoes_categoria?select=*&order=criado_em.desc"),
+  insertSolicitacaoCategoria: (data)    => sbFetch("solicitacoes_categoria", { method:"POST", body:JSON.stringify(data) }),
+  updateSolicitacaoCategoria: (id,data) => sbFetch(`solicitacoes_categoria?id=eq.${id}`, { method:"PATCH", body:JSON.stringify(data) }),
+  getProdutosByPrefixo:       (prefix)  => sbFetch(`produtos_catalogo?id=like.${encodeURIComponent(prefix+'*')}&select=id&order=id.desc`),
   getRegistros:   (userId)   => sbFetch(`registros?or=(user_id.eq.${encodeURIComponent(userId)},compartilhado.is.true)&select=*&order=criado_em.desc`)
     .then(rows=>(rows||[]).map(r=>({id:r.id,nome:r.nome,pastaId:r.pasta_id??null,compartilhado:!!r.compartilhado,userId:r.user_id,data:new Date(r.criado_em).toLocaleString("pt-BR"),d:r.dados?.d,calcs:r.dados?.calcs}))),
   getPastasRegistros: (userId) => sbFetch(`pastas_registros?or=(user_id.eq.${encodeURIComponent(userId)},compartilhado.is.true)&select=*&order=nome.asc`)
@@ -831,13 +837,18 @@ function ViewPerfis({ users }) {
 function PainelAdmin({ currentUser }) {
   const [view, setView] = useState("pendentes");
   const [users, setUsers] = useState([]);
+  const [solCats, setSolCats] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [modal, setModal] = useState(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
-    try { setUsers(await db.getUsers()); }
+    try {
+      const [u, sc] = await Promise.all([db.getUsers(), db.getSolicitacoesCategorias()]);
+      setUsers(u);
+      setSolCats(sc||[]);
+    }
     catch(e) { console.error(e); }
     finally { setLoading(false); }
   }, []);
@@ -885,12 +896,15 @@ function PainelAdmin({ currentUser }) {
     inativos: allUsers.filter(u => u.status === "inativo" || u.status === "rejeitado").length,
   };
 
+  const solCatsPendentes = solCats.filter(s=>!s.status||s.status==="pendente");
+
   const NAV = [
-    { id: "calc",      icon: "🧮", label: "Calculadora" },
+    { id: "calc",       icon: "🧮", label: "Calculadora" },
     { id: "sep" },
-    { id: "pendentes", icon: "⏳", label: "Pendentes", badge: pendentes.length },
-    { id: "usuarios",  icon: "👥", label: "Usuários" },
-    { id: "perfis",    icon: "🔐", label: "Perfis" },
+    { id: "pendentes",  icon: "⏳", label: "Pendentes", badge: pendentes.length },
+    { id: "usuarios",   icon: "👥", label: "Usuários" },
+    { id: "perfis",     icon: "🔐", label: "Perfis" },
+    { id: "categorias", icon: "📦", label: "Categorias", badge: solCatsPendentes.length },
   ];
 
   // Se view === "calc", renderiza a Calculadora inline
@@ -1011,6 +1025,65 @@ function PainelAdmin({ currentUser }) {
 
         {/* PERFIS */}
         {view === "perfis" && <ViewPerfis users={users}/>}
+
+        {/* CATEGORIAS */}
+        {view === "categorias" && (
+          <div className="tbl-wrap">
+            <div className="tbl-head">
+              <span className="tbl-head-title">📦 Solicitações de Categoria</span>
+              <span style={{ fontSize: 12, color: "var(--muted)" }}>{solCatsPendentes.length} pendente{solCatsPendentes.length!==1?"s":""}</span>
+            </div>
+            {solCats.length === 0
+              ? <div className="empty"><div className="empty-icon">📦</div><div className="empty-text">Nenhuma solicitação</div><div className="empty-sub">Nenhuma solicitação de categoria recebida</div></div>
+              : <table>
+                  <thead><tr>
+                    <th>Categoria</th><th>Prefixo</th><th>Solicitado por</th><th>Descrição</th><th>Status</th><th>Ações</th>
+                  </tr></thead>
+                  <tbody>
+                    {solCats.map(sol => {
+                      const isPendente = !sol.status || sol.status === "pendente";
+                      return (
+                        <tr key={sol.id} className={isPendente?"pending-row":""}>
+                          <td style={{ fontWeight: 600, color: "#fff" }}>{sol.nome_categoria}</td>
+                          <td><code style={{ fontSize: 12, color: "#93c5fd" }}>{sol.prefixo}</code></td>
+                          <td>
+                            <div style={{ fontSize: 13 }}>{sol.user_nome||"—"}</div>
+                            <div style={{ fontSize: 11, color: "var(--muted)" }}>{fmtDate(sol.criado_em)}</div>
+                          </td>
+                          <td style={{ fontSize: 12, color: "var(--muted)", maxWidth: 200 }}>{sol.descricao||"—"}</td>
+                          <td>
+                            {sol.status==="aprovado"&&<span className="badge badge-ativo">✓ Aprovado</span>}
+                            {sol.status==="rejeitado"&&<span className="badge badge-rejeitado">✕ Rejeitado</span>}
+                            {isPendente&&<span className="badge badge-pendente">◉ Pendente</span>}
+                          </td>
+                          <td>
+                            {isPendente && (
+                              <div className="act-row">
+                                <button className="btn-sm btn-approve" onClick={async()=>{
+                                  try{
+                                    await db.insertCategoria({id:sol.prefixo,nome:sol.nome_categoria,ativo:true});
+                                    await db.updateSolicitacaoCategoria(sol.id,{status:"aprovado"});
+                                    await refresh();
+                                  }catch(e){alert("Erro ao aprovar: "+e.message);}
+                                }}>✓ Aprovar</button>
+                                <button className="btn-sm btn-reject" onClick={async()=>{
+                                  try{
+                                    await db.updateSolicitacaoCategoria(sol.id,{status:"rejeitado"});
+                                    await refresh();
+                                  }catch(e){alert("Erro ao rejeitar: "+e.message);}
+                                }}>✕ Rejeitar</button>
+                              </div>
+                            )}
+                            {!isPendente && <span style={{ fontSize: 11, color: "var(--muted)", fontStyle: "italic" }}>finalizado</span>}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+            }
+          </div>
+        )}
       </div>
 
       {modal?.type === "edit" && <ModalEditUser user={modal.user} onClose={() => setModal(null)} onSave={saveUser}/>}
@@ -3385,7 +3458,7 @@ function RevCalc({precoAlvo,onChange,c,margem}){
 
 // ── CadastroProdutos ──────────────────────────────────────────────────────────
 const FORM_VAZIO={
-  id:"",ncm:"",nome:"",
+  categoria:"",ncm:"",nome:"",
   ipi_mao:0,ipi_ios:0,ipi_cwb:0,
   cred_mao:0,cred_ios:0,cred_cwb:0,
   icms_mao:0,icms_ios:0,icms_cwb:0,
@@ -3394,34 +3467,105 @@ const FORM_VAZIO={
   pd:0,scrap:0,royal:0,frete_venda:0,marg_ger:0,mkt:0,rebate:0,
 };
 
-function CadastroProdutos(){
-  const [produtos,setProdutos]=useState([]);
-  const [loading,setLoading]=useState(true);
-  const [modal,setModal]=useState(null); // null | "novo" | "editar"
-  const [form,setForm]=useState(null);
-  const [busca,setBusca]=useState("");
-  const [msg,setMsg]=useState(null);
-  const [salvando,setSalvando]=useState(false);
-  const [erroForm,setErroForm]=useState("");
+const INDICES_GRUPOS=[
+  {id:"impostos",label:"Impostos",icone:"🏛",campos:[
+    {k:"ipi_mao",l:"IPI MAO",sfx:"%"},{k:"ipi_ios",l:"IPI IOS",sfx:"%"},{k:"ipi_cwb",l:"IPI CWB",sfx:"%"},
+    {k:"cred_mao",l:"Créd. MAO",sfx:"%"},{k:"cred_ios",l:"Créd. IOS",sfx:"%"},{k:"cred_cwb",l:"Créd. CWB",sfx:"%"},
+    {k:"icms_mao",l:"ICMS MAO",sfx:"%"},{k:"icms_ios",l:"ICMS IOS",sfx:"%"},{k:"icms_cwb",l:"ICMS CWB",sfx:"%"},
+    {k:"mva",l:"MVA",sfx:"%"},{k:"fti",l:"FTI/UEA",sfx:"%"},{k:"aliq_st",l:"Aliq. ST",sfx:"%"},
+  ]},
+  {id:"vpl",label:"VPL",icone:"💰",campos:[
+    {k:"vpl_padrao",l:"VPL Padrão",sfx:"R$"},
+  ]},
+  {id:"garantia",label:"Garantia / BKP",icone:"🛡",campos:[
+    {k:"garantia",l:"Garantia",sfx:"R$"},{k:"bkp_pct",l:"BKP",sfx:"%"},
+  ]},
+  {id:"custos",label:"Custos Locais",icone:"🏭",campos:[
+    {k:"producao",l:"Produção",sfx:"R$"},{k:"embalagem",l:"Embalagem",sfx:"R$"},
+  ]},
+  {id:"gerais",label:"Índices Gerais",icone:"📊",campos:[
+    {k:"pd",l:"P&D",sfx:"%"},{k:"scrap",l:"Scrap",sfx:"%"},{k:"royal",l:"Royalties",sfx:"%"},{k:"frete_venda",l:"Frete Venda",sfx:"%"},
+  ]},
+  {id:"comerciais",label:"Índices Comerciais",icone:"📈",campos:[
+    {k:"marg_ger",l:"Margem Ger.",sfx:"%"},{k:"mkt",l:"Marketing",sfx:"%"},{k:"rebate",l:"Rebate",sfx:"%"},
+  ]},
+];
 
-  const reload=()=>db.getProdutos().then(r=>setProdutos(r||[])).finally(()=>setLoading(false));
+function gerarId(prefix, existentes){
+  const nums = existentes
+    .map(p => parseInt(p.id.replace(prefix,""),10))
+    .filter(n => !isNaN(n));
+  const next = nums.length>0 ? Math.max(...nums)+1 : 1;
+  return prefix + String(next).padStart(4,"0");
+}
+
+function CadastroProdutos({user}){
+  const [produtos,setProdutos]     = useState([]);
+  const [categorias,setCategorias] = useState([]);
+  const [loading,setLoading]       = useState(true);
+  const [modal,setModal]           = useState(null); // null | "novo" | "editar" | "bulk" | "solicitacao"
+  const [form,setForm]             = useState(null);
+  const [formId,setFormId]         = useState("");   // ID gerado automaticamente
+  const [secoesAbertas,setSecoesAbertas] = useState({});
+  const [busca,setBusca]           = useState("");
+  const [msg,setMsg]               = useState(null);
+  const [salvando,setSalvando]     = useState(false);
+  const [erroForm,setErroForm]     = useState("");
+  // Bulk update
+  const [selecionados,setSelecionados] = useState(new Set());
+  const [bulkPasso,setBulkPasso]   = useState(1); // 1=escolher indices, 2=grade
+  const [bulkIndices,setBulkIndices] = useState(new Set());
+  const [bulkVals,setBulkVals]     = useState({}); // {prodId: {campo: valor}}
+  const [bulkSalvando,setBulkSalvando] = useState(false);
+  // Solicitação categoria
+  const [solForm,setSolForm]       = useState({nome_categoria:"",prefixo:"",descricao:""});
+  const [solErro,setSolErro]       = useState("");
+  const [solOk,setSolOk]           = useState(false);
+
+  const reload=()=>Promise.all([
+    db.getProdutos().then(r=>setProdutos(r||[])),
+    db.getCategorias().then(r=>setCategorias(r||[])),
+  ]).finally(()=>setLoading(false));
   useEffect(()=>{reload();},[]);
 
   const SF=k=>e=>setForm(p=>({...p,[k]:e.target.type==="number"?parseFloat(e.target.value)||0:e.target.value}));
 
-  const abrirNovo=()=>{setForm({...FORM_VAZIO});setErroForm("");setModal("novo");};
-  const abrirEditar=p=>{setForm({...p});setErroForm("");setModal("editar");};
+  const abrirNovo=()=>{
+    setForm({...FORM_VAZIO});
+    setFormId("");
+    setSecoesAbertas({impostos:true,vpl:true,garantia:true,custos:true,gerais:true,comerciais:true});
+    setErroForm("");setModal("novo");
+  };
+
+  const abrirEditar=p=>{
+    setForm({...p,categoria:p.id.match(/^([A-Z]+)/)?.[1]||""});
+    setFormId(p.id);
+    setSecoesAbertas({});
+    setErroForm("");setModal("editar");
+  };
+
+  const toggleSecao=id=>setSecoesAbertas(p=>({...p,[id]:!p[id]}));
+
+  const handleCategoriaChange=async(cat)=>{
+    setForm(p=>({...p,categoria:cat}));
+    if(!cat){setFormId("");return;}
+    try{
+      const existentes=await db.getProdutosByPrefixo(cat);
+      setFormId(gerarId(cat, existentes||[]));
+    }catch{setFormId(cat+"0001");}
+  };
 
   const salvar=async()=>{
-    if(!form.id.trim()){setErroForm("ID obrigatório.");return;}
+    if(!formId){setErroForm("Selecione uma categoria.");return;}
     if(!form.ncm.trim()){setErroForm("NCM obrigatório.");return;}
     if(!form.nome.trim()){setErroForm("Nome obrigatório.");return;}
     setSalvando(true);
+    const dados={...form,id:formId};
+    delete dados.categoria;
     try{
-      if(modal==="novo") await db.insertProduto(form);
-      else await db.updateProduto(form.id,form);
-      await reload();
-      setModal(null);
+      if(modal==="novo") await db.insertProduto(dados);
+      else await db.updateProduto(formId,dados);
+      await reload();setModal(null);
       setMsg({t:"ok",txt:"Produto salvo com sucesso."});
       setTimeout(()=>setMsg(null),3000);
     }catch(e){setErroForm(e.message);}
@@ -3430,21 +3574,75 @@ function CadastroProdutos(){
 
   const excluir=async(id)=>{
     if(!window.confirm(`Excluir produto "${id}"?`))return;
-    await db.deleteProduto(id);
-    await reload();
+    await db.deleteProduto(id);await reload();
     setMsg({t:"ok",txt:`Produto ${id} excluído.`});
     setTimeout(()=>setMsg(null),3000);
+  };
+
+  // ── Bulk update ──
+  const toggleSel=id=>setSelecionados(p=>{const n=new Set(p);n.has(id)?n.delete(id):n.add(id);return n;});
+  const toggleTodos=()=>setSelecionados(selecionados.size===filtrados.length?new Set():new Set(filtrados.map(p=>p.id)));
+  const toggleBulkIndice=k=>setBulkIndices(p=>{const n=new Set(p);n.has(k)?n.delete(k):n.add(k);return n;});
+
+  const abrirBulk=()=>{
+    const init={};
+    selecionados.forEach(pid=>{init[pid]={};});
+    setBulkVals(init);setBulkIndices(new Set());setBulkPasso(1);setModal("bulk");
+  };
+
+  const salvarBulk=async()=>{
+    setBulkSalvando(true);
+    try{
+      await Promise.all(
+        [...selecionados].map(pid=>{
+          const vals=bulkVals[pid]||{};
+          if(Object.keys(vals).length===0)return Promise.resolve();
+          return db.updateProduto(pid,vals);
+        })
+      );
+      await reload();setModal(null);setSelecionados(new Set());
+      setMsg({t:"ok",txt:"Produtos atualizados com sucesso."});
+      setTimeout(()=>setMsg(null),3000);
+    }catch(e){setMsg({t:"err",txt:"Erro: "+e.message});}
+    finally{setBulkSalvando(false);}
+  };
+
+  // ── Solicitação de categoria ──
+  const enviarSolicitacao=async()=>{
+    if(!solForm.nome_categoria.trim()){setSolErro("Nome obrigatório.");return;}
+    if(!solForm.prefixo.trim()||solForm.prefixo.length<2||solForm.prefixo.length>4){setSolErro("Prefixo deve ter 2-4 letras.");return;}
+    const prefixo=solForm.prefixo.toUpperCase().replace(/[^A-Z]/g,"");
+    try{
+      await db.insertSolicitacaoCategoria({
+        user_id:String(user?.id||""),
+        user_nome:user?.nome||"",
+        nome_categoria:solForm.nome_categoria.trim(),
+        prefixo,
+        descricao:solForm.descricao.trim(),
+      });
+      setSolOk(true);setSolErro("");
+      setTimeout(()=>{setModal(null);setSolOk(false);setSolForm({nome_categoria:"",prefixo:"",descricao:""});},2500);
+    }catch(e){setSolErro(e.message);}
   };
 
   const filtrados=produtos.filter(p=>
     !busca||p.nome.toLowerCase().includes(busca.toLowerCase())||p.ncm.includes(busca)||p.id.includes(busca)
   );
 
+  // ── Componentes internos do formulário ──
   const Fn=({label,k,sfx=""})=>(
     <div style={{display:"flex",flexDirection:"column",gap:3}}>
       <label style={{fontSize:10,fontWeight:600,color:"#7a7f96",textTransform:"uppercase",letterSpacing:.6}}>{label}{sfx&&<span style={{color:"#475569",marginLeft:3}}>{sfx}</span>}</label>
       <input type="number" step="any" value={form[k]||0} onChange={SF(k)}
         style={{background:"#0c0e14",border:"1px solid rgba(255,255,255,.1)",color:"#e8eaf0",padding:"7px 10px",fontSize:13,outline:"none",fontFamily:"'DM Mono',monospace"}}/>
+    </div>
+  );
+  const FnRO=({label,k,sfx=""})=>(
+    <div style={{display:"flex",flexDirection:"column",gap:3}}>
+      <label style={{fontSize:10,fontWeight:600,color:"#7a7f96",textTransform:"uppercase",letterSpacing:.6}}>{label}{sfx&&<span style={{color:"#475569",marginLeft:3}}>{sfx}</span>}</label>
+      <div style={{background:"rgba(255,255,255,.03)",border:"1px solid rgba(255,255,255,.06)",color:"#7a7f96",padding:"7px 10px",fontSize:13,fontFamily:"'DM Mono',monospace",borderRadius:2}}>
+        {form[k]||0}
+      </div>
     </div>
   );
   const Ft=({label,k,placeholder=""})=>(
@@ -3455,18 +3653,75 @@ function CadastroProdutos(){
     </div>
   );
 
+  const SecaoToggle=({grupo})=>{
+    const aberta=!!secoesAbertas[grupo.id];
+    return(
+      <div style={{border:"1px solid rgba(255,255,255,.07)",borderRadius:4,overflow:"hidden",marginBottom:8}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"8px 14px",background:"rgba(255,255,255,.03)",cursor:"pointer"}} onClick={()=>toggleSecao(grupo.id)}>
+          <span style={{fontSize:12,fontWeight:700,color:"#7a90b0",textTransform:"uppercase",letterSpacing:.8}}>{grupo.icone} {grupo.label}</span>
+          <div style={{display:"flex",alignItems:"center",gap:8}}>
+            {grupo.id==="impostos"&&!aberta&&(
+              <a href="https://www.gov.br/receitafederal/pt-br/assuntos/aduana-e-comercio-exterior/classificacao-fiscal-de-mercadorias" target="_blank" rel="noopener noreferrer"
+                onClick={e=>e.stopPropagation()}
+                style={{fontSize:10,color:"#60a5fa",textDecoration:"none",padding:"2px 8px",border:"1px solid rgba(96,165,250,.3)",borderRadius:3}}>
+                🔗 Consultar NCM
+              </a>
+            )}
+            <button style={{padding:"3px 10px",background:aberta?"rgba(0,71,187,.2)":"rgba(255,255,255,.06)",border:`1px solid ${aberta?"rgba(0,71,187,.4)":"rgba(255,255,255,.12)"}`,color:aberta?"#93c5fd":"#7a90b0",fontSize:10,fontWeight:700,cursor:"pointer",borderRadius:3}}>
+              {aberta?"✕ Fechar":"✏ Alterar"}
+            </button>
+          </div>
+        </div>
+        {aberta&&(
+          <div style={{padding:"12px 14px",background:"rgba(0,0,0,.15)"}}>
+            {grupo.id==="impostos"&&(
+              <div style={{fontSize:10,color:"#60a5fa",marginBottom:10,padding:"6px 10px",background:"rgba(96,165,250,.06)",border:"1px solid rgba(96,165,250,.2)",borderRadius:3}}>
+                💡 Consulte as alíquotas em:{" "}
+                <a href="https://www.gov.br/receitafederal/pt-br/assuntos/aduana-e-comercio-exterior/classificacao-fiscal-de-mercadorias" target="_blank" rel="noopener noreferrer" style={{color:"#60a5fa"}}>Receita Federal — Classificação Fiscal</a>
+              </div>
+            )}
+            <div style={{display:"grid",gridTemplateColumns:grupo.campos.length>=3?"repeat(3,1fr)":grupo.campos.length===2?"repeat(2,1fr)":"1fr",gap:10}}>
+              {grupo.campos.map(c=><Fn key={c.k} label={c.l} k={c.k} sfx={c.sfx}/>)}
+            </div>
+          </div>
+        )}
+        {!aberta&&(
+          <div style={{padding:"8px 14px",display:"flex",flexWrap:"wrap",gap:12}}>
+            {grupo.campos.map(c=>(
+              <span key={c.k} style={{fontSize:11,fontFamily:"'DM Mono',monospace",color:"#5a6a84"}}>
+                <span style={{color:"#7a90b0",marginRight:3}}>{c.l}:</span>{form[c.k]||0}{c.sfx}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // ── Render ──
   return(
-    <div style={{padding:28,maxWidth:1100}}>
+    <div style={{padding:28,maxWidth:1200}}>
       <div className="page-title">Cadastro de Produtos</div>
       <div className="page-sub">Base de dados de produtos com índices padrão para precificação simplificada.</div>
 
       {msg&&<div className={`auth-msg ${msg.t}`} style={{marginBottom:16}}>{msg.txt}</div>}
 
-      <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:20}}>
-        <input className="tbl-search" placeholder="Buscar por nome, NCM ou ID..." value={busca} onChange={e=>setBusca(e.target.value)} style={{flex:1}}/>
+      <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:20,flexWrap:"wrap"}}>
+        <input className="tbl-search" placeholder="Buscar por nome, NCM ou ID..." value={busca} onChange={e=>setBusca(e.target.value)} style={{flex:1,minWidth:200}}/>
+        {selecionados.size>0&&(
+          <button onClick={abrirBulk}
+            style={{padding:"9px 18px",background:"rgba(0,71,187,.2)",border:"1px solid rgba(0,71,187,.4)",color:"#93c5fd",fontSize:12,fontWeight:700,cursor:"pointer",borderRadius:4,whiteSpace:"nowrap"}}>
+            ✏ Atualizar índices ({selecionados.size} produto{selecionados.size!==1?"s":""})
+          </button>
+        )}
+        <button style={{padding:"9px 16px",background:"rgba(124,58,237,.15)",border:"1px solid rgba(124,58,237,.35)",color:"#a78bfa",fontSize:12,fontWeight:700,cursor:"pointer",borderRadius:4,whiteSpace:"nowrap"}}
+          onClick={()=>{setSolForm({nome_categoria:"",prefixo:"",descricao:""});setSolErro("");setSolOk(false);setModal("solicitacao");}}>
+          + Solicitar categoria
+        </button>
         <button className="btn-primary" style={{width:"auto",padding:"9px 20px"}} onClick={abrirNovo}>+ Novo Produto</button>
       </div>
 
+      {/* Tabela */}
       <div className="tbl-wrap">
         <div className="tbl-head">
           <span className="tbl-head-title">Produtos Cadastrados ({filtrados.length})</span>
@@ -3476,25 +3731,26 @@ function CadastroProdutos(){
         <table>
           <thead>
             <tr>
+              <th style={{width:36}}>
+                <input type="checkbox" checked={selecionados.size===filtrados.length&&filtrados.length>0}
+                  onChange={toggleTodos} style={{cursor:"pointer",accentColor:"#0047BB"}}/>
+              </th>
               <th>ID</th><th>NCM</th><th>Nome</th><th>VPL Padrão</th>
               <th>IPI MAO/IOS/CWB</th><th>Cred. MAO/IOS/CWB</th><th>Ações</th>
             </tr>
           </thead>
           <tbody>
             {filtrados.map(p=>(
-              <tr key={p.id}>
+              <tr key={p.id} style={{background:selecionados.has(p.id)?"rgba(0,71,187,.08)":""}}>
+                <td><input type="checkbox" checked={selecionados.has(p.id)} onChange={()=>toggleSel(p.id)} style={{cursor:"pointer",accentColor:"#0047BB"}}/></td>
                 <td><code style={{fontSize:12,color:"#93c5fd"}}>{p.id}</code></td>
                 <td style={{fontFamily:"'DM Mono',monospace",fontSize:12}}>{p.ncm}</td>
                 <td style={{fontWeight:600}}>{p.nome}</td>
                 <td style={{fontFamily:"'DM Mono',monospace",fontSize:12,color:(p.vpl_padrao||0)>0?"#34d399":"#7a7f96"}}>
                   {(p.vpl_padrao||0)>0?`R$ ${(+p.vpl_padrao).toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2})}`:"—"}
                 </td>
-                <td style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:"#a8b5cc"}}>
-                  {p.ipi_mao}% / {p.ipi_ios}% / {p.ipi_cwb}%
-                </td>
-                <td style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:"#a8b5cc"}}>
-                  {p.cred_mao}% / {p.cred_ios}% / {p.cred_cwb}%
-                </td>
+                <td style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:"#a8b5cc"}}>{p.ipi_mao}% / {p.ipi_ios}% / {p.ipi_cwb}%</td>
+                <td style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:"#a8b5cc"}}>{p.cred_mao}% / {p.cred_ios}% / {p.cred_cwb}%</td>
                 <td>
                   <div className="act-row">
                     <button className="btn-sm btn-edit" onClick={()=>abrirEditar(p)}>Editar</button>
@@ -3507,63 +3763,42 @@ function CadastroProdutos(){
         </table>}
       </div>
 
-      {/* Modal Novo/Editar */}
-      {modal&&form&&(
+      {/* ── Modal Novo/Editar ── */}
+      {(modal==="novo"||modal==="editar")&&form&&(
         <div className="modal-ov" onClick={e=>{if(e.target===e.currentTarget)setModal(null);}}>
-          <div className="modal-box" style={{maxWidth:680}}>
+          <div className="modal-box" style={{maxWidth:700,maxHeight:"90vh",overflowY:"auto"}}>
             <div className="modal-head">
-              <span className="modal-title">{modal==="novo"?"Novo Produto":"Editar Produto"}</span>
+              <span className="modal-title">{modal==="novo"?"Novo Produto":"Editar: "+formId}</span>
               <button className="modal-close" onClick={()=>setModal(null)}>×</button>
             </div>
-            <div className="modal-body" style={{gap:16}}>
+            <div className="modal-body" style={{gap:10}}>
               {erroForm&&<div className="auth-msg err">{erroForm}</div>}
 
               {/* Identificação */}
               <div style={{fontFamily:"'Syne',sans-serif",fontSize:12,fontWeight:700,color:"#7a90b0",textTransform:"uppercase",letterSpacing:1,borderBottom:"1px solid rgba(255,255,255,.06)",paddingBottom:6}}>Identificação</div>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 2fr",gap:10}}>
-                <Ft label="ID (slug)" k="id" placeholder="ex: tab7"/>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 2fr",gap:10,marginBottom:4}}>
+                <div style={{display:"flex",flexDirection:"column",gap:3}}>
+                  <label style={{fontSize:10,fontWeight:600,color:"#7a7f96",textTransform:"uppercase",letterSpacing:.6}}>Categoria</label>
+                  <select value={form.categoria||""} onChange={e=>handleCategoriaChange(e.target.value)}
+                    disabled={modal==="editar"}
+                    style={{background:"#0c0e14",border:"1px solid rgba(255,255,255,.1)",color:form.categoria?"#e8eaf0":"#5a6a84",padding:"7px 10px",fontSize:13,outline:"none"}}>
+                    <option value="">— selecione —</option>
+                    {categorias.map(c=><option key={c.id} value={c.id}>{c.nome} ({c.id})</option>)}
+                  </select>
+                </div>
+                <div style={{display:"flex",flexDirection:"column",gap:3}}>
+                  <label style={{fontSize:10,fontWeight:600,color:"#7a7f96",textTransform:"uppercase",letterSpacing:.6}}>ID Gerado</label>
+                  <div style={{background:"rgba(255,255,255,.03)",border:"1px solid rgba(255,255,255,.06)",color:"#93c5fd",padding:"7px 10px",fontSize:13,fontFamily:"'DM Mono',monospace",borderRadius:2}}>
+                    {formId||"—"}
+                  </div>
+                </div>
                 <Ft label="NCM" k="ncm" placeholder="ex: 8471.30.11"/>
-                <Ft label="Nome" k="nome" placeholder="ex: Tablet 7&quot;"/>
               </div>
+              <Ft label="Nome" k="nome" placeholder="ex: Tablet 7&quot;"/>
 
-              {/* Dados Fiscais */}
-              <div style={{fontFamily:"'Syne',sans-serif",fontSize:12,fontWeight:700,color:"#7a90b0",textTransform:"uppercase",letterSpacing:1,borderBottom:"1px solid rgba(255,255,255,.06)",paddingBottom:6,marginTop:6}}>Dados Fiscais por Planta</div>
-              <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10}}>
-                <Fn label="IPI MAO" k="ipi_mao" sfx="%"/>
-                <Fn label="IPI IOS" k="ipi_ios" sfx="%"/>
-                <Fn label="IPI CWB" k="ipi_cwb" sfx="%"/>
-                <Fn label="Cred. MAO" k="cred_mao" sfx="%"/>
-                <Fn label="Cred. IOS" k="cred_ios" sfx="%"/>
-                <Fn label="Cred. CWB" k="cred_cwb" sfx="%"/>
-                <Fn label="ICMS MAO" k="icms_mao" sfx="%"/>
-                <Fn label="ICMS IOS" k="icms_ios" sfx="%"/>
-                <Fn label="ICMS CWB" k="icms_cwb" sfx="%"/>
-              </div>
-              <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10}}>
-                <Fn label="MVA" k="mva" sfx="%"/>
-                <Fn label="FTI/UEA" k="fti" sfx="%"/>
-                <Fn label="Aliq. ST" k="aliq_st" sfx="%"/>
-              </div>
-
-              {/* Índices Padrão */}
-              <div style={{fontFamily:"'Syne',sans-serif",fontSize:12,fontWeight:700,color:"#7a90b0",textTransform:"uppercase",letterSpacing:1,borderBottom:"1px solid rgba(255,255,255,.06)",paddingBottom:6,marginTop:6}}>Índices Padrão</div>
-              <Fn label="VPL Padrão" k="vpl_padrao" sfx="R$"/>
-              <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10}}>
-                <Fn label="Produção" k="producao" sfx="R$"/>
-                <Fn label="Garantia" k="garantia" sfx="R$"/>
-                <Fn label="BKP" k="bkp_pct" sfx="%"/>
-                <Fn label="Embalagem" k="embalagem" sfx="R$"/>
-              </div>
-              <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10}}>
-                <Fn label="P&D" k="pd" sfx="%"/>
-                <Fn label="Scrap" k="scrap" sfx="%"/>
-                <Fn label="Royalties" k="royal" sfx="%"/>
-                <Fn label="Frete Venda" k="frete_venda" sfx="%"/>
-              </div>
-              <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10}}>
-                <Fn label="Margem Ger." k="marg_ger" sfx="%"/>
-                <Fn label="Marketing" k="mkt" sfx="%"/>
-                <Fn label="Rebate" k="rebate" sfx="%"/>
+              {/* Seções com toggle */}
+              <div style={{marginTop:12}}>
+                {INDICES_GRUPOS.map(g=><SecaoToggle key={g.id} grupo={g}/>)}
               </div>
             </div>
             <div className="modal-foot">
@@ -3572,6 +3807,135 @@ function CadastroProdutos(){
                 {salvando?"Salvando...":"Salvar"}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal Bulk Update ── */}
+      {modal==="bulk"&&(
+        <div className="modal-ov" onClick={e=>{if(e.target===e.currentTarget)setModal(null);}}>
+          <div className="modal-box" style={{maxWidth:bulkPasso===2?900:520,maxHeight:"90vh",overflowY:"auto"}}>
+            <div className="modal-head">
+              <span className="modal-title">✏ Atualizar índices em lote</span>
+              <button className="modal-close" onClick={()=>setModal(null)}>×</button>
+            </div>
+            <div className="modal-body">
+              {bulkPasso===1&&(
+                <>
+                  <div style={{fontSize:12,color:"#7a90b0",marginBottom:16}}>
+                    Selecione os índices que deseja atualizar para os {selecionados.size} produto{selecionados.size!==1?"s":""} selecionados:
+                  </div>
+                  {INDICES_GRUPOS.map(g=>(
+                    <div key={g.id} style={{marginBottom:12}}>
+                      <div style={{fontSize:11,fontWeight:700,color:"#7a90b0",textTransform:"uppercase",letterSpacing:.8,marginBottom:6}}>{g.icone} {g.label}</div>
+                      <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                        {g.campos.map(c=>(
+                          <label key={c.k} style={{display:"flex",alignItems:"center",gap:5,padding:"4px 10px",background:bulkIndices.has(c.k)?"rgba(0,71,187,.2)":"rgba(255,255,255,.04)",border:`1px solid ${bulkIndices.has(c.k)?"rgba(0,71,187,.4)":"rgba(255,255,255,.1)"}`,borderRadius:20,cursor:"pointer",fontSize:11,color:bulkIndices.has(c.k)?"#93c5fd":"#7a90b0",userSelect:"none"}}>
+                            <input type="checkbox" checked={bulkIndices.has(c.k)} onChange={()=>toggleBulkIndice(c.k)} style={{display:"none"}}/>
+                            {c.l} <span style={{opacity:.6}}>{c.sfx}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </>
+              )}
+              {bulkPasso===2&&(
+                <>
+                  <div style={{fontSize:12,color:"#7a90b0",marginBottom:12}}>
+                    Preencha os novos valores. Campos em branco não serão alterados.
+                  </div>
+                  <div style={{overflowX:"auto"}}>
+                    <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+                      <thead>
+                        <tr>
+                          <th style={{padding:"8px 12px",background:"#1a2030",textAlign:"left",color:"#7a90b0",fontWeight:700,fontSize:11,whiteSpace:"nowrap",position:"sticky",left:0,zIndex:2}}>Produto</th>
+                          {[...bulkIndices].map(k=>{
+                            const campo=INDICES_GRUPOS.flatMap(g=>g.campos).find(c=>c.k===k);
+                            return <th key={k} style={{padding:"8px 10px",background:"#1a2030",textAlign:"center",color:"#93c5fd",fontWeight:700,fontSize:11,whiteSpace:"nowrap"}}>{campo?.l}<br/><span style={{color:"#475569",fontWeight:400}}>{campo?.sfx}</span></th>;
+                          })}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {[...selecionados].map(pid=>{
+                          const prod=produtos.find(p=>p.id===pid);
+                          return(
+                            <tr key={pid} style={{borderBottom:"1px solid rgba(255,255,255,.06)"}}>
+                              <td style={{padding:"8px 12px",color:"#dce7f7",fontWeight:600,whiteSpace:"nowrap",background:"#1a2030",position:"sticky",left:0}}>
+                                <code style={{fontSize:11,color:"#93c5fd",marginRight:6}}>{pid}</code>{prod?.nome}
+                              </td>
+                              {[...bulkIndices].map(k=>(
+                                <td key={k} style={{padding:"4px 6px",textAlign:"center"}}>
+                                  <input type="number" step="any"
+                                    placeholder={String(prod?.[k]??"")}
+                                    value={bulkVals[pid]?.[k]??""}
+                                    onChange={e=>{
+                                      const v=e.target.value;
+                                      setBulkVals(prev=>({...prev,[pid]:{...(prev[pid]||{}),[k]:v===""?undefined:parseFloat(v)||0}}));
+                                    }}
+                                    style={{width:80,background:"#0c0e14",border:"1px solid rgba(255,255,255,.12)",color:"#e8eaf0",padding:"5px 8px",fontSize:12,outline:"none",textAlign:"right",fontFamily:"'DM Mono',monospace"}}/>
+                                </td>
+                              ))}
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              )}
+            </div>
+            <div className="modal-foot">
+              {bulkPasso===2&&<button className="btn-sm btn-disable" onClick={()=>setBulkPasso(1)}>← Voltar</button>}
+              <button className="btn-sm btn-disable" onClick={()=>setModal(null)}>Cancelar</button>
+              {bulkPasso===1
+                ? <button className="btn-primary" style={{width:"auto",padding:"8px 22px"}} onClick={()=>{if(bulkIndices.size>0)setBulkPasso(2);}} disabled={bulkIndices.size===0}>
+                    Próximo →
+                  </button>
+                : <button className="btn-primary" style={{width:"auto",padding:"8px 22px"}} onClick={salvarBulk} disabled={bulkSalvando}>
+                    {bulkSalvando?"Salvando...":"✓ Confirmar atualização"}
+                  </button>
+              }
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal Solicitação de Categoria ── */}
+      {modal==="solicitacao"&&(
+        <div className="modal-ov" onClick={e=>{if(e.target===e.currentTarget)setModal(null);}}>
+          <div className="modal-box" style={{maxWidth:460}}>
+            <div className="modal-head">
+              <span className="modal-title">Solicitar nova categoria</span>
+              <button className="modal-close" onClick={()=>setModal(null)}>×</button>
+            </div>
+            <div className="modal-body">
+              {solOk
+                ? <div className="auth-msg ok">✓ Solicitação enviada! Os administradores serão notificados.</div>
+                : <>
+                    {solErro&&<div className="auth-msg err">{solErro}</div>}
+                    <div style={{fontSize:12,color:"#7a90b0",marginBottom:16}}>
+                      A solicitação será analisada pelos administradores. Quando aprovada, a categoria ficará disponível para uso.
+                    </div>
+                    <div className="fld">
+                      <label>Nome da categoria</label>
+                      <input type="text" placeholder="ex: Smart TVs" value={solForm.nome_categoria} onChange={e=>setSolForm(p=>({...p,nome_categoria:e.target.value}))}/>
+                    </div>
+                    <div className="fld">
+                      <label>Prefixo (2–4 letras)</label>
+                      <input type="text" placeholder="ex: STV" maxLength={4} value={solForm.prefixo} onChange={e=>setSolForm(p=>({...p,prefixo:e.target.value.toUpperCase().replace(/[^A-Z]/g,"")}))}/>
+                    </div>
+                    <div className="fld">
+                      <label>Descrição (opcional)</label>
+                      <input type="text" placeholder="Breve descrição da categoria" value={solForm.descricao} onChange={e=>setSolForm(p=>({...p,descricao:e.target.value}))}/>
+                    </div>
+                  </>
+              }
+            </div>
+            {!solOk&&<div className="modal-foot">
+              <button className="btn-cancel" onClick={()=>setModal(null)}>Cancelar</button>
+              <button className="btn-confirm" onClick={enviarSolicitacao}>Enviar solicitação</button>
+            </div>}
           </div>
         </div>
       )}
@@ -3641,7 +4005,7 @@ export default function App() {
           )}
           <div style={{flex:1,overflow:"hidden",display:"flex",flexDirection:"column"}}>
             {modView==="precificacao"&&temPrecificacao&&<MultiTab user={user}/>}
-            {modView==="cadastro"&&temCadastro&&<div style={{overflow:"auto",flex:1}}><CadastroProdutos/></div>}
+            {modView==="cadastro"&&temCadastro&&<div style={{overflow:"auto",flex:1}}><CadastroProdutos user={user}/></div>}
           </div>
         </div>
       </div>
