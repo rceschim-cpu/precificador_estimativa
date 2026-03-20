@@ -3532,7 +3532,7 @@ function CadastroProdutos(){
 export default function App() {
   const [user, setUser] = useState(() => loadSession());
   const [modView, setModView] = useState("precificacao");
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
   const handleLogin = (u) => setUser(u);
   const handleLogout = () => { saveSession(null); setUser(null); };
 
