@@ -24,11 +24,15 @@ const sbFetch = async (path, opts = {}) => {
 };
 
 const db = {
-  getUsers:    ()          => sbFetch("usuarios?select=*&order=criado_em.asc"),
-  getUserByEmail: (email)  => sbFetch(`usuarios?email=eq.${encodeURIComponent(email)}&select=*`),
-  insertUser:  (u)         => sbFetch("usuarios", { method: "POST", body: JSON.stringify(u) }),
-  updateUser:  (id, data)  => sbFetch(`usuarios?id=eq.${id}`, { method: "PATCH", body: JSON.stringify(data) }),
-  deleteUser:  (id)        => sbFetch(`usuarios?id=eq.${id}`, { method: "DELETE", prefer: "return=minimal" }),
+  getUsers:       ()         => sbFetch("usuarios?select=*&order=criado_em.asc"),
+  getUserByEmail: (email)    => sbFetch(`usuarios?email=eq.${encodeURIComponent(email)}&select=*`),
+  insertUser:     (u)        => sbFetch("usuarios", { method: "POST", body: JSON.stringify(u) }),
+  updateUser:     (id, data) => sbFetch(`usuarios?id=eq.${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  deleteUser:     (id)       => sbFetch(`usuarios?id=eq.${id}`, { method: "DELETE", prefer: "return=minimal" }),
+  getProdutos:    ()         => sbFetch("produtos_catalogo?select=*&order=nome.asc"),
+  insertProduto:  (p)        => sbFetch("produtos_catalogo", { method: "POST", body: JSON.stringify(p) }),
+  updateProduto:  (id, data) => sbFetch(`produtos_catalogo?id=eq.${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(data) }),
+  deleteProduto:  (id)       => sbFetch(`produtos_catalogo?id=eq.${encodeURIComponent(id)}`, { method: "DELETE", prefer: "return=minimal" }),
 };
 
 // ── STORAGE (sessão local apenas) ─────────────────────────────────────────────
@@ -38,13 +42,14 @@ const KEYS = { session: "ptc_session", perfis: "ptc_perfis" };
 const MODULOS = [
   { id: "precificacao", label: "Precificação Completa", icone: "🧮", desc: "Calculadora tributária completa — todos os tabs e campos.", ativo: true },
   { id: "relatorios",   label: "Relatórios",            icone: "📈", desc: "Em desenvolvimento.", ativo: false },
-  { id: "cadastro",     label: "Cadastro de Produtos",  icone: "📦", desc: "Em desenvolvimento.", ativo: false },
+  { id: "cadastro",     label: "Cadastro de Produtos",  icone: "📦", desc: "Cadastro de produtos com índices padrão.", ativo: true },
   { id: "sap",          label: "Interface SAP",         icone: "🔗", desc: "Em desenvolvimento.", ativo: false },
 ];
 
 const PERFIS_DEFAULT = [
   { id: "admin",    label: "Administrador",       icone: "⚙️",  cor: "#0047BB", desc: "Acesso total ao sistema. Gerencia usuários e perfis.", modulos: ["precificacao"], sistema: true  },
   { id: "custos",   label: "Depto. de Custos",    icone: "📊", cor: "#059669", desc: "Acesso completo à calculadora.", modulos: ["precificacao"], sistema: false },
+  { id: "base",     label: "Atualização de Base",  icone: "📦", cor: "#7c3aed", desc: "Cadastro de produtos e precificação simplificada.", modulos: ["cadastro","precificacao"], sistema: true  },
 ];
 
 const loadPerfis = () => {
@@ -1141,6 +1146,7 @@ const DEF={
   stAtivo:false,mva:0,icmsDestST:18,precoAlvo:0,
   modoCalc:"preco", precoSugerido:0,
   moedaCusto:"BRL",
+  vplModo:"estimado", vplManual:0,
 };
 
 const CALC_DEF={
@@ -2281,6 +2287,8 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
   const [calcs,setCalcs]=useState(()=>({...CALC_DEF}));
   const [tab,setTab]=useState("perfil");
   const [modal,setModal]=useState(null);
+  const [produtosDB,setProdutosDB]=useState([]);
+  const [produtoDB,setProdutoDB]=useState(null);
 
   // Escuta evento do botão Gestão no topbar
   useEffect(()=>{
@@ -2294,7 +2302,20 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
     setD({...DEF});
     setCalcs({...CALC_DEF});
     setTab("perfil");
+    setProdutoDB(null);
   },[currentUser?.id]);
+
+  // Carrega catálogo de produtos do Supabase
+  useEffect(()=>{
+    db.getProdutos().then(rows=>{
+      if(rows&&rows.length) setProdutosDB(rows);
+    }).catch(()=>{});
+  },[]);
+
+  // Redireciona aba se vplModo mudar para não-estimado e aba for importacao/ppb
+  useEffect(()=>{
+    if(d.vplModo!=="estimado"&&(tab==="importacao"||tab==="ppb")) setTab("vpl");
+  },[d.vplModo]);
 
   const S=k=>v=>setD(p=>({...p,[k]:v}));
   const SC=k=>v=>setCalcs(p=>({...p,[k]:{...p[k],...v}}));
@@ -2311,7 +2332,23 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
   const pcEntry=PC_ZFM.find(e=>e.k===d.pcZfmKey)||PC_ZFM[1];
   const setProd=id=>{
     const p=PRODUTOS.find(x=>x.id===id)||PRODUTOS[0];
-    setD(pv=>({...pv,prodId:id,stAtivo:p.mva>0,mva:p.mva,icmsDestST:p.aliqST}));
+    const dbRec=produtosDB.find(x=>x.id===id)||null;
+    setProdutoDB(dbRec);
+    const defaults=dbRec?{
+      producao:dbRec.producao||0,
+      garantia:dbRec.garantia||0,
+      bkpPct:dbRec.bkp_pct||0,
+      embalagem:dbRec.embalagem||0,
+      pd:dbRec.pd||0,
+      scrap:dbRec.scrap||0,
+      royal:dbRec.royal||0,
+      frete:dbRec.frete_venda||0,
+      margGer:dbRec.marg_ger||0,
+      mkt:dbRec.mkt||0,
+      rebate:dbRec.rebate||0,
+    }:{};
+    const vplModo=dbRec&&(dbRec.vpl_padrao||0)>0?"cadastrado":d.vplModo;
+    setD(pv=>({...pv,prodId:id,stAtivo:p.mva>0,mva:p.mva,icmsDestST:p.aliqST,...defaults,vplModo}));
     if(d.modalidade==="CBU") aplicarIICBU(p.ncm);
   };
   // ── Tabela TEC local — II por NCM (valores verificados na Receita Federal) ───
@@ -2390,11 +2427,13 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
       ? (-prodAtrib.ipi/100 + prodAtrib.icms/100 * 0.073) * basePlacaUSD * (1 + (d.conteudoLocal||0)/100)
       : 0;
 
-    const vpl=cmvImp+d.cfImp+ppbTot+d.cra;
+    const vplEstimado=cmvImp+d.cfImp+ppbTot+d.cra;
+    const vpl=d.vplModo==="estimado"?vplEstimado
+             :d.vplModo==="manual"?(d.vplManual||0)
+             :(produtoDB?.vpl_padrao||0);
     const bkpBase=vpl+(d.embalagem||0)+d.outrosBRL;
     const bkpV=bkpBase*(d.bkpPct/100);
-    // cmvTotal inclui cfImp, cra, embalagem e outrosBRL
-    const cmvTotal=cmvImp+d.cfImp+(d.cra||0)+ppbTot+d.producao+d.garantia+bkpV+(d.embalagem||0)+d.outrosBRL;
+    const cmvTotal=vpl+d.producao+d.garantia+bkpV+(d.embalagem||0)+d.outrosBRL;
 
     // IPI: para IOS a base de cálculo é sobre preço sem IPI → IPI ef = IPI% / (1 + IPI%)
     const ipi=prodAtrib.ipi;
@@ -2515,22 +2554,24 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
     const mcf=pFbase>0?((margVf+cfxVf+(d.margGerAtivo?margGerVf:0))/pFbase)*100:0;
     const mkpf=cmvTotal>0?pFbase/cmvTotal:0;
     const pUSDf=(d.ptaxPreco||d.ptax)>0?pFbase/(d.ptaxPreco||d.ptax):0;
-    return{cfrUSD,cfrBRL,iiV:iiV,iiUSD,vpl,bkpV,bkpBase,cfrImp,cmvImp,cmvTotal,ppbTot,despesas,
+    return{cfrUSD,cfrBRL,iiV:iiV,iiUSD,vpl,vplEstimado,bkpV,bkpBase,cfrImp,cmvImp,cmvTotal,ppbTot,despesas,
       craCalcMAO,creditoCalcIOS,cfrExpandidoUSD,basePlacaUSD,
       pcPct,pcEf,pcLabel,pcV:pcVf,pcSubvPct,pcSubvV:pcSubvVf,pcBaseRedPct,aliqInter,aliqDest,icmsEfPct,icmsV,icmsEfV:icmsEfVf,
       difal,difalV:difalVf,ftiPct,ftiV:ftiVf,fcpPct,fcpV:fcpVf,ipi,ipiEfPct,ipiV:ipiVf,ipiCreditoV:ipiCreditoVf,ipiCreditoIOSPct,pSI:pSIfinal,pCI,
       margV:margVf,indPct,pdV:pdVf,cfxV:cfxVf,scV:scVf,ryV:ryVf,cfnV:cfnVf,cfVendaEf,cartaoPct,frV:frVf,cmV:cmVf,mktV:mktVf,rebateV:rebateVf,stV,stBase,
       pF:pFfinal,pUSD:pUSDf,
       cargaTot:cargaTotf,cargaPct:cargaPctf,margPct:margPctf,mc:mcf,mkp:mkpf,ufO,intra,deveDifal,margemAlvo,margemSugerida,comisXPct,margGerPct,margGerV:margGerVf};
-  },[d,prod,prodAtrib,isZFM,isCBU,pcEntry,ppbTot]);
+  },[d,prod,prodAtrib,isZFM,isCBU,pcEntry,ppbTot,produtoDB]);
 
   // Notifica o MultiTab sempre que os cálculos mudarem (para o painel comparativo)
   useEffect(()=>{
     if(onCalcsChange) onCalcsChange(c, d, prod.nome);
   },[c]);
 
-  const TABS=["perfil","importacao","ppb","producao","indices","venda","st"];
-  const TLBL=["Perfil","Importacao","PPB","Producao","Indices","Venda","ST"];
+  const TABS_ALL=["perfil","importacao","ppb","vpl","indices","venda","st"];
+  const TLBL_ALL=["Perfil","Importação","PPB","VPL / Custos Locais","Índices","Venda","ST"];
+  const TABS=d.vplModo==="estimado"?TABS_ALL:TABS_ALL.filter(t=>!["importacao","ppb"].includes(t));
+  const TLBL=TABS_ALL.reduce((acc,t,i)=>{if(TABS.includes(t))acc.push(TLBL_ALL[i]);return acc;},[]);
 
   return(
     <>
@@ -2927,7 +2968,44 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
             </div>
           </>}
 
-          {tab==="producao"&&<>
+          {tab==="vpl"&&<>
+            {/* Card VPL — modo de custo base */}
+            <div style={{background:"#161e30",border:"1px solid rgba(0,71,187,.3)",borderRadius:6,padding:"14px 16px",marginBottom:12}}>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
+                <div>
+                  <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:9,fontWeight:700,letterSpacing:2,color:"#7a90b0",textTransform:"uppercase"}}>VPL — Valor de Pauta de Lote</div>
+                  <div style={{fontFamily:"'DM Mono',monospace",fontSize:22,fontWeight:700,color:"#93c5fd",marginTop:2}}>
+                    {brl(d.vplModo==="estimado"?c.vplEstimado:d.vplModo==="manual"?(d.vplManual||0):(produtoDB?.vpl_padrao||0))}
+                  </div>
+                </div>
+                <div style={{display:"flex",gap:4}}>
+                  {[["cadastrado","Cadastrado","#7c3aed"],["manual","Manual","#d97706"],["estimado","Estimado","#0047BB"]].map(([modo,label,cor])=>(
+                    <button key={modo} onClick={()=>S("vplModo")(modo)}
+                      style={{padding:"5px 12px",fontSize:10,fontWeight:700,borderRadius:4,border:"1px solid",cursor:"pointer",transition:".15s",letterSpacing:.3,
+                        background:d.vplModo===modo?cor:"rgba(255,255,255,.04)",
+                        borderColor:d.vplModo===modo?cor:"rgba(255,255,255,.1)",
+                        color:d.vplModo===modo?"#fff":"#7a90b0"}}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {d.vplModo==="cadastrado"&&(
+                produtoDB&&(produtoDB.vpl_padrao||0)>0
+                  ?<div style={{fontSize:11,color:"#34d399"}}>✓ VPL cadastrado para este produto: {brl(produtoDB.vpl_padrao)}</div>
+                  :<div style={{fontSize:11,color:"#f87171"}}>⚠ Produto sem VPL cadastrado — acesse o Cadastro de Produtos para configurar.</div>
+              )}
+              {d.vplModo==="manual"&&(
+                <div style={{display:"flex",alignItems:"center",gap:10,marginTop:4}}>
+                  <span style={{fontSize:11,color:"#7a90b0",flexShrink:0}}>VPL Manual (R$)</span>
+                  <input type="number" step="0.01" value={d.vplManual||0} onChange={e=>S("vplManual")(parseFloat(e.target.value)||0)}
+                    style={{background:"#0c0e14",border:"1px solid rgba(255,255,255,.15)",color:"#f1f5f9",padding:"5px 10px",fontFamily:"'DM Mono',monospace",fontSize:13,fontWeight:600,outline:"none",width:160,borderRadius:3}}/>
+                </div>
+              )}
+              {d.vplModo==="estimado"&&(
+                <div style={{fontSize:11,color:"#7a90b0"}}>Calculado a partir dos dados de Importação e PPB (abas visíveis acima).</div>
+              )}
+            </div>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
               <div style={{display:"flex",flexDirection:"column",gap:10}}>
                 <Sec title="Custos de Produção" tag="R$">
@@ -3214,9 +3292,206 @@ function RevCalc({precoAlvo,onChange,c,margem}){
   );
 }
 
+// ── CadastroProdutos ──────────────────────────────────────────────────────────
+const FORM_VAZIO={
+  id:"",ncm:"",nome:"",
+  ipi_mao:0,ipi_ios:0,ipi_cwb:0,
+  cred_mao:0,cred_ios:0,cred_cwb:0,
+  icms_mao:0,icms_ios:0,icms_cwb:0,
+  mva:0,fti:0,aliq_st:0,
+  vpl_padrao:0,producao:0,garantia:0,bkp_pct:0,embalagem:0,
+  pd:0,scrap:0,royal:0,frete_venda:0,marg_ger:0,mkt:0,rebate:0,
+};
+
+function CadastroProdutos(){
+  const [produtos,setProdutos]=useState([]);
+  const [loading,setLoading]=useState(true);
+  const [modal,setModal]=useState(null); // null | "novo" | "editar"
+  const [form,setForm]=useState(null);
+  const [busca,setBusca]=useState("");
+  const [msg,setMsg]=useState(null);
+  const [salvando,setSalvando]=useState(false);
+  const [erroForm,setErroForm]=useState("");
+
+  const reload=()=>db.getProdutos().then(r=>setProdutos(r||[])).finally(()=>setLoading(false));
+  useEffect(()=>{reload();},[]);
+
+  const SF=k=>e=>setForm(p=>({...p,[k]:e.target.type==="number"?parseFloat(e.target.value)||0:e.target.value}));
+
+  const abrirNovo=()=>{setForm({...FORM_VAZIO});setErroForm("");setModal("novo");};
+  const abrirEditar=p=>{setForm({...p});setErroForm("");setModal("editar");};
+
+  const salvar=async()=>{
+    if(!form.id.trim()){setErroForm("ID obrigatório.");return;}
+    if(!form.ncm.trim()){setErroForm("NCM obrigatório.");return;}
+    if(!form.nome.trim()){setErroForm("Nome obrigatório.");return;}
+    setSalvando(true);
+    try{
+      if(modal==="novo") await db.insertProduto(form);
+      else await db.updateProduto(form.id,form);
+      await reload();
+      setModal(null);
+      setMsg({t:"ok",txt:"Produto salvo com sucesso."});
+      setTimeout(()=>setMsg(null),3000);
+    }catch(e){setErroForm(e.message);}
+    finally{setSalvando(false);}
+  };
+
+  const excluir=async(id)=>{
+    if(!window.confirm(`Excluir produto "${id}"?`))return;
+    await db.deleteProduto(id);
+    await reload();
+    setMsg({t:"ok",txt:`Produto ${id} excluído.`});
+    setTimeout(()=>setMsg(null),3000);
+  };
+
+  const filtrados=produtos.filter(p=>
+    !busca||p.nome.toLowerCase().includes(busca.toLowerCase())||p.ncm.includes(busca)||p.id.includes(busca)
+  );
+
+  const Fn=({label,k,sfx=""})=>(
+    <div style={{display:"flex",flexDirection:"column",gap:3}}>
+      <label style={{fontSize:10,fontWeight:600,color:"#7a7f96",textTransform:"uppercase",letterSpacing:.6}}>{label}{sfx&&<span style={{color:"#475569",marginLeft:3}}>{sfx}</span>}</label>
+      <input type="number" step="any" value={form[k]||0} onChange={SF(k)}
+        style={{background:"#0c0e14",border:"1px solid rgba(255,255,255,.1)",color:"#e8eaf0",padding:"7px 10px",fontSize:13,outline:"none",fontFamily:"'DM Mono',monospace"}}/>
+    </div>
+  );
+  const Ft=({label,k,placeholder=""})=>(
+    <div style={{display:"flex",flexDirection:"column",gap:3}}>
+      <label style={{fontSize:10,fontWeight:600,color:"#7a7f96",textTransform:"uppercase",letterSpacing:.6}}>{label}</label>
+      <input type="text" value={form[k]||""} onChange={SF(k)} placeholder={placeholder}
+        style={{background:"#0c0e14",border:"1px solid rgba(255,255,255,.1)",color:"#e8eaf0",padding:"7px 10px",fontSize:13,outline:"none"}}/>
+    </div>
+  );
+
+  return(
+    <div style={{padding:28,maxWidth:1100}}>
+      <div className="page-title">Cadastro de Produtos</div>
+      <div className="page-sub">Base de dados de produtos com índices padrão para precificação simplificada.</div>
+
+      {msg&&<div className={`auth-msg ${msg.t}`} style={{marginBottom:16}}>{msg.txt}</div>}
+
+      <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:20}}>
+        <input className="tbl-search" placeholder="Buscar por nome, NCM ou ID..." value={busca} onChange={e=>setBusca(e.target.value)} style={{flex:1}}/>
+        <button className="btn-primary" style={{width:"auto",padding:"9px 20px"}} onClick={abrirNovo}>+ Novo Produto</button>
+      </div>
+
+      <div className="tbl-wrap">
+        <div className="tbl-head">
+          <span className="tbl-head-title">Produtos Cadastrados ({filtrados.length})</span>
+        </div>
+        {loading?<div style={{padding:24,color:"#7a7f96",textAlign:"center"}}>Carregando...</div>:
+        filtrados.length===0?<div style={{padding:24,color:"#7a7f96",textAlign:"center"}}>Nenhum produto cadastrado.</div>:
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th><th>NCM</th><th>Nome</th><th>VPL Padrão</th>
+              <th>IPI MAO/IOS/CWB</th><th>Cred. MAO/IOS/CWB</th><th>Ações</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtrados.map(p=>(
+              <tr key={p.id}>
+                <td><code style={{fontSize:12,color:"#93c5fd"}}>{p.id}</code></td>
+                <td style={{fontFamily:"'DM Mono',monospace",fontSize:12}}>{p.ncm}</td>
+                <td style={{fontWeight:600}}>{p.nome}</td>
+                <td style={{fontFamily:"'DM Mono',monospace",fontSize:12,color:(p.vpl_padrao||0)>0?"#34d399":"#7a7f96"}}>
+                  {(p.vpl_padrao||0)>0?`R$ ${(+p.vpl_padrao).toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2})}`:"—"}
+                </td>
+                <td style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:"#a8b5cc"}}>
+                  {p.ipi_mao}% / {p.ipi_ios}% / {p.ipi_cwb}%
+                </td>
+                <td style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:"#a8b5cc"}}>
+                  {p.cred_mao}% / {p.cred_ios}% / {p.cred_cwb}%
+                </td>
+                <td>
+                  <div className="act-row">
+                    <button className="btn-sm btn-edit" onClick={()=>abrirEditar(p)}>Editar</button>
+                    <button className="btn-sm btn-reject" onClick={()=>excluir(p.id)}>Excluir</button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>}
+      </div>
+
+      {/* Modal Novo/Editar */}
+      {modal&&form&&(
+        <div className="modal-ov" onClick={e=>{if(e.target===e.currentTarget)setModal(null);}}>
+          <div className="modal-box" style={{maxWidth:680}}>
+            <div className="modal-head">
+              <span className="modal-title">{modal==="novo"?"Novo Produto":"Editar Produto"}</span>
+              <button className="modal-close" onClick={()=>setModal(null)}>×</button>
+            </div>
+            <div className="modal-body" style={{gap:16}}>
+              {erroForm&&<div className="auth-msg err">{erroForm}</div>}
+
+              {/* Identificação */}
+              <div style={{fontFamily:"'Syne',sans-serif",fontSize:12,fontWeight:700,color:"#7a90b0",textTransform:"uppercase",letterSpacing:1,borderBottom:"1px solid rgba(255,255,255,.06)",paddingBottom:6}}>Identificação</div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 2fr",gap:10}}>
+                <Ft label="ID (slug)" k="id" placeholder="ex: tab7"/>
+                <Ft label="NCM" k="ncm" placeholder="ex: 8471.30.11"/>
+                <Ft label="Nome" k="nome" placeholder="ex: Tablet 7&quot;"/>
+              </div>
+
+              {/* Dados Fiscais */}
+              <div style={{fontFamily:"'Syne',sans-serif",fontSize:12,fontWeight:700,color:"#7a90b0",textTransform:"uppercase",letterSpacing:1,borderBottom:"1px solid rgba(255,255,255,.06)",paddingBottom:6,marginTop:6}}>Dados Fiscais por Planta</div>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10}}>
+                <Fn label="IPI MAO" k="ipi_mao" sfx="%"/>
+                <Fn label="IPI IOS" k="ipi_ios" sfx="%"/>
+                <Fn label="IPI CWB" k="ipi_cwb" sfx="%"/>
+                <Fn label="Cred. MAO" k="cred_mao" sfx="%"/>
+                <Fn label="Cred. IOS" k="cred_ios" sfx="%"/>
+                <Fn label="Cred. CWB" k="cred_cwb" sfx="%"/>
+                <Fn label="ICMS MAO" k="icms_mao" sfx="%"/>
+                <Fn label="ICMS IOS" k="icms_ios" sfx="%"/>
+                <Fn label="ICMS CWB" k="icms_cwb" sfx="%"/>
+              </div>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10}}>
+                <Fn label="MVA" k="mva" sfx="%"/>
+                <Fn label="FTI/UEA" k="fti" sfx="%"/>
+                <Fn label="Aliq. ST" k="aliq_st" sfx="%"/>
+              </div>
+
+              {/* Índices Padrão */}
+              <div style={{fontFamily:"'Syne',sans-serif",fontSize:12,fontWeight:700,color:"#7a90b0",textTransform:"uppercase",letterSpacing:1,borderBottom:"1px solid rgba(255,255,255,.06)",paddingBottom:6,marginTop:6}}>Índices Padrão</div>
+              <Fn label="VPL Padrão" k="vpl_padrao" sfx="R$"/>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10}}>
+                <Fn label="Produção" k="producao" sfx="R$"/>
+                <Fn label="Garantia" k="garantia" sfx="R$"/>
+                <Fn label="BKP" k="bkp_pct" sfx="%"/>
+                <Fn label="Embalagem" k="embalagem" sfx="R$"/>
+              </div>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10}}>
+                <Fn label="P&D" k="pd" sfx="%"/>
+                <Fn label="Scrap" k="scrap" sfx="%"/>
+                <Fn label="Royalties" k="royal" sfx="%"/>
+                <Fn label="Frete Venda" k="frete_venda" sfx="%"/>
+              </div>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10}}>
+                <Fn label="Margem Ger." k="marg_ger" sfx="%"/>
+                <Fn label="Marketing" k="mkt" sfx="%"/>
+                <Fn label="Rebate" k="rebate" sfx="%"/>
+              </div>
+            </div>
+            <div className="modal-foot">
+              <button className="btn-sm btn-disable" onClick={()=>setModal(null)}>Cancelar</button>
+              <button className="btn-primary" style={{width:"auto",padding:"8px 22px"}} onClick={salvar} disabled={salvando}>
+                {salvando?"Salvando...":"Salvar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── APP INTEGRADO ─────────────────────────────────────────────────────────────
 export default function App() {
   const [user, setUser] = useState(() => loadSession());
+  const [modView, setModView] = useState("precificacao");
   const handleLogin = (u) => setUser(u);
   const handleLogout = () => { saveSession(null); setUser(null); };
 
@@ -3225,6 +3500,12 @@ export default function App() {
   const perfisMap = getPerfisMap(loadPerfis());
   const p = perfisMap[user.perfil] || { label: user.perfil, cor:"#0047BB", icone:"?" };
   const isAdmin = user.perfil === "admin";
+  const userModulos = p.modulos || ["precificacao"];
+  const temCadastro = userModulos.includes("cadastro");
+  const temPrecificacao = userModulos.includes("precificacao");
+  const mostraSidebar = userModulos.length > 1;
+
+  const titulos = { precificacao:"Calculadora Tributária · PLAN_TRIB", cadastro:"Cadastro de Produtos" };
 
   return (
     <>
@@ -3236,7 +3517,7 @@ export default function App() {
           </div>
           <div className="topbar-divider"/>
           <span className="topbar-title">
-            {isAdmin ? "Painel Administrativo" : "Calculadora Tributária · PLAN_TRIB"}
+            {isAdmin ? "Painel Administrativo" : (titulos[modView]||"PLAN_TRIB")}
           </span>
           <div className="topbar-spacer"/>
           <div className="topbar-user">
@@ -3253,7 +3534,20 @@ export default function App() {
           </div>
         </div>
         <div className="dash-body">
-          <MultiTab user={user}/>
+          {mostraSidebar&&(
+            <div className="sidebar">
+              {MODULOS.filter(m=>m.ativo&&userModulos.includes(m.id)).map(m=>(
+                <div key={m.id} className={`snav-item ${modView===m.id?"on":""}`} onClick={()=>setModView(m.id)}>
+                  <span className="snav-icon">{m.icone}</span>
+                  <span>{m.label}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          <div style={{flex:1,overflow:"hidden",display:"flex",flexDirection:"column"}}>
+            {modView==="precificacao"&&temPrecificacao&&<MultiTab user={user}/>}
+            {modView==="cadastro"&&temCadastro&&<div style={{overflow:"auto",flex:1}}><CadastroProdutos/></div>}
+          </div>
         </div>
       </div>
     </>
