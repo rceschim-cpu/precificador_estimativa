@@ -181,11 +181,17 @@ input,select,textarea,button{font-family:inherit}
 .btn-logout:hover{border-color:var(--border2);color:var(--text)}
 
 .dash-body{display:flex;flex:1;min-height:0}
-.sidebar{width:220px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);padding:16px 0;display:flex;flex-direction:column;gap:2px;overflow-y:auto}
-.snav-item{display:flex;align-items:center;gap:11px;padding:10px 20px;cursor:pointer;color:var(--muted);font-size:13px;font-weight:500;transition:.15s;border-left:3px solid transparent}
+.sidebar{width:220px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);padding:16px 0;display:flex;flex-direction:column;gap:2px;overflow-y:auto;transition:width .2s}
+.sidebar.collapsed{width:50px}
+.snav-item{display:flex;align-items:center;gap:11px;padding:10px 20px;cursor:pointer;color:var(--muted);font-size:13px;font-weight:500;transition:.15s;border-left:3px solid transparent;position:relative;white-space:nowrap;overflow:hidden}
+.sidebar.collapsed .snav-item{padding:10px 0;justify-content:center;gap:0}
+.sidebar.collapsed .snav-label{display:none}
+.sidebar.collapsed .snav-item:hover::after{content:attr(data-label);position:absolute;left:54px;background:#1e2840;border:1px solid rgba(255,255,255,.12);color:#dce7f7;font-size:11px;font-weight:600;padding:4px 10px;border-radius:4px;white-space:nowrap;z-index:999;pointer-events:none}
 .snav-item:hover{background:rgba(255,255,255,.03);color:var(--text)}
 .snav-item.on{border-left-color:#0047BB;background:rgba(0,71,187,.1);color:#fff;font-weight:600}
 .snav-icon{font-size:16px;flex-shrink:0;width:22px;text-align:center}
+.snav-toggle{margin-top:auto;padding:10px 0;display:flex;justify-content:center;cursor:pointer;color:var(--muted);font-size:14px;border-top:1px solid var(--border);transition:.15s}
+.snav-toggle:hover{color:var(--text)}
 .snav-sep{height:1px;background:var(--border);margin:8px 16px}
 
 .main-content{flex:1;padding:28px;overflow-y:auto;background:var(--bg);min-height:0}
@@ -3498,6 +3504,7 @@ function CadastroProdutos(){
 export default function App() {
   const [user, setUser] = useState(() => loadSession());
   const [modView, setModView] = useState("precificacao");
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const handleLogin = (u) => setUser(u);
   const handleLogout = () => { saveSession(null); setUser(null); };
 
@@ -3541,13 +3548,16 @@ export default function App() {
         </div>
         <div className="dash-body">
           {mostraSidebar&&(
-            <div className="sidebar">
+            <div className={`sidebar${sidebarCollapsed?" collapsed":""}`}>
               {MODULOS.filter(m=>m.ativo&&userModulos.includes(m.id)).map(m=>(
-                <div key={m.id} className={`snav-item ${modView===m.id?"on":""}`} onClick={()=>setModView(m.id)}>
+                <div key={m.id} data-label={m.label} className={`snav-item ${modView===m.id?"on":""}`} onClick={()=>setModView(m.id)}>
                   <span className="snav-icon">{m.icone}</span>
-                  <span>{m.label}</span>
+                  <span className="snav-label">{m.label}</span>
                 </div>
               ))}
+              <div className="snav-toggle" title={sidebarCollapsed?"Expandir menu":"Recolher menu"} onClick={()=>setSidebarCollapsed(v=>!v)}>
+                {sidebarCollapsed ? "▶" : "◀"}
+              </div>
             </div>
           )}
           <div style={{flex:1,overflow:"hidden",display:"flex",flexDirection:"column"}}>
