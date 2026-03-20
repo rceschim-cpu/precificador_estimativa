@@ -56,10 +56,12 @@ const loadPerfis = () => {
   try {
     const stored = JSON.parse(localStorage.getItem(KEYS.perfis) || "null");
     if (!stored) return PERFIS_DEFAULT;
-    // Garante que perfis sistema do PERFIS_DEFAULT sempre existam (evita perda após updates)
+    // Perfis sistema sempre usam a definição do código (garante módulos atualizados após deploy)
+    const sistemaMap = Object.fromEntries(PERFIS_DEFAULT.filter(p => p.sistema).map(p => [p.id, p]));
     const storedIds = stored.map(p => p.id);
+    const updated = stored.map(p => sistemaMap[p.id] ? { ...p, ...sistemaMap[p.id] } : p);
     const missing = PERFIS_DEFAULT.filter(p => p.sistema && !storedIds.includes(p.id));
-    return missing.length > 0 ? [...stored, ...missing] : stored;
+    return missing.length > 0 ? [...updated, ...missing] : updated;
   } catch { return PERFIS_DEFAULT; }
 };
 const savePerfis = (p) => localStorage.setItem(KEYS.perfis, JSON.stringify(p));
