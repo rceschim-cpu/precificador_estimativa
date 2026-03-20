@@ -1526,8 +1526,47 @@ function ModalRegistros({onClose, onLoad, currentD, currentCalcs, prodNome, user
   const [editVal, setEditVal]     = useState("");
   const [sobrescrever, setSobrescrever] = useState(null);
   const [erro, setErro]           = useState(null);
+  const [migrando, setMigrando]   = useState(false);
+  const [migMsg, setMigMsg]       = useState(null);
 
   const canManageShared = user?.perfil === "admin" || user?.perfil === "custos";
+
+  const localCount = () => {
+    try { return JSON.parse(localStorage.getItem("positec_calc_registros")||"[]").length; } catch { return 0; }
+  };
+
+  const handleMigrar = async () => {
+    setMigrando(true); setMigMsg(null); setErro(null);
+    try {
+      const regsLocal  = JSON.parse(localStorage.getItem("positec_calc_registros")||"[]");
+      const pastasLocal = JSON.parse(localStorage.getItem("positec_calc_pastas")||"[]");
+      if(regsLocal.length===0){ setMigMsg("Nenhum registro local encontrado."); return; }
+
+      // Cria pastas em ordem topológica (raiz primeiro) e mapeia id antigo → novo
+      const idMap = {};
+      const ordered = [];
+      const add = (p) => { if(idMap[p.id]!==undefined||ordered.includes(p)) return; if(p.pai) { const pai=pastasLocal.find(x=>x.id===p.pai); if(pai) add(pai); } ordered.push(p); };
+      pastasLocal.forEach(add);
+
+      for(const p of ordered){
+        const novoId = (await db.insertPastaRegistro(user.id, p.nome, p.pai ? (idMap[p.pai]??null) : null, false))?.[0]?.id;
+        if(novoId) idMap[p.id] = novoId;
+      }
+
+      // Cria registros
+      let ok=0, fail=0;
+      for(const r of regsLocal){
+        try {
+          await db.insertRegistro(user.id, r.nome, r.pastaId ? (idMap[r.pastaId]??null) : null, false, r.d, r.calcs);
+          ok++;
+        } catch { fail++; }
+      }
+
+      setMigMsg(`✓ ${ok} registro${ok!==1?"s":""} migrado${ok!==1?"s":""}${fail?` · ${fail} falhou`:""}. Pode limpar o armazenamento local se quiser.`);
+      await reload();
+    } catch(e) { setErro("Erro na migração: "+e.message); }
+    finally { setMigrando(false); }
+  };
 
   const reload = async () => {
     setLoading(true); setErro(null);
@@ -1661,6 +1700,18 @@ function ModalRegistros({onClose, onLoad, currentD, currentCalcs, prodNome, user
         <div className="mbody">
 
           {erro&&<div style={{padding:"8px 12px",background:"rgba(220,38,38,.1)",border:"1px solid rgba(220,38,38,.3)",borderRadius:4,fontSize:11,color:"#f87171",marginBottom:8}}>{erro}</div>}
+
+          {/* ── Migração local → nuvem ── */}
+          {localCount()>0&&!migMsg&&(
+            <div style={{display:"flex",alignItems:"center",gap:10,padding:"8px 12px",background:"rgba(217,119,6,.08)",border:"1px solid rgba(217,119,6,.25)",borderRadius:4,marginBottom:10}}>
+              <span style={{fontSize:11,color:"#fbbf24",flex:1}}>📦 {localCount()} registro{localCount()!==1?"s":""} local{localCount()!==1?"is":""} encontrado{localCount()!==1?"s":""}. Migrar para a nuvem?</span>
+              <button onClick={handleMigrar} disabled={migrando}
+                style={{padding:"4px 12px",background:"rgba(217,119,6,.2)",border:"1px solid rgba(217,119,6,.4)",color:"#fbbf24",fontSize:11,fontWeight:700,cursor:"pointer",borderRadius:3,flexShrink:0}}>
+                {migrando?"Migrando...":"⬆ Migrar"}
+              </button>
+            </div>
+          )}
+          {migMsg&&<div style={{padding:"8px 12px",background:"rgba(5,150,105,.1)",border:"1px solid rgba(5,150,105,.3)",borderRadius:4,fontSize:11,color:"#34d399",marginBottom:8}}>{migMsg}</div>}
 
           {/* ── Salvar ── */}
           <div style={{background:"rgba(0,71,187,.08)",border:"1px solid rgba(0,71,187,.25)",padding:"10px 14px",borderRadius:4,marginBottom:12}}>
