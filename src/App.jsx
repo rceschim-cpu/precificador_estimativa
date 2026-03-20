@@ -3458,7 +3458,7 @@ function RevCalc({precoAlvo,onChange,c,margem}){
 
 // ── CadastroProdutos ──────────────────────────────────────────────────────────
 const FORM_VAZIO={
-  categoria:"",ncm:"",nome:"",
+  categoria:"",ncm:"",nome:"",sku:"",
   ipi_mao:0,ipi_ios:0,ipi_cwb:0,
   cred_mao:0,cred_ios:0,cred_cwb:0,
   icms_mao:0,icms_ios:0,icms_cwb:0,
@@ -3735,7 +3735,7 @@ function CadastroProdutos({user}){
                 <input type="checkbox" checked={selecionados.size===filtrados.length&&filtrados.length>0}
                   onChange={toggleTodos} style={{cursor:"pointer",accentColor:"#0047BB"}}/>
               </th>
-              <th>ID</th><th>NCM</th><th>Nome</th><th>VPL Padrão</th>
+              <th>ID</th><th>SKU</th><th>NCM</th><th>Nome</th><th>VPL Padrão</th>
               <th>IPI MAO/IOS/CWB</th><th>Cred. MAO/IOS/CWB</th><th>Ações</th>
             </tr>
           </thead>
@@ -3744,6 +3744,7 @@ function CadastroProdutos({user}){
               <tr key={p.id} style={{background:selecionados.has(p.id)?"rgba(0,71,187,.08)":""}}>
                 <td><input type="checkbox" checked={selecionados.has(p.id)} onChange={()=>toggleSel(p.id)} style={{cursor:"pointer",accentColor:"#0047BB"}}/></td>
                 <td><code style={{fontSize:12,color:"#93c5fd"}}>{p.id}</code></td>
+                <td style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:"#7a90b0"}}>{p.sku||"—"}</td>
                 <td style={{fontFamily:"'DM Mono',monospace",fontSize:12}}>{p.ncm}</td>
                 <td style={{fontWeight:600}}>{p.nome}</td>
                 <td style={{fontFamily:"'DM Mono',monospace",fontSize:12,color:(p.vpl_padrao||0)>0?"#34d399":"#7a7f96"}}>
@@ -3794,7 +3795,10 @@ function CadastroProdutos({user}){
                 </div>
                 <Ft label="NCM" k="ncm" placeholder="ex: 8471.30.11"/>
               </div>
-              <Ft label="Nome" k="nome" placeholder="ex: Tablet 7&quot;"/>
+              <div style={{display:"grid",gridTemplateColumns:"2fr 1fr",gap:10}}>
+                <Ft label="Nome" k="nome" placeholder='ex: Tablet 7"'/>
+                <Ft label="SKU" k="sku" placeholder="ex: 123456"/>
+              </div>
 
               {/* Seções com toggle */}
               <div style={{marginTop:12}}>
