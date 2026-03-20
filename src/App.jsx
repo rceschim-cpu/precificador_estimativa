@@ -47,7 +47,7 @@ const MODULOS = [
 ];
 
 const PERFIS_DEFAULT = [
-  { id: "admin",    label: "Administrador",       icone: "⚙️",  cor: "#0047BB", desc: "Acesso total ao sistema. Gerencia usuários e perfis.", modulos: ["precificacao"], sistema: true  },
+  { id: "admin",    label: "Administrador",       icone: "⚙️",  cor: "#0047BB", desc: "Acesso total ao sistema. Gerencia usuários e perfis.", modulos: ["precificacao","cadastro"], sistema: true  },
   { id: "custos",   label: "Depto. de Custos",    icone: "📊", cor: "#059669", desc: "Acesso completo à calculadora.", modulos: ["precificacao"], sistema: false },
   { id: "base",     label: "Atualização de Base",  icone: "📦", cor: "#7c3aed", desc: "Cadastro de produtos e precificação simplificada.", modulos: ["cadastro","precificacao"], sistema: true  },
 ];
@@ -55,7 +55,11 @@ const PERFIS_DEFAULT = [
 const loadPerfis = () => {
   try {
     const stored = JSON.parse(localStorage.getItem(KEYS.perfis) || "null");
-    return stored || PERFIS_DEFAULT;
+    if (!stored) return PERFIS_DEFAULT;
+    // Garante que perfis sistema do PERFIS_DEFAULT sempre existam (evita perda após updates)
+    const storedIds = stored.map(p => p.id);
+    const missing = PERFIS_DEFAULT.filter(p => p.sistema && !storedIds.includes(p.id));
+    return missing.length > 0 ? [...stored, ...missing] : stored;
   } catch { return PERFIS_DEFAULT; }
 };
 const savePerfis = (p) => localStorage.setItem(KEYS.perfis, JSON.stringify(p));
