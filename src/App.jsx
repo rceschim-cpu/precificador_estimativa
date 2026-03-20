@@ -33,6 +33,16 @@ const db = {
   insertProduto:  (p)        => sbFetch("produtos_catalogo", { method: "POST", body: JSON.stringify(p) }),
   updateProduto:  (id, data) => sbFetch(`produtos_catalogo?id=eq.${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(data) }),
   deleteProduto:  (id)       => sbFetch(`produtos_catalogo?id=eq.${encodeURIComponent(id)}`, { method: "DELETE", prefer: "return=minimal" }),
+  getRegistros:   (userId)   => sbFetch(`registros?or=(user_id.eq.${encodeURIComponent(userId)},compartilhado.is.true)&select=*&order=criado_em.desc`)
+    .then(rows=>(rows||[]).map(r=>({id:r.id,nome:r.nome,pastaId:r.pasta_id??null,compartilhado:!!r.compartilhado,userId:r.user_id,data:new Date(r.criado_em).toLocaleString("pt-BR"),d:r.dados?.d,calcs:r.dados?.calcs}))),
+  getPastasRegistros: (userId) => sbFetch(`pastas_registros?or=(user_id.eq.${encodeURIComponent(userId)},compartilhado.is.true)&select=*&order=nome.asc`)
+    .then(rows=>(rows||[]).map(p=>({id:p.id,nome:p.nome,pai:p.pai_id??null,compartilhado:!!p.compartilhado,userId:p.user_id}))),
+  insertRegistro: (userId, nome, pastaId, compartilhado, d, calcs) => sbFetch("registros", { method:"POST", body:JSON.stringify({user_id:String(userId),nome,pasta_id:pastaId||null,compartilhado:!!compartilhado,dados:{d,calcs}}) }),
+  updateRegistro: (id, data) => sbFetch(`registros?id=eq.${id}`, { method:"PATCH", body:JSON.stringify(data) }),
+  deleteRegistro: (id)       => sbFetch(`registros?id=eq.${id}`, { method:"DELETE", prefer:"return=minimal" }),
+  insertPastaRegistro: (userId, nome, paiId, compartilhado) => sbFetch("pastas_registros", { method:"POST", body:JSON.stringify({user_id:String(userId),nome,pai_id:paiId||null,compartilhado:!!compartilhado}) }),
+  updatePastaRegistro: (id, data) => sbFetch(`pastas_registros?id=eq.${id}`, { method:"PATCH", body:JSON.stringify(data) }),
+  deletePastaRegistro: (id)       => sbFetch(`pastas_registros?id=eq.${id}`, { method:"DELETE", prefer:"return=minimal" }),
 };
 
 // ── STORAGE (sessão local apenas) ─────────────────────────────────────────────
@@ -181,17 +191,18 @@ input,select,textarea,button{font-family:inherit}
 .btn-logout:hover{border-color:var(--border2);color:var(--text)}
 
 .dash-body{display:flex;flex:1;min-height:0}
-.sidebar{width:220px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);padding:16px 0;display:flex;flex-direction:column;gap:2px;overflow-y:auto;transition:width .2s}
-.sidebar.collapsed{width:50px}
-.snav-item{display:flex;align-items:center;gap:11px;padding:10px 20px;cursor:pointer;color:var(--muted);font-size:13px;font-weight:500;transition:.15s;border-left:3px solid transparent;position:relative;white-space:nowrap;overflow:hidden}
-.sidebar.collapsed .snav-item{padding:10px 0;justify-content:center;gap:0}
+.sidebar{width:220px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);padding:0;display:flex;flex-direction:column;gap:2px;overflow-y:auto;transition:width .2s}
+.sidebar.collapsed{width:50px;overflow:visible}
+.snav-item{display:flex;align-items:center;gap:11px;padding:10px 20px;cursor:pointer;color:var(--muted);font-size:13px;font-weight:500;transition:.15s;border-left:3px solid transparent;position:relative;white-space:nowrap}
+.sidebar:not(.collapsed) .snav-item{overflow:hidden}
+.sidebar.collapsed .snav-item{padding:10px 0;justify-content:center;gap:0;overflow:visible}
 .sidebar.collapsed .snav-label{display:none}
-.sidebar.collapsed .snav-item:hover::after{content:attr(data-label);position:absolute;left:54px;background:#1e2840;border:1px solid rgba(255,255,255,.12);color:#dce7f7;font-size:11px;font-weight:600;padding:4px 10px;border-radius:4px;white-space:nowrap;z-index:999;pointer-events:none}
+.sidebar.collapsed .snav-item:hover::after{content:attr(data-label);position:absolute;left:54px;top:50%;transform:translateY(-50%);background:#1e2840;border:1px solid rgba(255,255,255,.18);color:#dce7f7;font-size:11px;font-weight:600;padding:5px 12px;border-radius:4px;white-space:nowrap;z-index:9999;pointer-events:none;box-shadow:0 4px 12px rgba(0,0,0,.4)}
 .snav-item:hover{background:rgba(255,255,255,.03);color:var(--text)}
 .snav-item.on{border-left-color:#0047BB;background:rgba(0,71,187,.1);color:#fff;font-weight:600}
 .snav-icon{font-size:16px;flex-shrink:0;width:22px;text-align:center}
-.snav-toggle{margin-top:auto;padding:10px 0;display:flex;justify-content:center;cursor:pointer;color:var(--muted);font-size:14px;border-top:1px solid var(--border);transition:.15s}
-.snav-toggle:hover{color:var(--text)}
+.snav-toggle{padding:9px 0;display:flex;justify-content:center;cursor:pointer;color:var(--muted);font-size:13px;border-bottom:1px solid var(--border);transition:.15s;flex-shrink:0}
+.snav-toggle:hover{background:rgba(255,255,255,.04);color:var(--text)}
 .snav-sep{height:1px;background:var(--border);margin:8px 16px}
 
 .main-content{flex:1;padding:28px;overflow-y:auto;background:var(--bg);min-height:0}
@@ -1497,98 +1508,103 @@ function ModalCFVenda({onClose,onApply,data,setData}){
   );
 }
 
-function ModalRegistros({onClose, onLoad, currentD, currentCalcs, prodNome}){
-  const [registros, setRegistros] = useState(loadRegistros);
-  const [pastas, setPastas]       = useState(loadPastas);
+function ModalRegistros({onClose, onLoad, currentD, currentCalcs, prodNome, user}){
+  const [registros, setRegistros] = useState([]);
+  const [pastas, setPastas]       = useState([]);
+  const [loading, setLoading]     = useState(true);
+  const [saving, setSaving]       = useState(false);
   const [nome, setNome]           = useState(prodNome||"");
-  const [pastaAtual, setPastaAtual] = useState(null); // id da pasta aberta (null = raiz)
-  const [view, setView]           = useState("lista"); // "lista" | "nova-pasta" | "mover"
+  const [compartilhado, setCompartilhado] = useState(false);
+  const [pastaAtual, setPastaAtual] = useState(null);
+  const [view, setView]           = useState("lista");
   const [nomePasta, setNomePasta] = useState("");
-  const [pastaPaiCriacao, setPastaPaiCriacao] = useState(null); // pai da nova subpasta
+  const [pastaPaiCriacao, setPastaPaiCriacao] = useState(null);
   const [registroMover, setRegistroMover] = useState(null);
   const [confirmDel, setConfirmDel]         = useState(null);
   const [confirmDelPasta, setConfirmDelPasta] = useState(null);
   const [editNome, setEditNome]   = useState(null);
   const [editVal, setEditVal]     = useState("");
-  const [sobrescrever, setSobrescrever] = useState(null); // id do registro a sobrescrever
+  const [sobrescrever, setSobrescrever] = useState(null);
+  const [erro, setErro]           = useState(null);
 
-  const persist = (regs, pas) => {
-    saveRegistros(regs); setRegistros(regs);
-    if(pas!==undefined){ savePastas(pas); setPastas(pas); }
+  const canManageShared = user?.perfil === "admin" || user?.perfil === "custos";
+
+  const reload = async () => {
+    setLoading(true); setErro(null);
+    try {
+      const [regs, pas] = await Promise.all([db.getRegistros(user.id), db.getPastasRegistros(user.id)]);
+      setRegistros(regs||[]); setPastas(pas||[]);
+    } catch(e) { setErro("Erro ao carregar: "+e.message); }
+    finally { setLoading(false); }
   };
 
-  // Breadcrumb: caminho da pasta atual
+  useEffect(()=>{ reload(); }, []);
+
   const breadcrumb = (pastaId) => {
-    const path = [];
-    let cur = pastaId;
-    const visited = new Set();
-    while(cur !== null && cur !== undefined){
-      if(visited.has(cur)) break;
-      visited.add(cur);
-      const p = pastas.find(x=>x.id===cur);
-      if(!p) break;
-      path.unshift(p);
-      cur = p.pai ?? null;
-    }
+    const path=[]; let cur=pastaId; const visited=new Set();
+    while(cur!==null&&cur!==undefined){ if(visited.has(cur))break; visited.add(cur); const p=pastas.find(x=>x.id===cur); if(!p)break; path.unshift(p); cur=p.pai??null; }
     return path;
   };
   const caminho = breadcrumb(pastaAtual);
-
-  // Subpastas da pasta atual
   const subpastasAtuais = pastas.filter(p=>(p.pai??null)===pastaAtual);
   const regsNaPasta     = registros.filter(r=>(r.pastaId??null)===pastaAtual);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const label = nome.trim() || prodNome || "Sem nome";
-    if(sobrescrever){
-      // Sobrescrever registro existente
-      const regs = registros.map(r=>r.id===sobrescrever
-        ? {...r, nome:label, data:new Date().toLocaleString("pt-BR"), d:currentD, calcs:currentCalcs}
-        : r);
-      persist(regs);
-      setSobrescrever(null);
-    } else {
-      const novo = {id:Date.now(), nome:label, pastaId:pastaAtual,
-        data:new Date().toLocaleString("pt-BR"), d:currentD, calcs:currentCalcs};
-      persist([novo, ...registros]);
-    }
-    setNome("");
+    setErro(null); setSaving(true);
+    try {
+      if(sobrescrever){
+        const reg = registros.find(r=>r.id===sobrescrever);
+        if(reg?.compartilhado && !canManageShared){ setErro("Sem permissão para sobrescrever registros compartilhados."); return; }
+        await db.updateRegistro(sobrescrever, { nome:label, dados:{d:currentD,calcs:currentCalcs} });
+        setSobrescrever(null);
+      } else {
+        await db.insertRegistro(user.id, label, pastaAtual, compartilhado, currentD, currentCalcs);
+      }
+      setNome(""); setCompartilhado(false); await reload();
+    } catch(e) { setErro("Erro ao salvar: "+e.message); }
+    finally { setSaving(false); }
   };
 
-  const handleDelete = (id) => {
-    persist(registros.filter(r=>r.id!==id));
+  const handleDelete = async (id) => {
+    const reg = registros.find(r=>r.id===id);
+    if(reg?.compartilhado && !canManageShared){ setErro("Sem permissão para excluir registros compartilhados."); setConfirmDel(null); return; }
+    try { await db.deleteRegistro(id); await reload(); } catch(e) { setErro("Erro: "+e.message); }
     setConfirmDel(null);
   };
 
-  const handleDeletePasta = (id) => {
-    // Move registros e subpastas para raiz
-    const regs = registros.map(r=>r.pastaId===id?{...r,pastaId:null}:r);
-    const novaPastas = pastas
-      .filter(p=>p.id!==id)
-      .map(p=>p.pai===id?{...p,pai:null}:p);
-    persist(regs, novaPastas);
+  const handleDeletePasta = async (id) => {
+    try {
+      const regsNesta = registros.filter(r=>r.pastaId===id);
+      const subps = pastas.filter(p=>p.pai===id);
+      await Promise.all([
+        ...regsNesta.map(r=>db.updateRegistro(r.id,{pasta_id:null})),
+        ...subps.map(p=>db.updatePastaRegistro(p.id,{pai_id:null})),
+      ]);
+      await db.deletePastaRegistro(id);
+      if(pastaAtual===id) setPastaAtual(null);
+      await reload();
+    } catch(e) { setErro("Erro: "+e.message); }
     setConfirmDelPasta(null);
-    if(pastaAtual===id) setPastaAtual(null);
   };
 
-  const handleCriarPasta = () => {
+  const handleCriarPasta = async () => {
     if(!nomePasta.trim()) return;
-    const nova = {id:Date.now(), nome:nomePasta.trim(), pai:pastaPaiCriacao??pastaAtual??null};
-    const updated = [...pastas, nova];
-    savePastas(updated); setPastas(updated);
-    setNomePasta(""); setView("lista"); setPastaPaiCriacao(null);
+    try {
+      await db.insertPastaRegistro(user.id, nomePasta.trim(), pastaPaiCriacao??pastaAtual??null, false);
+      setNomePasta(""); setView("lista"); setPastaPaiCriacao(null); await reload();
+    } catch(e) { setErro("Erro: "+e.message); }
   };
 
-  const handleMover = (pastaDestino) => {
-    const regs = registros.map(r=>r.id===registroMover?{...r,pastaId:pastaDestino}:r);
-    persist(regs);
-    setRegistroMover(null); setView("lista");
+  const handleMover = async (pastaDestino) => {
+    try { await db.updateRegistro(registroMover,{pasta_id:pastaDestino}); setRegistroMover(null); setView("lista"); await reload(); }
+    catch(e) { setErro("Erro: "+e.message); }
   };
 
-  const handleRenomear = (id) => {
+  const handleRenomear = async (id) => {
     if(!editVal.trim()) return;
-    persist(registros.map(r=>r.id===id?{...r,nome:editVal.trim()}:r));
-    setEditNome(null);
+    try { await db.updateRegistro(id,{nome:editVal.trim()}); setEditNome(null); await reload(); }
+    catch(e) { setErro("Erro: "+e.message); }
   };
 
   const btnStyle = (active) => ({
@@ -1598,6 +1614,9 @@ function ModalRegistros({onClose, onLoad, currentD, currentCalcs, prodNome}){
     borderColor:active?"#0047BB":"rgba(255,255,255,.12)",
     color:active?"#93c5fd":"#7a90b0"
   });
+
+  // dropdown sobrescrever: só mostra registros que o usuário pode sobrescrever
+  const regsParaSobrescrever = canManageShared ? registros : registros.filter(r=>!r.compartilhado);
 
   // ── Tela de mover ──────────────────────────────────────────────────────────
   if(view==="mover") return(
@@ -1641,6 +1660,8 @@ function ModalRegistros({onClose, onLoad, currentD, currentCalcs, prodNome}){
         </div>
         <div className="mbody">
 
+          {erro&&<div style={{padding:"8px 12px",background:"rgba(220,38,38,.1)",border:"1px solid rgba(220,38,38,.3)",borderRadius:4,fontSize:11,color:"#f87171",marginBottom:8}}>{erro}</div>}
+
           {/* ── Salvar ── */}
           <div style={{background:"rgba(0,71,187,.08)",border:"1px solid rgba(0,71,187,.25)",padding:"10px 14px",borderRadius:4,marginBottom:12}}>
             <div style={{fontSize:10,fontWeight:700,color:"#93c5fd",marginBottom:8,letterSpacing:.5,textTransform:"uppercase"}}>
@@ -1653,19 +1674,26 @@ function ModalRegistros({onClose, onLoad, currentD, currentCalcs, prodNome}){
                   onKeyDown={e=>e.key==="Enter"&&handleSave()}
                   style={{background:"none",border:"none",outline:"none",fontFamily:"'IBM Plex Sans',sans-serif",fontSize:12,color:"#dce7f7",padding:"7px 10px",width:"100%"}}/>
               </div>
-              <button className="mapp" style={{padding:"7px 16px",borderRadius:4,fontSize:12,flexShrink:0}} onClick={handleSave}>
-                {sobrescrever ? "↺ Sobrescrever" : "💾 Salvar novo"}
+              <button className="mapp" style={{padding:"7px 16px",borderRadius:4,fontSize:12,flexShrink:0}} onClick={handleSave} disabled={saving}>
+                {saving ? "..." : sobrescrever ? "↺ Sobrescrever" : "💾 Salvar novo"}
               </button>
+            </div>
+            <div style={{display:"flex",alignItems:"center",gap:16,marginBottom:6}}>
+              <label style={{display:"flex",alignItems:"center",gap:6,cursor:"pointer",fontSize:11,color:compartilhado?"#93c5fd":"#7a90b0",userSelect:"none"}}>
+                <input type="checkbox" checked={compartilhado} onChange={e=>setCompartilhado(e.target.checked)}
+                  style={{accentColor:"#0047BB",cursor:"pointer"}}/>
+                🌐 Compartilhar com todos
+              </label>
             </div>
             {/* Sobrescrever dropdown */}
             <div style={{display:"flex",alignItems:"center",gap:8}}>
               <span style={{fontSize:10,color:"#5a6a84",flexShrink:0}}>Ou sobrescrever:</span>
               <select value={sobrescrever||""}
-                onChange={e=>setSobrescrever(e.target.value ? +e.target.value : null)}
+                onChange={e=>setSobrescrever(e.target.value ? Number(e.target.value) : null)}
                 style={{flex:1,background:"#1a2030",border:"1px solid rgba(255,255,255,.12)",color:sobrescrever?"#fbbf24":"#7a90b0",padding:"4px 8px",fontSize:11,borderRadius:3,outline:"none"}}>
                 <option value="">— selecionar registro —</option>
-                {registros.map(r=>(
-                  <option key={r.id} value={r.id}>{r.nome} ({r.data})</option>
+                {regsParaSobrescrever.map(r=>(
+                  <option key={r.id} value={r.id}>{r.compartilhado?"🌐 ":""}{r.nome} ({r.data})</option>
                 ))}
               </select>
               {sobrescrever&&<button onClick={()=>setSobrescrever(null)}
@@ -1675,7 +1703,6 @@ function ModalRegistros({onClose, onLoad, currentD, currentCalcs, prodNome}){
 
           {/* ── Navegação de pastas com breadcrumb ── */}
           <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8,flexWrap:"wrap"}}>
-            {/* Breadcrumb */}
             <button style={btnStyle(pastaAtual===null)} onClick={()=>setPastaAtual(null)}>🏠</button>
             {caminho.map((p,i)=>(
               <span key={p.id} style={{display:"flex",alignItems:"center",gap:4}}>
@@ -1685,16 +1712,12 @@ function ModalRegistros({onClose, onLoad, currentD, currentCalcs, prodNome}){
                 </button>
               </span>
             ))}
-
-            {/* Subpastas da pasta atual */}
             {subpastasAtuais.map(p=>(
               <button key={p.id} style={btnStyle(false)} onClick={()=>setPastaAtual(p.id)}>
-                📁 {p.nome}
+                {p.compartilhado?"🌐":"📁"} {p.nome}
                 <span style={{fontSize:9,marginLeft:3,opacity:.6}}>{registros.filter(r=>r.pastaId===p.id).length}</span>
               </button>
             ))}
-
-            {/* Nova pasta / subpasta */}
             {view==="nova-pasta"
               ? <div style={{display:"flex",gap:4,alignItems:"center"}}>
                   <input autoFocus type="text" placeholder="Nome da pasta" value={nomePasta}
@@ -1709,8 +1732,6 @@ function ModalRegistros({onClose, onLoad, currentD, currentCalcs, prodNome}){
                   + {pastaAtual ? "Subpasta" : "Pasta"}
                 </button>
             }
-
-            {/* Excluir pasta atual */}
             {pastaAtual!==null&&(
               confirmDelPasta===pastaAtual
                 ? <div style={{display:"flex",gap:4,alignItems:"center",marginLeft:"auto"}}>
@@ -1726,48 +1747,54 @@ function ModalRegistros({onClose, onLoad, currentD, currentCalcs, prodNome}){
           </div>
 
           {/* ── Lista de registros ── */}
-          {regsNaPasta.length===0&&subpastasAtuais.length===0
-            ? <div style={{textAlign:"center",padding:"24px 0",fontFamily:"'DM Mono',monospace",fontSize:11,color:"#5a6a84"}}>
-                {pastaAtual ? "Pasta vazia." : "Nenhum registro salvo ainda."}
-              </div>
-            : <div style={{display:"flex",flexDirection:"column",gap:4,maxHeight:340,overflowY:"auto"}}>
-                {regsNaPasta.map(r=>(
-                  <div key={r.id} style={{padding:"9px 12px",background:"#2a3550",border:"1px solid rgba(255,255,255,.08)",borderRadius:4}}>
-                    <div style={{display:"flex",alignItems:"center",gap:8}}>
-                      {editNome===r.id
-                        ? <input autoFocus value={editVal} onChange={e=>setEditVal(e.target.value)}
-                            onKeyDown={e=>{if(e.key==="Enter")handleRenomear(r.id);if(e.key==="Escape")setEditNome(null);}}
-                            style={{flex:1,background:"rgba(255,255,255,.08)",border:"1px solid rgba(255,255,255,.2)",color:"#dce7f7",padding:"4px 8px",fontSize:12,borderRadius:3,outline:"none"}}/>
-                        : <div style={{flex:1,minWidth:0}}>
-                            <div style={{fontSize:13,fontWeight:700,color:"#dce7f7",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{r.nome}</div>
-                            <div style={{fontSize:10,fontFamily:"'DM Mono',monospace",color:"#5a6a84",marginTop:2}}>
-                              {r.data} · {r.d?.ufDestino||""} · ML {r.d?.margem||0}%
+          {loading
+            ? <div style={{textAlign:"center",padding:"24px 0",fontSize:12,color:"#5a6a84"}}>Carregando...</div>
+            : regsNaPasta.length===0&&subpastasAtuais.length===0
+              ? <div style={{textAlign:"center",padding:"24px 0",fontFamily:"'DM Mono',monospace",fontSize:11,color:"#5a6a84"}}>
+                  {pastaAtual ? "Pasta vazia." : "Nenhum registro salvo ainda."}
+                </div>
+              : <div style={{display:"flex",flexDirection:"column",gap:4,maxHeight:340,overflowY:"auto"}}>
+                  {regsNaPasta.map(r=>(
+                    <div key={r.id} style={{padding:"9px 12px",background:"#2a3550",border:"1px solid rgba(255,255,255,.08)",borderRadius:4}}>
+                      <div style={{display:"flex",alignItems:"center",gap:8}}>
+                        {editNome===r.id
+                          ? <input autoFocus value={editVal} onChange={e=>setEditVal(e.target.value)}
+                              onKeyDown={e=>{if(e.key==="Enter")handleRenomear(r.id);if(e.key==="Escape")setEditNome(null);}}
+                              style={{flex:1,background:"rgba(255,255,255,.08)",border:"1px solid rgba(255,255,255,.2)",color:"#dce7f7",padding:"4px 8px",fontSize:12,borderRadius:3,outline:"none"}}/>
+                          : <div style={{flex:1,minWidth:0}}>
+                              <div style={{fontSize:13,fontWeight:700,color:"#dce7f7",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>
+                                {r.compartilhado&&<span title="Compartilhado" style={{marginRight:4}}>🌐</span>}{r.nome}
+                              </div>
+                              <div style={{fontSize:10,fontFamily:"'DM Mono',monospace",color:"#5a6a84",marginTop:2}}>
+                                {r.data} · {r.d?.ufDestino||""} · ML {r.d?.margem||0}%
+                              </div>
                             </div>
-                          </div>
-                      }
-                      {confirmDel===r.id
-                        ? <div style={{display:"flex",gap:4,alignItems:"center",flexShrink:0}}>
-                            <span style={{fontSize:10,color:"#f87171"}}>Excluir?</span>
-                            <button onClick={()=>handleDelete(r.id)} style={{padding:"4px 8px",background:"#dc2626",border:"none",color:"#fff",fontSize:11,fontWeight:700,cursor:"pointer",borderRadius:3}}>Sim</button>
-                            <button onClick={()=>setConfirmDel(null)} style={{padding:"4px 8px",background:"transparent",border:"1px solid rgba(255,255,255,.15)",color:"#94a3b8",fontSize:11,cursor:"pointer",borderRadius:3}}>Não</button>
-                          </div>
-                        : <div style={{display:"flex",gap:3,flexShrink:0}}>
-                            <button onClick={()=>{onLoad(r.d,r.calcs,r.nome);onClose();}}
-                              style={{padding:"5px 11px",background:"#0047BB",border:"none",color:"#fff",fontSize:11,fontWeight:700,cursor:"pointer",borderRadius:3}}>↩ Carregar</button>
-                            <button onClick={()=>{setEditNome(r.id);setEditVal(r.nome);}}
-                              title="Renomear"
-                              style={{padding:"5px 8px",background:"rgba(255,255,255,.05)",border:"1px solid rgba(255,255,255,.12)",color:"#a8b5cc",fontSize:11,cursor:"pointer",borderRadius:3}}>✎</button>
-                            <button onClick={()=>{setRegistroMover(r.id);setView("mover");}}
-                              title="Mover"
-                              style={{padding:"5px 8px",background:"rgba(255,255,255,.05)",border:"1px solid rgba(255,255,255,.12)",color:"#a8b5cc",fontSize:11,cursor:"pointer",borderRadius:3}}>📁</button>
-                            <button onClick={()=>setConfirmDel(r.id)}
-                              style={{padding:"5px 8px",background:"rgba(220,38,38,.1)",border:"1px solid rgba(220,38,38,.25)",color:"#f87171",fontSize:11,cursor:"pointer",borderRadius:3}}>✕</button>
-                          </div>
-                      }
+                        }
+                        {confirmDel===r.id
+                          ? <div style={{display:"flex",gap:4,alignItems:"center",flexShrink:0}}>
+                              <span style={{fontSize:10,color:"#f87171"}}>Excluir?</span>
+                              <button onClick={()=>handleDelete(r.id)} style={{padding:"4px 8px",background:"#dc2626",border:"none",color:"#fff",fontSize:11,fontWeight:700,cursor:"pointer",borderRadius:3}}>Sim</button>
+                              <button onClick={()=>setConfirmDel(null)} style={{padding:"4px 8px",background:"transparent",border:"1px solid rgba(255,255,255,.15)",color:"#94a3b8",fontSize:11,cursor:"pointer",borderRadius:3}}>Não</button>
+                            </div>
+                          : <div style={{display:"flex",gap:3,flexShrink:0}}>
+                              <button onClick={()=>{onLoad(r.d,r.calcs,r.nome);onClose();}}
+                                style={{padding:"5px 11px",background:"#0047BB",border:"none",color:"#fff",fontSize:11,fontWeight:700,cursor:"pointer",borderRadius:3}}>↩ Carregar</button>
+                              <button onClick={()=>{setEditNome(r.id);setEditVal(r.nome);}}
+                                title="Renomear"
+                                style={{padding:"5px 8px",background:"rgba(255,255,255,.05)",border:"1px solid rgba(255,255,255,.12)",color:"#a8b5cc",fontSize:11,cursor:"pointer",borderRadius:3}}>✎</button>
+                              <button onClick={()=>{setRegistroMover(r.id);setView("mover");}}
+                                title="Mover"
+                                style={{padding:"5px 8px",background:"rgba(255,255,255,.05)",border:"1px solid rgba(255,255,255,.12)",color:"#a8b5cc",fontSize:11,cursor:"pointer",borderRadius:3}}>📁</button>
+                              {(r.userId===String(user?.id)||canManageShared)&&
+                                <button onClick={()=>setConfirmDel(r.id)}
+                                  style={{padding:"5px 8px",background:"rgba(220,38,38,.1)",border:"1px solid rgba(220,38,38,.25)",color:"#f87171",fontSize:11,cursor:"pointer",borderRadius:3}}>✕</button>
+                              }
+                            </div>
+                        }
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
           }
         </div>
       </div>
@@ -2609,6 +2636,7 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
       onClose={()=>setModal(null)}
       currentD={d} currentCalcs={calcs}
       prodNome={nomeAba||prod.nome}
+      user={currentUser}
       onLoad={(savedD, savedCalcs, nome)=>{
         const safeD={
           ...DEF,
@@ -3549,15 +3577,15 @@ export default function App() {
         <div className="dash-body">
           {mostraSidebar&&(
             <div className={`sidebar${sidebarCollapsed?" collapsed":""}`}>
+              <div className="snav-toggle" title={sidebarCollapsed?"Expandir menu":"Recolher menu"} onClick={()=>setSidebarCollapsed(v=>!v)}>
+                {sidebarCollapsed ? "▶" : "◀"}
+              </div>
               {MODULOS.filter(m=>m.ativo&&userModulos.includes(m.id)).map(m=>(
                 <div key={m.id} data-label={m.label} className={`snav-item ${modView===m.id?"on":""}`} onClick={()=>setModView(m.id)}>
                   <span className="snav-icon">{m.icone}</span>
                   <span className="snav-label">{m.label}</span>
                 </div>
               ))}
-              <div className="snav-toggle" title={sidebarCollapsed?"Expandir menu":"Recolher menu"} onClick={()=>setSidebarCollapsed(v=>!v)}>
-                {sidebarCollapsed ? "▶" : "◀"}
-              </div>
             </div>
           )}
           <div style={{flex:1,overflow:"hidden",display:"flex",flexDirection:"column"}}>
