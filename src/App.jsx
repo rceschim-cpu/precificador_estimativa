@@ -65,7 +65,6 @@ const MODULOS = [
 const PERFIS_DEFAULT = [
   { id: "admin",    label: "Administrador",       icone: "⚙️",  cor: "#0047BB", desc: "Acesso total ao sistema. Gerencia usuários e perfis.", modulos: ["precificacao","cadastro"], sistema: true  },
   { id: "custos",   label: "Depto. de Custos",    icone: "📊", cor: "#059669", desc: "Acesso completo à calculadora.", modulos: ["precificacao"], sistema: false },
-  { id: "base",     label: "Atualização de Base",  icone: "📦", cor: "#7c3aed", desc: "Cadastro de produtos e precificação simplificada.", modulos: ["cadastro","precificacao"], sistema: true  },
 ];
 
 const loadPerfis = () => {
