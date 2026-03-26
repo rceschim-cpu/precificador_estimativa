@@ -2461,6 +2461,10 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
   const [produtosDB,setProdutosDB]=useState([]);
   const [produtoDB,setProdutoDB]=useState(null);
   const [categoriasDB,setCategoriasDB]=useState([]);
+  const [buscaProd,setBuscaProd]=useState("");
+  const [editCadModal,setEditCadModal]=useState(false);
+  const [editCadForm,setEditCadForm]=useState(null);
+  const [editCadSalvando,setEditCadSalvando]=useState(false);
 
   // Escuta evento do botão Gestão no topbar
   useEffect(()=>{
@@ -2507,6 +2511,10 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
   const isZFM=prodAtrib.isZFM;
   const isCBU=prodAtrib.isCBU;
   const pcEntry=PC_ZFM.find(e=>e.k===d.pcZfmKey)||PC_ZFM[1];
+  const temCadastro=useMemo(()=>{
+    const pm=getPerfisMap(loadPerfis());
+    return (pm[currentUser?.perfil]?.modulos||[]).includes("cadastro");
+  },[currentUser?.perfil]);
   const setProd=id=>{
     const dbRec=produtosDB.find(x=>x.id===id)||null;
     setProdutoDB(dbRec);
@@ -2797,6 +2805,92 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
       }}/>}
     {modal==="gestao"&&<ModalGestaoUsers onClose={()=>setModal(null)} currentUser={currentUser}/> }
 
+    {/* Modal de edição rápida do cadastro do produto */}
+    {editCadModal&&editCadForm&&(()=>{
+      const F=k=>e=>setEditCadForm(p=>({...p,[k]:e.target.type==="number"?parseFloat(e.target.value)||0:e.target.value}));
+      const salvar=async()=>{
+        setEditCadSalvando(true);
+        try{
+          const {categoria,...dados}=editCadForm;
+          await db.updateProduto(editCadForm.id,dados);
+          const rows=await db.getProdutos();
+          if(rows&&rows.length){
+            setProdutosDB(rows);
+            const novo=rows.find(r=>r.id===editCadForm.id)||null;
+            setProdutoDB(novo);
+          }
+          setEditCadModal(false);
+        }catch(e){alert("Erro ao salvar: "+e.message);}
+        finally{setEditCadSalvando(false);}
+      };
+      const Campo=({label,k,sfx=""})=>(
+        <div style={{display:"flex",flexDirection:"column",gap:2}}>
+          <label style={{fontSize:9,fontWeight:700,color:"#A7A8AA",textTransform:"uppercase",letterSpacing:.5}}>
+            {label}{sfx&&<span style={{color:"#636262",marginLeft:2}}>{sfx}</span>}
+          </label>
+          <input type="number" step="any" value={editCadForm[k]||0} onChange={F(k)}
+            style={{background:"#201f1e",border:"1px solid rgba(255,255,255,.12)",color:"#f0f0f0",
+              padding:"5px 8px",fontSize:12,outline:"none",borderRadius:3,width:"100%"}}/>
+        </div>
+      );
+      return(
+        <div className="ov" onClick={()=>setEditCadModal(false)}>
+          <div className="mb" style={{maxWidth:520}} onClick={e=>e.stopPropagation()}>
+            <div className="mh">
+              <span className="mt">✏ Editar cadastro — {editCadForm.nome}</span>
+              <button className="mc" onClick={()=>setEditCadModal(false)}>×</button>
+            </div>
+            <div className="mbody" style={{gap:14}}>
+              <div style={{fontSize:11,color:"#A7A8AA",padding:"6px 10px",background:"rgba(60,219,192,.06)",
+                border:"1px solid rgba(60,219,192,.15)",borderRadius:4}}>
+                <strong style={{color:"#3CDBC0"}}>{editCadForm.id}</strong>
+                {" · NCM "}{editCadForm.ncm}
+                {editCadForm.sku?<> · SKU {editCadForm.sku}</>:null}
+              </div>
+
+              <div style={{fontSize:10,fontWeight:700,color:"#A7A8AA",textTransform:"uppercase",letterSpacing:.8,borderBottom:"1px solid rgba(255,255,255,.06)",paddingBottom:4}}>Impostos</div>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
+                <Campo label="IPI MAO" k="ipi_mao" sfx="%"/>
+                <Campo label="IPI IOS" k="ipi_ios" sfx="%"/>
+                <Campo label="IPI CWB" k="ipi_cwb" sfx="%"/>
+                <Campo label="Créd. MAO" k="cred_mao" sfx="%"/>
+                <Campo label="Créd. IOS" k="cred_ios" sfx="%"/>
+                <Campo label="Créd. CWB" k="cred_cwb" sfx="%"/>
+                <Campo label="ICMS MAO" k="icms_mao" sfx="%"/>
+                <Campo label="ICMS IOS" k="icms_ios" sfx="%"/>
+                <Campo label="ICMS CWB" k="icms_cwb" sfx="%"/>
+                <Campo label="MVA" k="mva" sfx="%"/>
+                <Campo label="FTI/UEA" k="fti" sfx="%"/>
+                <Campo label="Aliq. ST" k="aliq_st" sfx="%"/>
+              </div>
+
+              <div style={{fontSize:10,fontWeight:700,color:"#A7A8AA",textTransform:"uppercase",letterSpacing:.8,borderBottom:"1px solid rgba(255,255,255,.06)",paddingBottom:4}}>VPL e Custos</div>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
+                <Campo label="VPL Padrão" k="vpl_padrao" sfx="R$"/>
+                <Campo label="Produção" k="producao" sfx="R$"/>
+                <Campo label="Embalagem" k="embalagem" sfx="R$"/>
+                <Campo label="Garantia" k="garantia" sfx="R$"/>
+                <Campo label="BKP" k="bkp_pct" sfx="%"/>
+                <Campo label="P&D" k="pd" sfx="%"/>
+                <Campo label="Scrap" k="scrap" sfx="%"/>
+                <Campo label="Royalties" k="royal" sfx="%"/>
+                <Campo label="Frete Venda" k="frete_venda" sfx="%"/>
+                <Campo label="Marg. Ger." k="marg_ger" sfx="%"/>
+                <Campo label="Marketing" k="mkt" sfx="%"/>
+                <Campo label="Rebate" k="rebate" sfx="%"/>
+              </div>
+            </div>
+            <div style={{padding:"12px 15px",borderTop:"1px solid rgba(255,255,255,.07)",display:"flex",gap:8,justifyContent:"flex-end"}}>
+              <button className="btn-cancel" onClick={()=>setEditCadModal(false)}>Cancelar</button>
+              <button className="btn-confirm" onClick={salvar} disabled={editCadSalvando}>
+                {editCadSalvando?"Salvando...":"Salvar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    })()}
+
     <div className="app">
     <style>{CSS}</style>
 
@@ -2913,11 +3007,35 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
               <div style={{display:"flex",flexDirection:"column",gap:10}}>
                 <Sec title="Produto" tag={produtosDB.length>0?"Catálogo":"NCM / PLAN_TRIB"}>
-                  <select className="psel" value={d.prodId} onChange={e=>setProd(e.target.value)}>
+                  {produtosDB.length>0&&(
+                    <input
+                      className="psel"
+                      placeholder="🔍 Buscar por nome, NCM ou ID..."
+                      value={buscaProd}
+                      onChange={e=>setBuscaProd(e.target.value)}
+                      style={{marginBottom:4,fontSize:11}}
+                    />
+                  )}
+                  <select className="psel" value={d.prodId} onChange={e=>{setProd(e.target.value);setBuscaProd("");}}>
                     {produtosDB.length>0?(()=>{
-                      // agrupar por prefixo de categoria
+                      const q=buscaProd.toLowerCase().trim();
+                      const lista=q
+                        ?produtosDB.filter(p=>
+                            p.nome.toLowerCase().includes(q)||
+                            (p.ncm||"").includes(q)||
+                            p.id.toLowerCase().includes(q)
+                          )
+                        :produtosDB;
+                      if(q){
+                        // busca ativa: lista plana sem optgroups
+                        return[
+                          <option key="" value="">— Selecione o produto —</option>,
+                          ...lista.map(p=><option key={p.id} value={p.id}>[{p.id}] {p.nome}</option>)
+                        ];
+                      }
+                      // sem busca: agrupado por categoria
                       const grupos={};
-                      produtosDB.forEach(p=>{
+                      lista.forEach(p=>{
                         const prefix=p.id.match(/^([A-Z]+)/)?.[1]||"?";
                         if(!grupos[prefix])grupos[prefix]=[];
                         grupos[prefix].push(p);
@@ -2937,7 +3055,23 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
                   </select>
                   {d.prodId&&produtosDB.length>0&&(()=>{
                     const r=produtosDB.find(p=>p.id===d.prodId);
-                    return r?<div style={{fontSize:10,color:"#A7A8AA",marginTop:4}}>NCM {r.ncm}{r.sku?` · SKU ${r.sku}`:""}</div>:null;
+                    if(!r)return null;
+                    return(
+                      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginTop:5}}>
+                        <span style={{fontSize:10,color:"#A7A8AA"}}>
+                          NCM {r.ncm}{r.sku?` · SKU ${r.sku}`:""}
+                        </span>
+                        {temCadastro&&(
+                          <button
+                            onClick={()=>{setEditCadForm({...r});setEditCadModal(true);}}
+                            style={{padding:"2px 8px",fontSize:10,fontWeight:700,cursor:"pointer",
+                              background:"rgba(60,219,192,.1)",border:"1px solid rgba(60,219,192,.3)",
+                              color:"#3CDBC0",borderRadius:3}}>
+                            ✏ Editar cadastro
+                          </button>
+                        )}
+                      </div>
+                    );
                   })()}
                   {/* Origem de Fabricação */}
                   <div style={{marginTop:6}}>
