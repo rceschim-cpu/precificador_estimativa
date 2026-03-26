@@ -1120,13 +1120,28 @@ const PRODUTOS = [
 ];
 
 // Converte produto do catálogo (snake_case) → shape da calculadora (camelCase)
-const normalizeProdutoDB = r => ({
-  id: r.id, ncm: r.ncm||"", nome: r.nome||"",
-  mva: r.mva||0, aliqST: r.aliq_st||0, fti: r.fti||0,
-  ipiMAO: r.ipi_mao||0, ipiIOS: r.ipi_ios||0, ipiCWB: r.ipi_cwb||0,
-  credMAO: r.cred_mao||0, credIOS: r.cred_ios||0, credCWB: r.cred_cwb||0,
-  icmsMAO: r.icms_mao||0, icmsIOS: r.icms_ios||0, icmsCWB: r.icms_cwb||0,
-});
+const normalizeProdutoDB = r => {
+  // Tributos: usar tabela PRODUTOS hardcoded por NCM (perfil tributário por regime/planta)
+  // Fallback para os valores do catálogo se o NCM não existir na tabela
+  const base = PRODUTOS.find(p => p.ncm === r.ncm) ?? {};
+  return {
+    id: r.id, ncm: r.ncm||"", nome: r.nome||"",
+    // Tributos — PRODUTOS por NCM é fonte primária; catálogo só como fallback
+    mva:    base.mva     ?? r.mva     ?? 0,
+    aliqST: base.aliqST  ?? r.aliq_st ?? 0,
+    ipiMAO: base.ipiMAO  ?? r.ipi_mao ?? 0,
+    ipiIOS: base.ipiIOS  ?? r.ipi_ios ?? 0,
+    ipiCWB: base.ipiCWB  ?? r.ipi_cwb ?? 0,
+    credMAO: base.credMAO ?? r.cred_mao ?? 0,
+    credIOS: base.credIOS ?? r.cred_ios ?? 0,
+    credCWB: base.credCWB ?? r.cred_cwb ?? 0,
+    icmsMAO: base.icmsMAO ?? r.icms_mao ?? 0,
+    icmsIOS: base.icmsIOS ?? r.icms_ios ?? 0,
+    icmsCWB: base.icmsCWB ?? r.icms_cwb ?? 0,
+    // Índices — sempre do catálogo (valores inseridos por produto)
+    fti: r.fti ?? 0,
+  };
+};
 
 // ── ORIGENS e MODALIDADES ─────────────────────────────────────────────────────
 const ORIGENS = [
