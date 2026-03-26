@@ -3520,6 +3520,7 @@ function CadastroProdutos({user}){
   const [solForm,setSolForm]       = useState({nome_categoria:"",prefixo:"",descricao:""});
   const [solErro,setSolErro]       = useState("");
   const [solOk,setSolOk]           = useState(false);
+  const [categFiltro,setCategFiltro] = useState("");
 
   const reload=()=>Promise.all([
     db.getProdutos().then(r=>setProdutos(r||[])),
@@ -3624,9 +3625,26 @@ function CadastroProdutos({user}){
     }catch(e){setSolErro(e.message);}
   };
 
-  const filtrados=produtos.filter(p=>
-    !busca||p.nome.toLowerCase().includes(busca.toLowerCase())||p.ncm.includes(busca)||p.id.includes(busca)
-  );
+  const filtrados=produtos.filter(p=>{
+    if(categFiltro&&!p.id.startsWith(categFiltro))return false;
+    if(!busca)return true;
+    return p.nome.toLowerCase().includes(busca.toLowerCase())||p.ncm.includes(busca)||p.id.toLowerCase().includes(busca.toLowerCase());
+  });
+
+  // categorias que têm pelo menos um produto cadastrado
+  const categsComProdutos=useMemo(()=>{
+    const prefixMap={};
+    produtos.forEach(p=>{
+      const prefix=p.id.match(/^([A-Z]+)/)?.[1]||"?";
+      prefixMap[prefix]=(prefixMap[prefix]||0)+1;
+    });
+    return Object.entries(prefixMap)
+      .map(([prefix,count])=>{
+        const cat=categorias.find(c=>c.id===prefix||c.prefixo===prefix);
+        return {prefix,count,nome:cat?.nome||prefix};
+      })
+      .sort((a,b)=>a.nome.localeCompare(b.nome));
+  },[produtos,categorias]);
 
   // ── Componentes internos do formulário ──
   const Fn=({label,k,sfx=""})=>(
@@ -3719,6 +3737,28 @@ function CadastroProdutos({user}){
         </button>
         <button className="btn-primary" style={{width:"auto",padding:"9px 20px"}} onClick={abrirNovo}>+ Novo Produto</button>
       </div>
+
+      {/* Filtro por categoria */}
+      {categsComProdutos.length>0&&(
+        <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:14}}>
+          <button
+            onClick={()=>setCategFiltro("")}
+            style={{padding:"4px 12px",fontSize:11,fontWeight:700,cursor:"pointer",borderRadius:20,border:`1px solid ${!categFiltro?"#3CDBC0":"rgba(255,255,255,.12)"}`,background:!categFiltro?"rgba(60,219,192,.15)":"rgba(255,255,255,.04)",color:!categFiltro?"#3CDBC0":"#A7A8AA",transition:".15s"}}>
+            Todas ({produtos.length})
+          </button>
+          {categsComProdutos.map(({prefix,count,nome})=>{
+            const sel=categFiltro===prefix;
+            return(
+              <button key={prefix}
+                onClick={()=>setCategFiltro(sel?"":prefix)}
+                style={{padding:"4px 12px",fontSize:11,fontWeight:700,cursor:"pointer",borderRadius:20,border:`1px solid ${sel?"#3CDBC0":"rgba(255,255,255,.12)"}`,background:sel?"rgba(60,219,192,.15)":"rgba(255,255,255,.04)",color:sel?"#3CDBC0":"#A7A8AA",transition:".15s",display:"flex",alignItems:"center",gap:5}}>
+                {nome}
+                <span style={{fontSize:10,opacity:.7}}>({count})</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {/* Tabela */}
       <div className="tbl-wrap">
