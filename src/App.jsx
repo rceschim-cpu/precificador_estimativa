@@ -92,24 +92,24 @@ const initials = (nome) => nome ? nome.split(" ").slice(0,2).map(w=>w[0]).join("
 
 // ── CSS ──────────────────────────────────────────────────────────────────────
 const CSS_AUTH = `
-@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Instrument+Sans:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap');
 
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-body{background:#0c0e14;color:#e8eaf0;font-family:'Instrument Sans',sans-serif;min-height:100vh;overflow-x:hidden}
+body{background:#2C2A29;color:#f0f0f0;font-family:'Montserrat',Arial,Helvetica,sans-serif;min-height:100vh;overflow-x:hidden}
 input,select,textarea,button{font-family:inherit}
 
 /* ── TOKENS ── */
 :root{
-  --bg:       #0c0e14;
-  --surface:  #13161f;
-  --card:     #191c27;
+  --bg:       #2C2A29;
+  --surface:  #201f1e;
+  --card:     #252322;
   --border:   rgba(255,255,255,.08);
   --border2:  rgba(255,255,255,.13);
-  --text:     #e8eaf0;
-  --muted:    #7a7f96;
-  --blue:     #0047BB;
-  --blue2:    #1a65d4;
-  --blue-glow:rgba(0,71,187,.25);
+  --text:     #f0f0f0;
+  --muted:    #A7A8AA;
+  --blue:     #3CDBC0;
+  --blue2:    #2bc4ab;
+  --blue-glow:rgba(60,219,192,.25);
 }
 
 /* ── LAYOUT ── */
@@ -118,14 +118,14 @@ input,select,textarea,button{font-family:inherit}
 /* ── AUTH SCREEN ── */
 .auth-wrap{
   min-height:100vh;display:flex;align-items:center;justify-content:center;
-  background:radial-gradient(ellipse 80% 60% at 50% 0%, rgba(0,71,187,.18) 0%, transparent 70%),
-             radial-gradient(ellipse 40% 40% at 80% 80%, rgba(0,71,187,.08) 0%, transparent 60%),
-             #0c0e14;
+  background:radial-gradient(ellipse 80% 60% at 50% 0%, rgba(60,219,192,.12) 0%, transparent 70%),
+             radial-gradient(ellipse 40% 40% at 80% 80%, rgba(60,219,192,.05) 0%, transparent 60%),
+             #2C2A29;
   padding:24px;
 }
 .auth-box{
   width:100%;max-width:420px;
-  background:rgba(19,22,31,.9);
+  background:rgba(37,35,34,.92);
   border:1px solid var(--border2);
   backdrop-filter:blur(20px);
   padding:0;
@@ -135,39 +135,39 @@ input,select,textarea,button{font-family:inherit}
 }
 .auth-box::before{
   content:'';position:absolute;top:0;left:0;right:0;height:3px;
-  background:linear-gradient(90deg,#0047BB,#1a65d4,#0047BB);
+  background:linear-gradient(90deg,#3CDBC0,#2bc4ab,#3CDBC0);
 }
 @keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
 
 .auth-head{padding:32px 32px 0;display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center}
 .auth-logo{display:flex;align-items:center;gap:10px}
-.auth-mark{width:36px;height:36px;background:#0047BB;display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-size:18px;font-weight:800;color:#fff}
-.auth-brand{font-family:'Syne',sans-serif;font-size:20px;font-weight:800;color:#fff;letter-spacing:.5px}
-.auth-title{font-family:'Syne',sans-serif;font-size:22px;font-weight:700;color:#fff;margin-top:8px}
+.auth-mark{width:36px;height:36px;background:#3CDBC0;display:flex;align-items:center;justify-content:center;font-family:'Montserrat',sans-serif;font-size:18px;font-weight:800;color:#2C2A29}
+.auth-brand{font-family:'Montserrat',sans-serif;font-size:20px;font-weight:800;color:#fff;letter-spacing:.5px}
+.auth-title{font-family:'Montserrat',sans-serif;font-size:22px;font-weight:700;color:#fff;margin-top:8px}
 .auth-sub{font-size:13px;color:var(--muted);line-height:1.5}
 
 .auth-body{padding:28px 32px 32px;display:flex;flex-direction:column;gap:16px}
 .auth-tabs{display:flex;border:1px solid var(--border);background:rgba(255,255,255,.03);margin-bottom:4px}
 .auth-tab{flex:1;padding:10px;background:none;border:none;color:var(--muted);font-size:13px;font-weight:600;cursor:pointer;transition:.15s;letter-spacing:.3px}
-.auth-tab.on{background:var(--blue);color:#fff}
+.auth-tab.on{background:var(--blue);color:#2C2A29}
 .auth-tab:hover:not(.on){color:var(--text);background:rgba(255,255,255,.04)}
 
 .fld{display:flex;flex-direction:column;gap:6px}
 .fld label{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.8px}
 .fld input,.fld select{
-  background:#0c0e14;border:1px solid var(--border2);color:var(--text);
+  background:#2C2A29;border:1px solid var(--border2);color:var(--text);
   padding:11px 14px;font-size:14px;outline:none;transition:.15s;
-  font-family:'Instrument Sans',sans-serif;
+  font-family:'Montserrat',sans-serif;
 }
-.fld input:focus,.fld select:focus{border-color:#0047BB;box-shadow:0 0 0 3px var(--blue-glow)}
-.fld input::placeholder{color:#3a3f55}
+.fld input:focus,.fld select:focus{border-color:#3CDBC0;box-shadow:0 0 0 3px var(--blue-glow)}
+.fld input::placeholder{color:#53565A}
 
 .btn-primary{
-  width:100%;padding:13px;background:#0047BB;border:none;color:#fff;
-  font-family:'Syne',sans-serif;font-size:14px;font-weight:700;letter-spacing:.5px;
+  width:100%;padding:13px;background:#3CDBC0;border:none;color:#2C2A29;
+  font-family:'Montserrat',sans-serif;font-size:14px;font-weight:700;letter-spacing:.5px;
   cursor:pointer;transition:.15s;text-transform:uppercase;
 }
-.btn-primary:hover{background:#1a65d4}
+.btn-primary:hover{background:#2bc4ab}
 .btn-primary:disabled{opacity:.45;cursor:not-allowed}
 
 .auth-msg{padding:10px 14px;font-size:13px;line-height:1.5;border-left:3px solid}
@@ -183,13 +183,13 @@ input,select,textarea,button{font-family:inherit}
   position:sticky;top:0;z-index:100;flex-shrink:0;
 }
 .topbar-logo{display:flex;align-items:center;gap:9px;flex-shrink:0}
-.topbar-mark{width:30px;height:30px;background:#0047BB;display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-size:14px;font-weight:800;color:#fff;flex-shrink:0}
-.topbar-name{font-family:'Syne',sans-serif;font-size:15px;font-weight:700;color:#fff}
+.topbar-mark{width:30px;height:30px;background:#3CDBC0;display:flex;align-items:center;justify-content:center;font-family:'Montserrat',sans-serif;font-size:14px;font-weight:800;color:#2C2A29;flex-shrink:0}
+.topbar-name{font-family:'Montserrat',sans-serif;font-size:15px;font-weight:700;color:#fff}
 .topbar-divider{width:1px;height:24px;background:var(--border);flex-shrink:0}
 .topbar-title{font-size:13px;color:var(--muted);font-weight:500}
 .topbar-spacer{flex:1}
 .topbar-user{display:flex;align-items:center;gap:10px}
-.topbar-avatar{width:32px;height:32px;border-radius:50%;background:#0047BB;display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-size:12px;font-weight:700;color:#fff;flex-shrink:0}
+.topbar-avatar{width:32px;height:32px;border-radius:50%;background:#3CDBC0;display:flex;align-items:center;justify-content:center;font-family:'Montserrat',sans-serif;font-size:12px;font-weight:700;color:#2C2A29;flex-shrink:0}
 .topbar-uname{font-size:13px;font-weight:600;color:var(--text)}
 .topbar-uperfil{font-size:11px;color:var(--muted)}
 .btn-logout{padding:7px 14px;background:rgba(255,255,255,.05);border:1px solid var(--border);color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;transition:.15s;letter-spacing:.3px}
@@ -202,9 +202,9 @@ input,select,textarea,button{font-family:inherit}
 .sidebar:not(.collapsed) .snav-item{overflow:hidden}
 .sidebar.collapsed .snav-item{padding:10px 0;justify-content:center;gap:0;overflow:visible}
 .sidebar.collapsed .snav-label{display:none}
-.sidebar.collapsed .snav-item:hover::after{content:attr(data-label);position:absolute;left:54px;top:50%;transform:translateY(-50%);background:#1e2840;border:1px solid rgba(255,255,255,.18);color:#dce7f7;font-size:11px;font-weight:600;padding:5px 12px;border-radius:4px;white-space:nowrap;z-index:9999;pointer-events:none;box-shadow:0 4px 12px rgba(0,0,0,.4)}
+.sidebar.collapsed .snav-item:hover::after{content:attr(data-label);position:absolute;left:54px;top:50%;transform:translateY(-50%);background:#1e2840;border:1px solid rgba(255,255,255,.18);color:#f0f0f0;font-size:11px;font-weight:600;padding:5px 12px;border-radius:4px;white-space:nowrap;z-index:9999;pointer-events:none;box-shadow:0 4px 12px rgba(0,0,0,.4)}
 .snav-item:hover{background:rgba(255,255,255,.03);color:var(--text)}
-.snav-item.on{border-left-color:#0047BB;background:rgba(0,71,187,.1);color:#fff;font-weight:600}
+.snav-item.on{border-left-color:#3CDBC0;background:rgba(60,219,192,.1);color:#3CDBC0;font-weight:600}
 .snav-icon{font-size:16px;flex-shrink:0;width:22px;text-align:center}
 .snav-toggle{padding:9px 0;display:flex;justify-content:center;cursor:pointer;color:var(--muted);font-size:13px;border-bottom:1px solid var(--border);transition:.15s;flex-shrink:0}
 .snav-toggle:hover{background:rgba(255,255,255,.04);color:var(--text)}
@@ -213,16 +213,16 @@ input,select,textarea,button{font-family:inherit}
 .main-content{flex:1;padding:28px;overflow-y:auto;background:var(--bg);min-height:0}
 
 /* ── CARDS ── */
-.page-title{font-family:'Syne',sans-serif;font-size:24px;font-weight:800;color:#fff;margin-bottom:6px}
+.page-title{font-family:'Montserrat',sans-serif;font-size:24px;font-weight:800;color:#fff;margin-bottom:6px}
 .page-sub{font-size:13px;color:var(--muted);margin-bottom:24px}
 
 .stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:24px}
 .stat-card{background:var(--card);border:1px solid var(--border);padding:18px;display:flex;flex-direction:column;gap:6px}
 .stat-label{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.8px}
-.stat-val{font-family:'Syne',sans-serif;font-size:30px;font-weight:800;color:#fff;line-height:1}
+.stat-val{font-family:'Montserrat',sans-serif;font-size:30px;font-weight:800;color:#fff;line-height:1}
 .stat-sub{font-size:11px;color:var(--muted)}
-.stat-card.blue{border-color:rgba(0,71,187,.3);background:rgba(0,71,187,.08)}
-.stat-card.blue .stat-val{color:#93c5fd}
+.stat-card.blue{border-color:rgba(60,219,192,.3);background:rgba(60,219,192,.08)}
+.stat-card.blue .stat-val{color:#3CDBC0}
 .stat-card.green{border-color:rgba(5,150,105,.3);background:rgba(5,150,105,.08)}
 .stat-card.green .stat-val{color:#34d399}
 .stat-card.amber{border-color:rgba(217,119,6,.3);background:rgba(217,119,6,.08)}
@@ -233,10 +233,10 @@ input,select,textarea,button{font-family:inherit}
 /* ── TABLE ── */
 .tbl-wrap{background:var(--card);border:1px solid var(--border);overflow:hidden}
 .tbl-head{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px}
-.tbl-head-title{font-family:'Syne',sans-serif;font-size:14px;font-weight:700;color:#fff}
-.tbl-search{background:#0c0e14;border:1px solid var(--border);color:var(--text);padding:7px 12px;font-size:13px;outline:none;min-width:200px;transition:.15s}
-.tbl-search:focus{border-color:#0047BB}
-.tbl-search::placeholder{color:#3a3f55}
+.tbl-head-title{font-family:'Montserrat',sans-serif;font-size:14px;font-weight:700;color:#fff}
+.tbl-search{background:#2C2A29;border:1px solid var(--border);color:var(--text);padding:7px 12px;font-size:13px;outline:none;min-width:200px;transition:.15s}
+.tbl-search:focus{border-color:#3CDBC0}
+.tbl-search::placeholder{color:#53565A}
 table{width:100%;border-collapse:collapse}
 th{padding:10px 18px;text-align:left;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;border-bottom:1px solid var(--border);background:rgba(255,255,255,.02)}
 td{padding:13px 18px;font-size:13px;color:var(--text);border-bottom:1px solid rgba(255,255,255,.04)}
@@ -260,14 +260,14 @@ tr:hover td{background:rgba(255,255,255,.02)}
 .btn-approve:hover{background:rgba(5,150,105,.2)}
 .btn-reject{background:rgba(220,38,38,.1);border-color:rgba(220,38,38,.4);color:#f87171}
 .btn-reject:hover{background:rgba(220,38,38,.2)}
-.btn-edit{background:rgba(0,71,187,.1);border-color:rgba(0,71,187,.4);color:#93c5fd}
-.btn-edit:hover{background:rgba(0,71,187,.2)}
+.btn-edit{background:rgba(60,219,192,.1);border-color:rgba(60,219,192,.4);color:#3CDBC0}
+.btn-edit:hover{background:rgba(60,219,192,.2)}
 .btn-disable{background:rgba(122,127,150,.1);border-color:rgba(122,127,150,.3);color:#7a7f96}
 .btn-disable:hover{background:rgba(122,127,150,.2);color:var(--text)}
 
 /* ── AVATAR TABLE ── */
 .usr-cell{display:flex;align-items:center;gap:10px}
-.usr-av{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-size:11px;font-weight:700;color:#fff;flex-shrink:0}
+.usr-av{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Montserrat',sans-serif;font-size:11px;font-weight:700;color:#2C2A29;flex-shrink:0}
 .usr-nome{font-weight:600;color:#fff}
 .usr-email{font-size:11px;color:var(--muted)}
 
@@ -275,15 +275,15 @@ tr:hover td{background:rgba(255,255,255,.02)}
 .modal-ov{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:500;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(4px)}
 .modal-box{background:var(--card);border:1px solid var(--border2);width:100%;max-width:460px;max-height:90vh;overflow-y:auto;animation:fadeUp .25s ease}
 .modal-head{padding:18px 22px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:var(--card);z-index:1}
-.modal-title{font-family:'Syne',sans-serif;font-size:16px;font-weight:700;color:#fff}
+.modal-title{font-family:'Montserrat',sans-serif;font-size:16px;font-weight:700;color:#fff}
 .modal-close{background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;padding:2px 6px;line-height:1;transition:.15s}
 .modal-close:hover{color:var(--text)}
 .modal-body{padding:22px;display:flex;flex-direction:column;gap:14px}
 .modal-foot{padding:14px 22px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end}
 .btn-cancel{padding:9px 18px;background:rgba(255,255,255,.05);border:1px solid var(--border);color:var(--muted);font-size:13px;font-weight:600;cursor:pointer;transition:.15s}
 .btn-cancel:hover{color:var(--text);border-color:var(--border2)}
-.btn-confirm{padding:9px 20px;background:#0047BB;border:none;color:#fff;font-family:'Syne',sans-serif;font-size:13px;font-weight:700;cursor:pointer;transition:.15s;letter-spacing:.3px}
-.btn-confirm:hover{background:#1a65d4}
+.btn-confirm{padding:9px 20px;background:#3CDBC0;border:none;color:#2C2A29;font-family:'Montserrat',sans-serif;font-size:13px;font-weight:700;cursor:pointer;transition:.15s;letter-spacing:.3px}
+.btn-confirm:hover{background:#2bc4ab}
 .btn-confirm.danger{background:#dc2626}
 .btn-confirm.danger:hover{background:#b91c1c}
 
@@ -291,13 +291,13 @@ tr:hover td{background:rgba(255,255,255,.02)}
 .perfil-grid{display:flex;flex-direction:column;gap:8px}
 .perfil-opt{display:flex;align-items:center;gap:12px;padding:12px 14px;border:2px solid var(--border);cursor:pointer;transition:.15s;background:rgba(255,255,255,.02)}
 .perfil-opt:hover{border-color:var(--border2)}
-.perfil-opt.sel{border-color:#0047BB;background:rgba(0,71,187,.1)}
+.perfil-opt.sel{border-color:#3CDBC0;background:rgba(60,219,192,.1)}
 .perfil-opt-icon{font-size:18px;width:28px;text-align:center}
 .perfil-opt-info{flex:1}
 .perfil-opt-label{font-size:13px;font-weight:600;color:#fff}
 .perfil-opt-desc{font-size:11px;color:var(--muted);margin-top:2px}
 .perfil-opt-radio{width:16px;height:16px;border:2px solid var(--border2);border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:.15s}
-.perfil-opt.sel .perfil-opt-radio{border-color:#0047BB;background:#0047BB}
+.perfil-opt.sel .perfil-opt-radio{border-color:#3CDBC0;background:#3CDBC0}
 .perfil-opt.sel .perfil-opt-radio::after{content:'';width:6px;height:6px;border-radius:50%;background:#fff}
 
 /* ── EMPTY STATE ── */
@@ -307,9 +307,9 @@ tr:hover td{background:rgba(255,255,255,.02)}
 .empty-sub{font-size:12px}
 
 /* ── WELCOME ── */
-.welcome-card{background:linear-gradient(135deg,rgba(0,71,187,.2),rgba(0,71,187,.05));border:1px solid rgba(0,71,187,.25);padding:24px;margin-bottom:24px}
-.welcome-greeting{font-family:'Syne',sans-serif;font-size:22px;font-weight:800;color:#fff;margin-bottom:4px}
-.welcome-sub{font-size:13px;color:#93c5fd}
+.welcome-card{background:linear-gradient(135deg,rgba(60,219,192,.15),rgba(60,219,192,.04));border:1px solid rgba(60,219,192,.2);padding:24px;margin-bottom:24px}
+.welcome-greeting{font-family:'Montserrat',sans-serif;font-size:22px;font-weight:800;color:#fff;margin-bottom:4px}
+.welcome-sub{font-size:13px;color:#3CDBC0}
 
 /* ── PENDING ROW ── */
 .pending-row{background:rgba(217,119,6,.04);border-left:3px solid rgba(217,119,6,.5)}
@@ -319,7 +319,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
 ::-webkit-scrollbar{width:5px}
 ::-webkit-scrollbar-track{background:var(--bg)}
 ::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:3px}
-::-webkit-scrollbar-thumb:hover{background:#0047BB}
+::-webkit-scrollbar-thumb:hover{background:#3CDBC0}
 
 /* ── PERFIS DINÂMICOS ── */
 .pfcard{background:var(--card);border:1px solid var(--border);padding:18px;border-radius:4px;display:flex;flex-direction:column;gap:10px;transition:border-color .15s}
@@ -327,35 +327,35 @@ tr:hover td{background:rgba(255,255,255,.02)}
 .pfcard.sistema{opacity:.7}
 .pfcard-head{display:flex;align-items:center;gap:10px}
 .pfcard-icon{font-size:20px;width:32px;text-align:center}
-.pfcard-name{font-family:'Syne',sans-serif;font-size:15px;font-weight:700;color:#fff;flex:1}
+.pfcard-name{font-family:'Montserrat',sans-serif;font-size:15px;font-weight:700;color:#fff;flex:1}
 .pfcard-actions{display:flex;gap:6px}
 .pfcard-desc{font-size:12px;color:var(--muted);line-height:1.5}
 .pfcard-mods{display:flex;flex-wrap:wrap;gap:5px}
 .mod-chip{padding:3px 9px;font-size:11px;font-weight:600;border-radius:20px;border:1px solid}
-.mod-chip.on{background:rgba(0,71,187,.15);border-color:rgba(0,71,187,.4);color:#93c5fd}
+.mod-chip.on{background:rgba(60,219,192,.15);border-color:rgba(60,219,192,.4);color:#3CDBC0}
 .mod-chip.off{background:rgba(255,255,255,.03);border-color:rgba(255,255,255,.08);color:var(--muted);text-decoration:line-through;opacity:.5}
 .pfcard-count{font-size:11px;color:var(--muted);font-weight:500}
 
 /* ── MODAL PERFIL ── */
 .mod-toggle{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--border);cursor:pointer;transition:all .15s;border-radius:3px}
 .mod-toggle:hover{border-color:var(--border2)}
-.mod-toggle.on{border-color:rgba(0,71,187,.4);background:rgba(0,71,187,.08)}
+.mod-toggle.on{border-color:rgba(60,219,192,.4);background:rgba(60,219,192,.08)}
 .mod-toggle.disabled-mod{opacity:.4;cursor:not-allowed}
 .mod-toggle-icon{font-size:16px;width:24px;text-align:center}
 .mod-toggle-info{flex:1}
 .mod-toggle-label{font-size:13px;font-weight:600;color:#fff}
 .mod-toggle-desc{font-size:11px;color:var(--muted);margin-top:1px}
 .mod-toggle-check{width:18px;height:18px;border:2px solid var(--border2);border-radius:3px;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:.15s;font-size:11px;color:transparent}
-.mod-toggle.on .mod-toggle-check{background:#0047BB;border-color:#0047BB;color:#fff}
+.mod-toggle.on .mod-toggle-check{background:#3CDBC0;border-color:#3CDBC0;color:#2C2A29}
 .cor-grid{display:flex;gap:6px;flex-wrap:wrap}
 .cor-dot{width:24px;height:24px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:.15s}
 .cor-dot.sel{border-color:#fff;box-shadow:0 0 0 2px rgba(255,255,255,.3)}
 .icone-grid{display:flex;gap:4px;flex-wrap:wrap}
 .icone-opt{width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:16px;cursor:pointer;border:1px solid var(--border);border-radius:3px;transition:.15s}
 .icone-opt:hover{border-color:var(--border2)}
-.icone-opt.sel{border-color:#0047BB;background:rgba(0,71,187,.15)}
-.btn-add-perfil{display:flex;align-items:center;justify-content:center;gap:8px;padding:14px;border:2px dashed rgba(0,71,187,.3);background:rgba(0,71,187,.04);color:#7a90b0;font-size:13px;font-weight:600;cursor:pointer;transition:.15s;border-radius:4px}
-.btn-add-perfil:hover{border-color:rgba(0,71,187,.6);color:#93c5fd;background:rgba(0,71,187,.08)}
+.icone-opt.sel{border-color:#3CDBC0;background:rgba(60,219,192,.15)}
+.btn-add-perfil{display:flex;align-items:center;justify-content:center;gap:8px;padding:14px;border:2px dashed rgba(60,219,192,.3);background:rgba(60,219,192,.04);color:#A7A8AA;font-size:13px;font-weight:600;cursor:pointer;transition:.15s;border-radius:4px}
+.btn-add-perfil:hover{border-color:rgba(60,219,192,.6);color:#3CDBC0;background:rgba(60,219,192,.08)}
 `;
 
 // ── COMPONENTS ───────────────────────────────────────────────────────────────
@@ -415,7 +415,7 @@ function ModalPerfil({ perfil, onClose, onSave, users }) {
             background: form.cor+"15", border:`1px solid ${form.cor}44`, borderRadius:4 }}>
             <span style={{ fontSize:24 }}>{form.icone}</span>
             <div>
-              <div style={{ fontFamily:"Syne", fontWeight:700, color:"#fff", fontSize:15 }}>{form.label||"Nome do perfil"}</div>
+              <div style={{ fontFamily:"'Montserrat',sans-serif", fontWeight:700, color:"#fff", fontSize:15 }}>{form.label||"Nome do perfil"}</div>
               <div style={{ fontSize:11, color:form.cor, fontWeight:600 }}>
                 {!isNew && usersCount > 0 ? `${usersCount} usuário${usersCount!==1?"s":""} ativo${usersCount!==1?"s":""}` : "Novo perfil"}
               </div>
@@ -971,7 +971,7 @@ function PainelAdmin({ currentUser }) {
                           <div><div className="usr-nome">{u.nome}</div><div className="usr-email">{u.email}</div></div>
                         </div></td>
                         <td><PerfilBadge perfil={u.perfil}/></td>
-                        <td style={{ fontFamily: "JetBrains Mono", fontSize: 12, color: "var(--muted)" }}>{fmtDate(u.criadoEm)}</td>
+                        <td style={{ fontFamily: "'Montserrat',sans-serif", fontSize: 12, color: "var(--muted)" }}>{fmtDate(u.criadoEm)}</td>
                         <td><div className="act-row">
                           <button className="btn-sm btn-approve" onClick={() => setModal({ type: "aprovar", user: u })}>✓ Analisar</button>
                         </div></td>
@@ -1003,7 +1003,7 @@ function PainelAdmin({ currentUser }) {
                     </div></td>
                     <td><PerfilBadge perfil={u.perfil}/></td>
                     <td><StatusBadge status={u.status}/></td>
-                    <td style={{ fontFamily: "JetBrains Mono", fontSize: 11, color: "var(--muted)" }}>{fmtDate(u.criadoEm)}</td>
+                    <td style={{ fontFamily: "'Montserrat',sans-serif", fontSize: 11, color: "var(--muted)" }}>{fmtDate(u.criadoEm)}</td>
                     <td style={{ fontSize: 12, color: "var(--muted)" }}>{u.aprovadoPor || "—"}</td>
                     <td><div className="act-row">
                       {u.perfil !== "admin" && <>
@@ -1272,7 +1272,7 @@ function NInput({value,onChange,readOnly,width=80}){
   const shown=readOnly?String(+value||0).replace(".",","):raw;
   return(
     <input type="text" inputMode="decimal" value={shown} readOnly={!!readOnly}
-      style={{background:"none",border:"none",outline:"none",fontFamily:"'DM Mono',monospace",
+      style={{background:"none",border:"none",outline:"none",fontFamily:"'Montserrat',sans-serif",
         fontSize:11,fontWeight:500,color:"#f1f5f9",padding:"5px 8px",width,textAlign:"right"}}
       onFocus={()=>setFocused(true)}
       onChange={e=>{
@@ -1291,9 +1291,9 @@ function Field({label,value,onChange,sfx="",hint,note,readOnly,action,locked,onU
   return(
     <div style={{display:"flex",alignItems:"flex-start",gap:8,justifyContent:"space-between"}}>
       <div style={{flex:1,display:"flex",flexDirection:"column",gap:2}}>
-        <span style={{fontSize:12,fontWeight:600,color:"#dce7f7",letterSpacing:".3px"}}>{label}</span>
-        {hint&&<span style={{fontSize:10,color:"#7a90b0",fontFamily:"'DM Mono',monospace"}}>{hint}</span>}
-        {note&&<span style={{fontSize:10,color:"#f87171",fontFamily:"'DM Mono',monospace"}}>{note}</span>}
+        <span style={{fontSize:12,fontWeight:600,color:"#f0f0f0",letterSpacing:".3px"}}>{label}</span>
+        {hint&&<span style={{fontSize:10,color:"#A7A8AA",fontFamily:"'Montserrat',sans-serif"}}>{hint}</span>}
+        {note&&<span style={{fontSize:10,color:"#f87171",fontFamily:"'Montserrat',sans-serif"}}>{note}</span>}
       </div>
       <div style={{display:"flex",gap:4,alignItems:"center",flexShrink:0}}>
         <div className={`fw ${isRO?"fro":""} ${locked?"flocked":""}`}>
@@ -1312,7 +1312,7 @@ function Field({label,value,onChange,sfx="",hint,note,readOnly,action,locked,onU
 function RG({label,val,onChange,opts}){
   return(
     <div style={{display:"flex",flexDirection:"column",gap:5}}>
-      {label&&<div style={{fontSize:12,fontWeight:600,color:"#dce7f7",letterSpacing:".3px"}}>{label}</div>}
+      {label&&<div style={{fontSize:12,fontWeight:600,color:"#f0f0f0",letterSpacing:".3px"}}>{label}</div>}
       <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
         {opts.map(o=><button key={o.v} className={`rgb ${val===o.v?"on":""}`} onClick={()=>onChange(o.v)}>{o.l}</button>)}
       </div>
@@ -1323,8 +1323,8 @@ function Tog({label,val,onChange,hint}){
   return(
     <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}>
       <div style={{flex:1}}>
-        <div style={{fontSize:12,fontWeight:600,color:"#dce7f7",letterSpacing:".3px"}}>{label}</div>
-        {hint&&<div style={{fontSize:10,color:"#7a90b0",fontFamily:"'DM Mono',monospace"}}>{hint}</div>}
+        <div style={{fontSize:12,fontWeight:600,color:"#f0f0f0",letterSpacing:".3px"}}>{label}</div>
+        {hint&&<div style={{fontSize:10,color:"#A7A8AA",fontFamily:"'Montserrat',sans-serif"}}>{hint}</div>}
       </div>
       <button className={`tog ${val?"on":""}`} onClick={()=>onChange(!val)}><span className="tknob"/></button>
     </div>
@@ -1366,7 +1366,7 @@ function MI({val,onChange,sfx="USD",width=60}){
     <div className="fw" style={{minWidth:88}}>
       <span className="fpre">{sfx}</span>
       <input type="text" inputMode="decimal" value={r}
-        style={{background:"none",border:"none",outline:"none",fontFamily:"'DM Mono',monospace",
+        style={{background:"none",border:"none",outline:"none",fontFamily:"'Montserrat',sans-serif",
           fontSize:11,fontWeight:500,color:"#f1f5f9",padding:"5px 6px",width,textAlign:"right"}}
         onChange={e=>{const v=e.target.value;if(/^-?\d*[,.]?\d{0,3}$/.test(v)||v===""){setR(v);onChange(parse(v));}}}
         onBlur={()=>{const n=parse(r);setR(String(n).replace(".",","));}}/>
@@ -1398,9 +1398,9 @@ function ModalCF({onClose,onApply,fobUSD,ptax,data,setData}){
             <div><span>CF em USD</span><span style={{color:cfUSD<0?"#4ade80":"#94a3b8"}}>{usd(cfUSD)}</span></div>
             <div><span>PTAX</span><span>R$ {n3(ptax)}</span></div>
           </div>
-          <div className="pres" style={{borderColor:cfBRL<0?"#16a34a":"#0047BB"}}>
+          <div className="pres" style={{borderColor:cfBRL<0?"#16a34a":"#3CDBC0"}}>
             <span style={{color:cfBRL<0?"#4ade80":"#93c5fd"}}>Custo Financeiro (BRL)</span>
-            <span style={{fontFamily:"'DM Mono',monospace",fontSize:16,fontWeight:700,color:cfBRL<0?"#4ade80":"#93c5fd"}}>{brl(cfBRL)}</span>
+            <span style={{fontFamily:"'Montserrat',sans-serif",fontSize:16,fontWeight:700,color:cfBRL<0?"#4ade80":"#3CDBC0"}}>{brl(cfBRL)}</span>
           </div>
           {cfBRL<0&&<Box t="ok">Antecipacao gera reducao de custo. O valor negativo sera subtraido do CMV.</Box>}
           <button className="mapp" onClick={()=>onApply(parseFloat(cfBRL.toFixed(3)))}>Aplicar ao campo CF Importacao</button>
@@ -1506,8 +1506,8 @@ function ModalCRA({onClose, onApply, origem, c, d, prodAtrib}){
             {[["mao","CRA (MAO)"],["ios","Crédito Federal (IOS)"]].map(([k,l])=>(
               <button key={k} onClick={()=>setAba(k)}
                 style={{flex:1,padding:"6px",fontSize:11,fontWeight:700,cursor:"pointer",borderRadius:4,border:"1px solid",transition:".15s",
-                  background:aba===k?"rgba(0,71,187,.25)":"rgba(255,255,255,.04)",
-                  borderColor:aba===k?"#0047BB":"rgba(255,255,255,.1)",
+                  background:aba===k?"rgba(60,219,192,.25)":"rgba(255,255,255,.04)",
+                  borderColor:aba===k?"#3CDBC0":"rgba(255,255,255,.1)",
                   color:aba===k?"#93c5fd":"#7a90b0"}}>{l}</button>
             ))}
           </div>
@@ -1721,8 +1721,8 @@ function ModalRegistros({onClose, onLoad, currentD, currentCalcs, prodNome, user
   const btnStyle = (active) => ({
     padding:"4px 10px", fontSize:10, fontWeight:700, cursor:"pointer", borderRadius:20,
     border:"1px solid", flexShrink:0,
-    background:active?"rgba(0,71,187,.25)":"rgba(255,255,255,.04)",
-    borderColor:active?"#0047BB":"rgba(255,255,255,.12)",
+    background:active?"rgba(60,219,192,.25)":"rgba(255,255,255,.04)",
+    borderColor:active?"#3CDBC0":"rgba(255,255,255,.12)",
     color:active?"#93c5fd":"#7a90b0"
   });
 
@@ -1738,17 +1738,17 @@ function ModalRegistros({onClose, onLoad, currentD, currentCalcs, prodNome, user
           <button className="mc_btn" onClick={()=>setView("lista")}>×</button>
         </div>
         <div className="mbody">
-          <div style={{fontSize:11,color:"#7a90b0",marginBottom:12}}>
-            Registro: <strong style={{color:"#dce7f7"}}>{registros.find(r=>r.id===registroMover)?.nome}</strong>
+          <div style={{fontSize:11,color:"#A7A8AA",marginBottom:12}}>
+            Registro: <strong style={{color:"#f0f0f0"}}>{registros.find(r=>r.id===registroMover)?.nome}</strong>
           </div>
           <div style={{display:"flex",flexDirection:"column",gap:6}}>
             <div onClick={()=>handleMover(null)}
-              style={{padding:"10px 14px",background:"#2a3550",border:"1px solid rgba(255,255,255,.1)",borderRadius:4,cursor:"pointer",fontSize:12,color:"#dce7f7",display:"flex",alignItems:"center",gap:8}}>
+              style={{padding:"10px 14px",background:"#302e2d",border:"1px solid rgba(255,255,255,.1)",borderRadius:4,cursor:"pointer",fontSize:12,color:"#f0f0f0",display:"flex",alignItems:"center",gap:8}}>
               <span>🏠</span> Raiz (sem pasta)
             </div>
             {pastas.map(p=>(
               <div key={p.id} onClick={()=>handleMover(p.id)}
-                style={{padding:"10px 14px",background:"#2a3550",border:"1px solid rgba(255,255,255,.1)",borderRadius:4,cursor:"pointer",fontSize:12,color:"#dce7f7",display:"flex",alignItems:"center",gap:8,
+                style={{padding:"10px 14px",background:"#302e2d",border:"1px solid rgba(255,255,255,.1)",borderRadius:4,cursor:"pointer",fontSize:12,color:"#f0f0f0",display:"flex",alignItems:"center",gap:8,
                   paddingLeft: p.pai ? 28 : 14}}>
                 <span>{p.pai?"└ 📂":"📁"}</span>
                 {p.pai ? (pastas.find(x=>x.id===p.pai)?.nome||"") + " / " : ""}{p.nome}
@@ -1786,8 +1786,8 @@ function ModalRegistros({onClose, onLoad, currentD, currentCalcs, prodNome, user
           {migMsg&&<div style={{padding:"8px 12px",background:"rgba(5,150,105,.1)",border:"1px solid rgba(5,150,105,.3)",borderRadius:4,fontSize:11,color:"#34d399",marginBottom:8}}>{migMsg}</div>}
 
           {/* ── Salvar ── */}
-          <div style={{background:"rgba(0,71,187,.08)",border:"1px solid rgba(0,71,187,.25)",padding:"10px 14px",borderRadius:4,marginBottom:12}}>
-            <div style={{fontSize:10,fontWeight:700,color:"#93c5fd",marginBottom:8,letterSpacing:.5,textTransform:"uppercase"}}>
+          <div style={{background:"rgba(60,219,192,.08)",border:"1px solid rgba(60,219,192,.25)",padding:"10px 14px",borderRadius:4,marginBottom:12}}>
+            <div style={{fontSize:10,fontWeight:700,color:"#3CDBC0",marginBottom:8,letterSpacing:.5,textTransform:"uppercase"}}>
               Salvar em: {caminho.length>0 ? caminho.map(p=>p.nome).join(" / ") : "Raiz"}
             </div>
             <div style={{display:"flex",gap:8,marginBottom:6}}>
@@ -1795,7 +1795,7 @@ function ModalRegistros({onClose, onLoad, currentD, currentCalcs, prodNome, user
                 <input type="text" placeholder={prodNome||"Nome do registro"} value={nome}
                   onChange={e=>setNome(e.target.value)}
                   onKeyDown={e=>e.key==="Enter"&&handleSave()}
-                  style={{background:"none",border:"none",outline:"none",fontFamily:"'IBM Plex Sans',sans-serif",fontSize:12,color:"#dce7f7",padding:"7px 10px",width:"100%"}}/>
+                  style={{background:"none",border:"none",outline:"none",fontFamily:"'Montserrat',sans-serif",fontSize:12,color:"#f0f0f0",padding:"7px 10px",width:"100%"}}/>
               </div>
               <button className="mapp" style={{padding:"7px 16px",borderRadius:4,fontSize:12,flexShrink:0}} onClick={handleSave} disabled={saving}>
                 {saving ? "..." : sobrescrever ? "↺ Sobrescrever" : "💾 Salvar novo"}
@@ -1804,7 +1804,7 @@ function ModalRegistros({onClose, onLoad, currentD, currentCalcs, prodNome, user
             <div style={{display:"flex",alignItems:"center",gap:16,marginBottom:6}}>
               <label style={{display:"flex",alignItems:"center",gap:6,cursor:"pointer",fontSize:11,color:compartilhado?"#93c5fd":"#7a90b0",userSelect:"none"}}>
                 <input type="checkbox" checked={compartilhado} onChange={e=>setCompartilhado(e.target.checked)}
-                  style={{accentColor:"#0047BB",cursor:"pointer"}}/>
+                  style={{accentColor:"#3CDBC0",cursor:"pointer"}}/>
                 🌐 Compartilhar com todos
               </label>
             </div>
@@ -1813,14 +1813,14 @@ function ModalRegistros({onClose, onLoad, currentD, currentCalcs, prodNome, user
               <span style={{fontSize:10,color:"#5a6a84",flexShrink:0}}>Ou sobrescrever:</span>
               <select value={sobrescrever||""}
                 onChange={e=>setSobrescrever(e.target.value ? Number(e.target.value) : null)}
-                style={{flex:1,background:"#1a2030",border:"1px solid rgba(255,255,255,.12)",color:sobrescrever?"#fbbf24":"#7a90b0",padding:"4px 8px",fontSize:11,borderRadius:3,outline:"none"}}>
+                style={{flex:1,background:"#201f1e",border:"1px solid rgba(255,255,255,.12)",color:sobrescrever?"#fbbf24":"#7a90b0",padding:"4px 8px",fontSize:11,borderRadius:3,outline:"none"}}>
                 <option value="">— selecionar registro —</option>
                 {regsParaSobrescrever.map(r=>(
                   <option key={r.id} value={r.id}>{r.compartilhado?"🌐 ":""}{r.nome} ({r.data})</option>
                 ))}
               </select>
               {sobrescrever&&<button onClick={()=>setSobrescrever(null)}
-                style={{padding:"3px 8px",background:"none",border:"1px solid rgba(255,255,255,.1)",color:"#7a90b0",fontSize:10,cursor:"pointer",borderRadius:3}}>✕</button>}
+                style={{padding:"3px 8px",background:"none",border:"1px solid rgba(255,255,255,.1)",color:"#A7A8AA",fontSize:10,cursor:"pointer",borderRadius:3}}>✕</button>}
             </div>
           </div>
 
@@ -1846,7 +1846,7 @@ function ModalRegistros({onClose, onLoad, currentD, currentCalcs, prodNome, user
                   <input autoFocus type="text" placeholder="Nome da pasta" value={nomePasta}
                     onChange={e=>setNomePasta(e.target.value)}
                     onKeyDown={e=>{if(e.key==="Enter")handleCriarPasta();if(e.key==="Escape"){setView("lista");setNomePasta("");}}}
-                    style={{background:"rgba(255,255,255,.06)",border:"1px solid rgba(255,255,255,.15)",color:"#dce7f7",padding:"4px 8px",fontSize:11,borderRadius:4,outline:"none",width:110}}/>
+                    style={{background:"rgba(255,255,255,.06)",border:"1px solid rgba(255,255,255,.15)",color:"#f0f0f0",padding:"4px 8px",fontSize:11,borderRadius:4,outline:"none",width:110}}/>
                   <button onClick={handleCriarPasta} style={{...btnStyle(true),padding:"3px 8px"}}>✓</button>
                   <button onClick={()=>{setView("lista");setNomePasta("");}} style={{...btnStyle(false),padding:"3px 8px"}}>✕</button>
                 </div>
@@ -1873,22 +1873,22 @@ function ModalRegistros({onClose, onLoad, currentD, currentCalcs, prodNome, user
           {loading
             ? <div style={{textAlign:"center",padding:"24px 0",fontSize:12,color:"#5a6a84"}}>Carregando...</div>
             : regsNaPasta.length===0&&subpastasAtuais.length===0
-              ? <div style={{textAlign:"center",padding:"24px 0",fontFamily:"'DM Mono',monospace",fontSize:11,color:"#5a6a84"}}>
+              ? <div style={{textAlign:"center",padding:"24px 0",fontFamily:"'Montserrat',sans-serif",fontSize:11,color:"#5a6a84"}}>
                   {pastaAtual ? "Pasta vazia." : "Nenhum registro salvo ainda."}
                 </div>
               : <div style={{display:"flex",flexDirection:"column",gap:4,maxHeight:340,overflowY:"auto"}}>
                   {regsNaPasta.map(r=>(
-                    <div key={r.id} style={{padding:"9px 12px",background:"#2a3550",border:"1px solid rgba(255,255,255,.08)",borderRadius:4}}>
+                    <div key={r.id} style={{padding:"9px 12px",background:"#302e2d",border:"1px solid rgba(255,255,255,.08)",borderRadius:4}}>
                       <div style={{display:"flex",alignItems:"center",gap:8}}>
                         {editNome===r.id
                           ? <input autoFocus value={editVal} onChange={e=>setEditVal(e.target.value)}
                               onKeyDown={e=>{if(e.key==="Enter")handleRenomear(r.id);if(e.key==="Escape")setEditNome(null);}}
-                              style={{flex:1,background:"rgba(255,255,255,.08)",border:"1px solid rgba(255,255,255,.2)",color:"#dce7f7",padding:"4px 8px",fontSize:12,borderRadius:3,outline:"none"}}/>
+                              style={{flex:1,background:"rgba(255,255,255,.08)",border:"1px solid rgba(255,255,255,.2)",color:"#f0f0f0",padding:"4px 8px",fontSize:12,borderRadius:3,outline:"none"}}/>
                           : <div style={{flex:1,minWidth:0}}>
-                              <div style={{fontSize:13,fontWeight:700,color:"#dce7f7",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>
+                              <div style={{fontSize:13,fontWeight:700,color:"#f0f0f0",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>
                                 {r.compartilhado&&<span title="Compartilhado" style={{marginRight:4}}>🌐</span>}{r.nome}
                               </div>
-                              <div style={{fontSize:10,fontFamily:"'DM Mono',monospace",color:"#5a6a84",marginTop:2}}>
+                              <div style={{fontSize:10,fontFamily:"'Montserrat',sans-serif",color:"#5a6a84",marginTop:2}}>
                                 {r.data} · {r.d?.ufDestino||""} · ML {r.d?.margem||0}%
                               </div>
                             </div>
@@ -1901,7 +1901,7 @@ function ModalRegistros({onClose, onLoad, currentD, currentCalcs, prodNome, user
                             </div>
                           : <div style={{display:"flex",gap:3,flexShrink:0}}>
                               <button onClick={()=>{onLoad(r.d,r.calcs,r.nome);onClose();}}
-                                style={{padding:"5px 11px",background:"#0047BB",border:"none",color:"#fff",fontSize:11,fontWeight:700,cursor:"pointer",borderRadius:3}}>↩ Carregar</button>
+                                style={{padding:"5px 11px",background:"#3CDBC0",border:"none",color:"#2C2A29",fontSize:11,fontWeight:700,cursor:"pointer",borderRadius:3}}>↩ Carregar</button>
                               <button onClick={()=>{setEditNome(r.id);setEditVal(r.nome);}}
                                 title="Renomear"
                                 style={{padding:"5px 8px",background:"rgba(255,255,255,.05)",border:"1px solid rgba(255,255,255,.12)",color:"#a8b5cc",fontSize:11,cursor:"pointer",borderRadius:3}}>✎</button>
@@ -1942,7 +1942,7 @@ function BreakdownPanel({c,d,prod,ppbTot,calcs}){
       <span className="bdl">{l}</span>
       <span className="bdv">
         {dual&&<span className="bdv2">{dual}</span>}
-        <span style={acc==="red"?{color:"#f87171"}:acc==="green"?{color:"#4ade80"}:acc==="blue"?{color:"#93c5fd"}:acc==="warn"?{color:"#fbbf24"}:{}}>{brl(v)}</span>
+        <span style={acc==="red"?{color:"#f87171"}:acc==="green"?{color:"#4ade80"}:acc==="blue"?{color:"#3CDBC0"}:acc==="warn"?{color:"#fbbf24"}:{}}>{brl(v)}</span>
       </span>
     </div>
   );
@@ -2012,7 +2012,7 @@ function BreakdownPanel({c,d,prod,ppbTot,calcs}){
       </Grp>
 
       {/* CUSTO TOTAL — fixo */}
-      <Tot label="CUSTO TOTAL" v={c.cmvTotal} color="#0047BB"/>
+      <Tot label="CUSTO TOTAL" v={c.cmvTotal} color="#3CDBC0"/>
 
       {/* IMPOSTOS DA VENDA */}
       <Grp id="impvenda" label="Impostos da Venda" total={totalImpVenda} color="#ef4444">
@@ -2057,7 +2057,7 @@ function BreakdownPanel({c,d,prod,ppbTot,calcs}){
       {/* PREÇO FINAL — fixo */}
       <div className="bd-preco">
         <span>PREÇO FINAL</span>
-        <span style={{fontFamily:"'DM Mono',monospace",fontSize:17,fontWeight:800,color:"#93c5fd"}}>{brl(c.pF)}</span>
+        <span style={{fontFamily:"'Montserrat',sans-serif",fontSize:17,fontWeight:800,color:"#3CDBC0"}}>{brl(c.pF)}</span>
       </div>
     </div>
   );
@@ -2113,8 +2113,8 @@ function ModalGestaoUsers({ onClose, currentUser }) {
   });
 
   const btnStyle = (on) => ({
-    padding:"7px 16px", background: on?"#0047BB":"rgba(255,255,255,.05)",
-    border:`1px solid ${on?"#0047BB":"rgba(255,255,255,.1)"}`,
+    padding:"7px 16px", background: on?"#3CDBC0":"rgba(255,255,255,.05)",
+    border:`1px solid ${on?"#3CDBC0":"rgba(255,255,255,.1)"}`,
     color: on?"#fff":"var(--muted)", fontSize:12, fontWeight:700,
     cursor:"pointer", borderRadius:3, transition:".15s", letterSpacing:".3px"
   });
@@ -2155,7 +2155,7 @@ function ModalGestaoUsers({ onClose, currentUser }) {
                         <div style={{fontSize:11,color:"var(--muted)"}}>{u.email}</div>
                       </td>
                       <td style={{padding:"10px 12px"}}><PerfilBadge perfil={u.perfil}/></td>
-                      <td style={{padding:"10px 12px",fontFamily:"JetBrains Mono",fontSize:11,color:"var(--muted)"}}>{fmtDate(u.criadoEm)}</td>
+                      <td style={{padding:"10px 12px",fontFamily:"'Montserrat',sans-serif",fontSize:11,color:"var(--muted)"}}>{fmtDate(u.criadoEm)}</td>
                       <td style={{padding:"10px 12px"}}>
                         <button className="btn-sm btn-approve" onClick={()=>setModal({type:"aprovar",user:u})}>✓ Analisar</button>
                       </td>
@@ -2264,183 +2264,183 @@ function ModalGestaoUsers({ onClose, currentUser }) {
 
 // ── CSS ───────────────────────────────────────────────────────────────────────
 const CSS=`
-@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=DM+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap');
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-body{background:#1c2333;color:#dce7f7;font-family:'IBM Plex Sans',sans-serif;min-height:100vh}
+body{background:#2C2A29;color:#f0f0f0;font-family:'Montserrat',Arial,Helvetica,sans-serif;min-height:100vh}
 input::-webkit-inner-spin-button,input::-webkit-outer-spin-button{-webkit-appearance:none}
 .app{display:flex;flex-direction:column;flex:1}
-.hdr{background:#232c3d;color:#fff;padding:0 20px;display:flex;align-items:center;gap:16px;min-height:58px;border-bottom:3px solid #0047BB;flex-wrap:wrap}
-.buf{padding:4px 10px;font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:700;letter-spacing:.5px;border-radius:20px}
-.buf.zmf{background:rgba(0,71,187,.35);color:#93c5fd;border:1px solid rgba(0,71,187,.5)}.buf.ios{background:rgba(26,101,212,.35);color:#93c5fd;border:1px solid rgba(26,101,212,.5)}.buf.cwb{background:rgba(100,116,139,.2);color:#94a3b8;border:1px solid rgba(100,116,139,.3)}
-.brt{padding:3px 9px;font-family:'DM Mono',monospace;font-size:9px;border:1px solid rgba(255,255,255,.12);color:#7a90b0;border-radius:20px}
-.bdf{padding:3px 9px;font-family:'DM Mono',monospace;font-size:9px;border-radius:20px;background:rgba(220,38,38,.12);border:1px solid rgba(220,38,38,.25);color:#f87171}
+.hdr{background:#252322;color:#fff;padding:0 20px;display:flex;align-items:center;gap:16px;min-height:58px;border-bottom:3px solid #3CDBC0;flex-wrap:wrap}
+.buf{padding:4px 10px;font-family:'Montserrat',sans-serif;font-size:11px;font-weight:700;letter-spacing:.5px;border-radius:20px}
+.buf.zmf{background:rgba(60,219,192,.2);color:#3CDBC0;border:1px solid rgba(60,219,192,.4)}.buf.ios{background:rgba(60,219,192,.12);color:#3CDBC0;border:1px solid rgba(60,219,192,.3)}.buf.cwb{background:rgba(100,116,139,.2);color:#94a3b8;border:1px solid rgba(100,116,139,.3)}
+.brt{padding:3px 9px;font-family:'Montserrat',sans-serif;font-size:9px;border:1px solid rgba(255,255,255,.12);color:#A7A8AA;border-radius:20px}
+.bdf{padding:3px 9px;font-family:'Montserrat',sans-serif;font-size:9px;border-radius:20px;background:rgba(220,38,38,.12);border:1px solid rgba(220,38,38,.25);color:#f87171}
 .layout{display:grid;grid-template-columns:360px 1fr;flex:1}
-.pleft{background:#1a2030;border-right:1px solid rgba(255,255,255,.08);display:flex;flex-direction:column}
-.tnav{display:flex;flex-wrap:nowrap;border-bottom:1px solid rgba(255,255,255,.08);background:#161e2c;flex-shrink:0;overflow-x:auto;scrollbar-width:none}.tnav::-webkit-scrollbar{display:none}
-.tbtn{flex:0 0 auto;padding:9px 7px;background:none;border:none;border-bottom:2px solid transparent;color:#7a90b0;font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;cursor:pointer;transition:.15s;white-space:nowrap}
-.tbtn.on{color:#f0f4ff;border-bottom-color:#0047BB;background:rgba(0,71,187,.15)}
+.pleft{background:#201f1e;border-right:1px solid rgba(255,255,255,.08);display:flex;flex-direction:column}
+.tnav{display:flex;flex-wrap:nowrap;border-bottom:1px solid rgba(255,255,255,.08);background:#1a1918;flex-shrink:0;overflow-x:auto;scrollbar-width:none}.tnav::-webkit-scrollbar{display:none}
+.tbtn{flex:0 0 auto;padding:9px 7px;background:none;border:none;border-bottom:2px solid transparent;color:#A7A8AA;font-family:'Montserrat',sans-serif;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;cursor:pointer;transition:.15s;white-space:nowrap}
+.tbtn.on{color:#3CDBC0;border-bottom-color:#3CDBC0;background:rgba(60,219,192,.1)}
 .tbtn:hover:not(.on){color:#c4d4e8;background:rgba(255,255,255,.04)}
 .pscroll{overflow-y:auto;padding:8px;display:flex;flex-direction:column;gap:6px}
-.sec{border:1px solid rgba(255,255,255,.08);overflow:hidden;background:#232c3d;border-radius:6px}
-.sec.hl{border-color:rgba(0,71,187,.6)}
-.sech{padding:9px 13px;background:#2a3550;border-bottom:1px solid rgba(255,255,255,.08);display:flex;align-items:center;justify-content:space-between;min-height:34px}
-.sec.hl .sech{background:#0047BB}
-.sect{font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#f0f4ff}
-.sec.hl .sect{color:#fff}
-.sectag{font-family:'DM Mono',monospace;font-size:9px;color:#7a90b0;padding:2px 7px;border:1px solid rgba(255,255,255,.1);border-radius:20px}
-.sec.hl .sectag{color:rgba(255,255,255,.65);border-color:rgba(255,255,255,.25)}
+.sec{border:1px solid rgba(255,255,255,.08);overflow:hidden;background:#252322;border-radius:6px}
+.sec.hl{border-color:rgba(60,219,192,.5)}
+.sech{padding:9px 13px;background:#302e2d;border-bottom:1px solid rgba(255,255,255,.08);display:flex;align-items:center;justify-content:space-between;min-height:34px}
+.sec.hl .sech{background:#3CDBC0}
+.sect{font-family:'Montserrat',sans-serif;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#f0f4ff}
+.sec.hl .sect{color:#2C2A29}
+.sectag{font-family:'Montserrat',sans-serif;font-size:9px;color:#A7A8AA;padding:2px 7px;border:1px solid rgba(255,255,255,.1);border-radius:20px}
+.sec.hl .sectag{color:rgba(44,42,41,.7);border-color:rgba(44,42,41,.3)}
 .secb{padding:12px 13px;display:flex;flex-direction:column;gap:9px}
-.fw{display:flex;align-items:center;border:1px solid rgba(255,255,255,.1);background:#1a2030;overflow:hidden;min-width:115px;flex-shrink:0;transition:.15s;border-radius:4px}
-.fw:focus-within{border-color:#0047BB;box-shadow:0 0 0 2px rgba(0,71,187,.2)}
+.fw{display:flex;align-items:center;border:1px solid rgba(255,255,255,.1);background:#201f1e;overflow:hidden;min-width:115px;flex-shrink:0;transition:.15s;border-radius:4px}
+.fw:focus-within{border-color:#3CDBC0;box-shadow:0 0 0 2px rgba(60,219,192,.2)}
 .fro{opacity:.45;pointer-events:none}
-.flocked{border-color:rgba(0,71,187,.5)!important;background:rgba(0,71,187,.07)!important}
-.fpre{padding:0 8px;font-family:'DM Mono',monospace;font-size:10px;color:#7a90b0;background:#161e2c;border-right:1px solid rgba(255,255,255,.08);white-space:nowrap;align-self:stretch;display:flex;align-items:center}
-.fsel{border:1px solid rgba(255,255,255,.1);background:#1a2030;padding:7px 8px;font-family:'DM Mono',monospace;font-size:11px;color:#dce7f7;outline:none;min-width:115px;flex-shrink:0;cursor:pointer;border-radius:4px}
-.fsel:focus{border-color:#0047BB}
-.cbtn{width:28px;height:28px;background:#2a3550;border:1px solid rgba(255,255,255,.1);cursor:pointer;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:.15s;border-radius:4px;color:#7a90b0;font-family:'DM Mono',monospace}
-.cbtn:hover{border-color:#0047BB;background:rgba(0,71,187,.2);color:#93c5fd}
-.cbtn.cactive{border-color:#0047BB!important;color:#93c5fd!important;background:rgba(0,71,187,.25)!important}
-.cunlock{font-size:13px;color:#7a90b0!important}
+.flocked{border-color:rgba(60,219,192,.5)!important;background:rgba(60,219,192,.07)!important}
+.fpre{padding:0 8px;font-family:'Montserrat',sans-serif;font-size:10px;color:#A7A8AA;background:#1a1918;border-right:1px solid rgba(255,255,255,.08);white-space:nowrap;align-self:stretch;display:flex;align-items:center}
+.fsel{border:1px solid rgba(255,255,255,.1);background:#201f1e;padding:7px 8px;font-family:'Montserrat',sans-serif;font-size:11px;color:#f0f0f0;outline:none;min-width:115px;flex-shrink:0;cursor:pointer;border-radius:4px}
+.fsel:focus{border-color:#3CDBC0}
+.cbtn{width:28px;height:28px;background:#302e2d;border:1px solid rgba(255,255,255,.1);cursor:pointer;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:.15s;border-radius:4px;color:#A7A8AA;font-family:'Montserrat',sans-serif}
+.cbtn:hover{border-color:#3CDBC0;background:rgba(60,219,192,.15);color:#3CDBC0}
+.cbtn.cactive{border-color:#3CDBC0!important;color:#3CDBC0!important;background:rgba(60,219,192,.2)!important}
+.cunlock{font-size:13px;color:#A7A8AA!important}
 .cunlock:hover{color:#fbbf24!important;border-color:rgba(251,191,36,.4)!important;background:rgba(251,191,36,.08)!important}
-.rgb{flex:1;padding:7px 8px;background:#1a2030;border:1px solid rgba(255,255,255,.1);color:#7a90b0;font-family:'IBM Plex Sans',sans-serif;font-size:12px;font-weight:500;cursor:pointer;transition:.15s;min-width:60px;border-radius:3px}
-.rgb.on{background:rgba(0,71,187,.2);border-color:rgba(0,71,187,.5);color:#93c5fd;font-weight:600}
+.rgb{flex:1;padding:7px 8px;background:#201f1e;border:1px solid rgba(255,255,255,.1);color:#A7A8AA;font-family:'Montserrat',sans-serif;font-size:12px;font-weight:500;cursor:pointer;transition:.15s;min-width:60px;border-radius:3px}
+.rgb.on{background:rgba(60,219,192,.15);border-color:rgba(60,219,192,.4);color:#3CDBC0;font-weight:600}
 .rgb:hover:not(.on){border-color:rgba(255,255,255,.2);color:#c4d4e8}
-.tog{width:40px;height:22px;background:#2a3550;border:1px solid rgba(255,255,255,.12);border-radius:11px;cursor:pointer;position:relative;transition:.2s;flex-shrink:0}
-.tog.on{background:#0047BB;border-color:#0047BB}
-.tknob{position:absolute;top:3px;left:3px;width:14px;height:14px;background:#7a90b0;border-radius:50%;transition:.2s}
-.tog.on .tknob{transform:translateX(18px);background:#fff}
+.tog{width:40px;height:22px;background:#302e2d;border:1px solid rgba(255,255,255,.12);border-radius:11px;cursor:pointer;position:relative;transition:.2s;flex-shrink:0}
+.tog.on{background:#3CDBC0;border-color:#3CDBC0}
+.tknob{position:absolute;top:3px;left:3px;width:14px;height:14px;background:#A7A8AA;border-radius:50%;transition:.2s}
+.tog.on .tknob{transform:translateX(18px);background:#2C2A29}
 .ib{padding:8px 11px;font-size:11px;line-height:1.65;border-left:3px solid;white-space:pre-wrap;border-radius:0 4px 4px 0}
-.ib.blue{background:rgba(0,71,187,.1);border-color:#0047BB;color:#93c5fd}
-.ib.gray{background:rgba(255,255,255,.03);border-color:rgba(255,255,255,.1);color:#7a90b0;font-family:'DM Mono',monospace;font-size:10px}
+.ib.blue{background:rgba(60,219,192,.08);border-color:#3CDBC0;color:#3CDBC0}
+.ib.gray{background:rgba(255,255,255,.03);border-color:rgba(255,255,255,.1);color:#A7A8AA;font-family:'Montserrat',sans-serif;font-size:10px}
 .ib.ok{background:rgba(22,163,74,.08);border-color:#16a34a;color:#4ade80}
 .ib.warn{background:rgba(217,119,6,.08);border-color:#d97706;color:#fbbf24}
-.dr{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.04);font-size:12px;color:#7a90b0}
-.dr:last-child{border-bottom:none}.drb{font-weight:700;color:#dce7f7}.drs{border-top:1px solid rgba(255,255,255,.08);margin-top:4px;padding-top:7px}
+.dr{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.04);font-size:12px;color:#A7A8AA}
+.dr:last-child{border-bottom:none}.drb{font-weight:700;color:#f0f0f0}.drs{border-top:1px solid rgba(255,255,255,.08);margin-top:4px;padding-top:7px}
 .dr.red .dv{color:#f87171;font-weight:600}.dr.green .dv{color:#4ade80;font-weight:600}.dr.blue .dv{color:#60a5fa;font-weight:600}.dr.warn .dv{color:#fbbf24;font-weight:600}
-.dv{font-family:'DM Mono',monospace;font-size:12px;font-weight:500;color:#a8b5cc}
-.drb .dv{color:#dce7f7}
-.psel{width:100%;padding:8px 10px;border:1px solid rgba(255,255,255,.1);background:#1a2030;font-family:'DM Mono',monospace;font-size:11px;color:#dce7f7;outline:none;border-radius:4px}
-.psel:focus{border-color:#0047BB}
+.dv{font-family:'Montserrat',sans-serif;font-size:12px;font-weight:500;color:#C8C9CA}
+.drb .dv{color:#f0f0f0}
+.psel{width:100%;padding:8px 10px;border:1px solid rgba(255,255,255,.1);background:#201f1e;font-family:'Montserrat',sans-serif;font-size:11px;color:#f0f0f0;outline:none;border-radius:4px}
+.psel:focus{border-color:#3CDBC0}
 .pgrid{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:5px}
-.pchip{background:#1a2030;border:1px solid rgba(255,255,255,.08);padding:6px 10px;border-radius:4px}
-.pcl{display:block;font-size:9px;color:#3d5070;text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px;font-family:'DM Mono',monospace}
-.pcv{font-family:'DM Mono',monospace;font-size:12px;font-weight:700;color:#dce7f7}
-.zmfi{display:flex;gap:8px;padding:9px 11px;border:1px solid rgba(255,255,255,.08);cursor:pointer;background:#1a2030;transition:.15s;border-radius:4px}
-.zmfi.sel{border-color:rgba(0,71,187,.6);background:rgba(0,71,187,.1)}.zmfi:hover:not(.sel){border-color:rgba(255,255,255,.18)}
+.pchip{background:#201f1e;border:1px solid rgba(255,255,255,.08);padding:6px 10px;border-radius:4px}
+.pcl{display:block;font-size:9px;color:#3d5070;text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px;font-family:'Montserrat',sans-serif}
+.pcv{font-family:'Montserrat',sans-serif;font-size:12px;font-weight:700;color:#f0f0f0}
+.zmfi{display:flex;gap:8px;padding:9px 11px;border:1px solid rgba(255,255,255,.08);cursor:pointer;background:#201f1e;transition:.15s;border-radius:4px}
+.zmfi.sel{border-color:rgba(60,219,192,.5);background:rgba(60,219,192,.08)}.zmfi:hover:not(.sel){border-color:rgba(255,255,255,.18)}
 .rdot{width:13px;height:13px;border-radius:50%;border:2px solid rgba(255,255,255,.15);transition:.15s;margin-top:2px;flex-shrink:0}
-.rdot.on{border-color:#0047BB;background:#0047BB;box-shadow:0 0 0 3px rgba(0,71,187,.2)}
-.ppbi{border:1px solid rgba(255,255,255,.08);overflow:hidden;border-radius:5px}.ppbc{display:flex;align-items:center;gap:8px;padding:9px 12px;cursor:pointer;background:#2a3550;width:100%}
+.rdot.on{border-color:#3CDBC0;background:#3CDBC0;box-shadow:0 0 0 3px rgba(60,219,192,.2)}
+.ppbi{border:1px solid rgba(255,255,255,.08);overflow:hidden;border-radius:5px}.ppbc{display:flex;align-items:center;gap:8px;padding:9px 12px;cursor:pointer;background:#302e2d;width:100%}
 .ppbc input[type=checkbox]{display:none}
-.ppbcb{width:16px;height:16px;border:2px solid rgba(255,255,255,.15);flex-shrink:0;background:#1a2030;transition:.15s;position:relative;border-radius:3px}
-.ppbc input:checked+.ppbcb{background:#0047BB;border-color:#0047BB}
-.ppbc input:checked+.ppbcb::after{content:"v";position:absolute;top:-1px;left:2px;color:#fff;font-size:10px;font-weight:700}
-.ppbtot{display:flex;justify-content:space-between;align-items:center;padding:9px 12px;background:#0047BB;color:#fff;font-family:'DM Mono',monospace;font-size:13px;font-weight:700;margin-top:4px}
-.cvres{display:flex;justify-content:space-between;align-items:center;padding:11px 13px;background:rgba(0,71,187,.12);border:1px solid rgba(0,71,187,.35);border-radius:4px}
-.cvres span:first-child{font-size:12px;font-weight:600;color:#93c5fd}
+.ppbcb{width:16px;height:16px;border:2px solid rgba(255,255,255,.15);flex-shrink:0;background:#201f1e;transition:.15s;position:relative;border-radius:3px}
+.ppbc input:checked+.ppbcb{background:#3CDBC0;border-color:#3CDBC0}
+.ppbc input:checked+.ppbcb::after{content:"v";position:absolute;top:-1px;left:2px;color:#2C2A29;font-size:10px;font-weight:700}
+.ppbtot{display:flex;justify-content:space-between;align-items:center;padding:9px 12px;background:#3CDBC0;color:#2C2A29;font-family:'Montserrat',sans-serif;font-size:13px;font-weight:700;margin-top:4px}
+.cvres{display:flex;justify-content:space-between;align-items:center;padding:11px 13px;background:rgba(60,219,192,.08);border:1px solid rgba(60,219,192,.3);border-radius:4px}
+.cvres span:first-child{font-size:12px;font-weight:600;color:#3CDBC0}
 .txgrid{display:grid;grid-template-columns:1fr 1fr;gap:5px}
-.txc{padding:9px 11px;border:1px solid rgba(255,255,255,.08);background:#1a2030;border-radius:4px}
+.txc{padding:9px 11px;border:1px solid rgba(255,255,255,.08);background:#201f1e;border-radius:4px}
 .txon{border-color:rgba(248,113,113,.25);background:rgba(220,38,38,.06)}.txok{border-color:rgba(74,222,128,.2);background:rgba(22,163,74,.06)}.txwn{border-color:rgba(251,191,36,.2);background:rgba(217,119,6,.06)}
-.txl{font-size:9px;color:#5a6a84;text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px;font-family:'DM Mono',monospace;line-height:1.3}
-.txv{font-family:'DM Mono',monospace;font-size:14px;font-weight:700;color:#dce7f7}
+.txl{font-size:9px;color:#5a6a84;text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px;font-family:'Montserrat',sans-serif;line-height:1.3}
+.txv{font-family:'Montserrat',sans-serif;font-size:14px;font-weight:700;color:#f0f0f0}
 .txon .txv{color:#f87171}.txok .txv{color:#4ade80}
-.pright{display:flex;flex-direction:column;background:#1c2333}
-.form-topbar{display:flex;align-items:center;border-bottom:1px solid rgba(255,255,255,.08);background:#161e2c;flex-shrink:0;min-height:40px}
+.pright{display:flex;flex-direction:column;background:#2C2A29}
+.form-topbar{display:flex;align-items:center;border-bottom:1px solid rgba(255,255,255,.08);background:#1a1918;flex-shrink:0;min-height:40px}
 .form-topbar .tnav{border-bottom:none;background:transparent}
-.price-hero{background:linear-gradient(150deg,#0f2a6e 0%,#0a1a45 100%);padding:14px 16px;border:1px solid rgba(37,99,235,.2);border-bottom:3px solid #0047BB;border-radius:6px;margin-bottom:4px}
+.price-hero{background:linear-gradient(150deg,#1a2520 0%,#0d1a18 100%);padding:14px 16px;border:1px solid rgba(60,219,192,.15);border-bottom:3px solid #3CDBC0;border-radius:6px;margin-bottom:4px}
 .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .form-grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
 .form-col{display:flex;flex-direction:column;gap:10px}
-.hero{background:linear-gradient(135deg,#0f2a6e,#0a1a45);padding:18px 22px;display:flex;align-items:flex-end;justify-content:space-between;gap:14px;flex-wrap:wrap;border:1px solid rgba(0,71,187,.2);border-bottom:3px solid #0047BB;border-radius:6px}
+.hero{background:linear-gradient(135deg,#1a2520,#0d1a18);padding:18px 22px;display:flex;align-items:flex-end;justify-content:space-between;gap:14px;flex-wrap:wrap;border:1px solid rgba(60,219,192,.15);border-bottom:3px solid #3CDBC0;border-radius:6px}
 .kpi{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);padding:9px 14px;text-align:center;min-width:80px;border-radius:5px}
-.kpi-red{border-color:rgba(248,113,113,.2);background:rgba(220,38,38,.06)}.kpi-green{border-color:rgba(74,222,128,.2);background:rgba(22,163,74,.06)}.kpi-blue{border-color:rgba(96,165,250,.2);background:rgba(0,71,187,.07)}
-.kpi-red span:last-child{color:#f87171!important}.kpi-green span:last-child{color:#4ade80!important}.kpi-blue span:last-child{color:#93c5fd!important}
-.rcard{background:#232c3d;border:1px solid rgba(255,255,255,.08);padding:12px 16px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;border-radius:6px}
-.rlbl{font-family:'Barlow Condensed',sans-serif;font-size:10px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:#5a6a84;white-space:nowrap;flex-shrink:0}
+.kpi-red{border-color:rgba(248,113,113,.2);background:rgba(220,38,38,.06)}.kpi-green{border-color:rgba(74,222,128,.2);background:rgba(22,163,74,.06)}.kpi-blue{border-color:rgba(60,219,192,.2);background:rgba(60,219,192,.07)}
+.kpi-red span:last-child{color:#f87171!important}.kpi-green span:last-child{color:#4ade80!important}.kpi-blue span:last-child{color:#3CDBC0!important}
+.rcard{background:#252322;border:1px solid rgba(255,255,255,.08);padding:12px 16px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;border-radius:6px}
+.rlbl{font-family:'Montserrat',sans-serif;font-size:10px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:#5a6a84;white-space:nowrap;flex-shrink:0}
 .rbody{display:flex;align-items:center;gap:12px;flex:1;flex-wrap:wrap}
-.riw{display:flex;align-items:center;border:1px solid rgba(255,255,255,.12);background:#1a2030;overflow:hidden;border-radius:4px}
-.riw:focus-within{border-color:#0047BB}
-.rpfx{padding:0 10px;font-family:'DM Mono',monospace;font-size:12px;color:#7a90b0;background:#161e2c;border-right:1px solid rgba(255,255,255,.08);align-self:stretch;display:flex;align-items:center}
-.ri{background:none;border:none;outline:none;font-family:'DM Mono',monospace;font-size:15px;font-weight:700;color:#dce7f7;padding:8px 10px;width:160px;text-align:right}
-.rcl{padding:0 9px;background:none;border:none;border-left:1px solid rgba(255,255,255,.08);color:#7a90b0;font-size:12px;cursor:pointer;align-self:stretch;display:flex;align-items:center}
+.riw{display:flex;align-items:center;border:1px solid rgba(255,255,255,.12);background:#201f1e;overflow:hidden;border-radius:4px}
+.riw:focus-within{border-color:#3CDBC0}
+.rpfx{padding:0 10px;font-family:'Montserrat',sans-serif;font-size:12px;color:#A7A8AA;background:#1a1918;border-right:1px solid rgba(255,255,255,.08);align-self:stretch;display:flex;align-items:center}
+.ri{background:none;border:none;outline:none;font-family:'Montserrat',sans-serif;font-size:15px;font-weight:700;color:#f0f0f0;padding:8px 10px;width:160px;text-align:right}
+.rcl{padding:0 9px;background:none;border:none;border-left:1px solid rgba(255,255,255,.08);color:#A7A8AA;font-size:12px;cursor:pointer;align-self:stretch;display:flex;align-items:center}
 .rcl:hover{color:#f87171}
 .rres{display:flex;flex-direction:column;gap:4px;flex:1}
-.rrmain{display:flex;justify-content:space-between;align-items:center;font-size:12px;font-weight:600;color:#a8b5cc}
-.rrv{font-family:'DM Mono',monospace;font-size:20px;font-weight:800}
+.rrmain{display:flex;justify-content:space-between;align-items:center;font-size:12px;font-weight:600;color:#C8C9CA}
+.rrv{font-family:'Montserrat',sans-serif;font-size:20px;font-weight:800}
 .rpos .rrv{color:#4ade80}.rneg .rrv{color:#f87171}
 .rrsub{display:flex;flex-direction:column;gap:2px}
-.rrsub span{font-family:'DM Mono',monospace;font-size:10px;color:#5a6a84}
-.strip{display:flex;align-items:center;gap:3px;flex-wrap:wrap;background:#232c3d;border:1px solid rgba(255,255,255,.08);padding:10px 14px;border-radius:6px}
-.sb{border:1px solid rgba(255,255,255,.08);padding:6px 10px;min-width:68px;text-align:center;background:#1a2030;border-radius:4px}
-.sb.hl{border-color:rgba(255,255,255,.15);background:#2a3550}.sb.blue{border-color:rgba(0,71,187,.4);background:rgba(0,71,187,.12)}.sb.dk{border-color:rgba(255,255,255,.1);background:#1a2030}
-.sbl{font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#5a6a84;margin-bottom:2px;font-family:'Barlow Condensed',sans-serif}
-.sbv{font-family:'DM Mono',monospace;font-size:10px;font-weight:700;color:#a8b5cc}
-.sb.hl .sbv,.sb.dk .sbv{color:#dce7f7}.sb.blue .sbv{color:#93c5fd}
-.wfc{background:#232c3d;border:1px solid rgba(255,255,255,.08);padding:14px;border-radius:6px}
-.ctit{font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:#dce7f7;margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid #0047BB;display:inline-block}
+.rrsub span{font-family:'Montserrat',sans-serif;font-size:10px;color:#5a6a84}
+.strip{display:flex;align-items:center;gap:3px;flex-wrap:wrap;background:#252322;border:1px solid rgba(255,255,255,.08);padding:10px 14px;border-radius:6px}
+.sb{border:1px solid rgba(255,255,255,.08);padding:6px 10px;min-width:68px;text-align:center;background:#201f1e;border-radius:4px}
+.sb.hl{border-color:rgba(255,255,255,.15);background:#302e2d}.sb.blue{border-color:rgba(60,219,192,.4);background:rgba(60,219,192,.1)}.sb.dk{border-color:rgba(255,255,255,.1);background:#201f1e}
+.sbl{font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#5a6a84;margin-bottom:2px;font-family:'Montserrat',sans-serif}
+.sbv{font-family:'Montserrat',sans-serif;font-size:10px;font-weight:700;color:#C8C9CA}
+.sb.hl .sbv,.sb.dk .sbv{color:#f0f0f0}.sb.blue .sbv{color:#3CDBC0}
+.wfc{background:#252322;border:1px solid rgba(255,255,255,.08);padding:14px;border-radius:6px}
+.ctit{font-family:'Montserrat',sans-serif;font-size:11px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:#f0f0f0;margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid #3CDBC0;display:inline-block}
 .wfr{display:flex;align-items:center;gap:6px;padding:3px 0}
-.wft .wfl{font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:800;color:#dce7f7;text-transform:uppercase}
+.wft .wfl{font-family:'Montserrat',sans-serif;font-size:12px;font-weight:800;color:#f0f0f0;text-transform:uppercase}
 .wfs .wfl{color:#5a6a84;font-size:10px;padding-left:10px}
-.wfl{width:195px;font-size:11px;font-weight:600;color:#7a90b0;flex-shrink:0;line-height:1.3}
-.wftr{flex:1;height:12px;background:#1a2030;overflow:hidden;border-radius:3px}
+.wfl{width:195px;font-size:11px;font-weight:600;color:#A7A8AA;flex-shrink:0;line-height:1.3}
+.wftr{flex:1;height:12px;background:#201f1e;overflow:hidden;border-radius:3px}
 .wff{height:100%;transition:width .3s;opacity:.9}
-.wfp{width:42px;text-align:right;font-family:'DM Mono',monospace;font-size:9px;color:#3d5070;flex-shrink:0}
-.wfv{width:80px;text-align:right;font-family:'DM Mono',monospace;font-size:10px;font-weight:500;color:#7a90b0;flex-shrink:0}
-.wft .wfv{font-size:13px;font-weight:700;color:#93c5fd}
-.dc{background:#232c3d;border:1px solid rgba(255,255,255,.08);padding:14px;border-radius:6px}
+.wfp{width:42px;text-align:right;font-family:'Montserrat',sans-serif;font-size:9px;color:#3d5070;flex-shrink:0}
+.wfv{width:80px;text-align:right;font-family:'Montserrat',sans-serif;font-size:10px;font-weight:500;color:#A7A8AA;flex-shrink:0}
+.wft .wfv{font-size:13px;font-weight:700;color:#3CDBC0}
+.dc{background:#252322;border:1px solid rgba(255,255,255,.08);padding:14px;border-radius:6px}
 .ov{position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px}
-.mb{background:#232c3d;border:1.5px solid rgba(0,71,187,.6);width:100%;max-width:460px;max-height:90vh;overflow-y:auto;display:flex;flex-direction:column;border-radius:8px}
-.mh{padding:13px 17px;background:#2a3550;border-bottom:1px solid rgba(0,71,187,.3);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:1;border-radius:8px 8px 0 0}
-.mt{font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:#f0f4ff}
-.mc{background:none;border:none;color:#7a90b0;font-size:18px;cursor:pointer;padding:2px 6px;line-height:1}
-.mc_btn{background:none;border:none;color:#7a90b0;font-size:18px;cursor:pointer;padding:2px 6px;line-height:1}
-.mc:hover{color:#dce7f7}
+.mb{background:#252322;border:1.5px solid rgba(60,219,192,.4);width:100%;max-width:460px;max-height:90vh;overflow-y:auto;display:flex;flex-direction:column;border-radius:8px}
+.mh{padding:13px 17px;background:#302e2d;border-bottom:1px solid rgba(60,219,192,.2);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:1;border-radius:8px 8px 0 0}
+.mt{font-family:'Montserrat',sans-serif;font-size:14px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:#f0f4ff}
+.mc{background:none;border:none;color:#A7A8AA;font-size:18px;cursor:pointer;padding:2px 6px;line-height:1}
+.mc_btn{background:none;border:none;color:#A7A8AA;font-size:18px;cursor:pointer;padding:2px 6px;line-height:1}
+.mc:hover{color:#f0f0f0}
 .mbody{padding:15px;display:flex;flex-direction:column;gap:10px}
-.pbase{display:flex;justify-content:space-between;align-items:center;padding:7px 11px;background:#1a2030;border:1px solid rgba(255,255,255,.08);font-family:'DM Mono',monospace;font-size:11px;color:#7a90b0;border-radius:4px}
-.pbase span:last-child{color:#93c5fd;font-weight:700}
-.pdecomp{background:#1a2030;border:1px solid rgba(255,255,255,.08);padding:9px 11px;display:flex;flex-direction:column;gap:5px;border-radius:4px}
-.pdecomp div{display:flex;justify-content:space-between;font-size:11px;font-family:'DM Mono',monospace;color:#7a90b0;border-bottom:1px solid rgba(255,255,255,.04);padding-bottom:4px}
+.pbase{display:flex;justify-content:space-between;align-items:center;padding:7px 11px;background:#201f1e;border:1px solid rgba(255,255,255,.08);font-family:'Montserrat',sans-serif;font-size:11px;color:#A7A8AA;border-radius:4px}
+.pbase span:last-child{color:#3CDBC0;font-weight:700}
+.pdecomp{background:#201f1e;border:1px solid rgba(255,255,255,.08);padding:9px 11px;display:flex;flex-direction:column;gap:5px;border-radius:4px}
+.pdecomp div{display:flex;justify-content:space-between;font-size:11px;font-family:'Montserrat',sans-serif;color:#A7A8AA;border-bottom:1px solid rgba(255,255,255,.04);padding-bottom:4px}
 .pdecomp div:last-child{border-bottom:none;padding-bottom:0}
-.pdecomp div span:last-child{color:#a8b5cc}
-.pres{display:flex;justify-content:space-between;align-items:center;padding:11px 14px;background:rgba(0,71,187,.14);border:1.5px solid rgba(0,71,187,.5);border-radius:4px}
-.pres span:first-child{font-size:12px;font-weight:600;color:#93c5fd}.pres span:last-child{font-family:'DM Mono',monospace;font-size:17px;font-weight:700;color:#93c5fd}
-.mapp{padding:11px;background:#0047BB;border:none;color:#fff;cursor:pointer;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;transition:.15s}
-.mapp:hover{background:#1a65d4}
+.pdecomp div span:last-child{color:#C8C9CA}
+.pres{display:flex;justify-content:space-between;align-items:center;padding:11px 14px;background:rgba(60,219,192,.08);border:1.5px solid rgba(60,219,192,.4);border-radius:4px}
+.pres span:first-child{font-size:12px;font-weight:600;color:#3CDBC0}.pres span:last-child{font-family:'Montserrat',sans-serif;font-size:17px;font-weight:700;color:#3CDBC0}
+.mapp{padding:11px;background:#3CDBC0;border:none;color:#2C2A29;cursor:pointer;font-family:'Montserrat',sans-serif;font-size:13px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;transition:.15s}
+.mapp:hover{background:#2bc4ab}
 .ftable{display:flex;flex-direction:column;gap:3px}
-.fth{display:grid;grid-template-columns:1fr 100px 100px;gap:6px;padding:4px 9px;font-family:'DM Mono',monospace;font-size:9px;color:#3d5070;text-transform:uppercase;letter-spacing:.5px}
-.ftr{display:grid;grid-template-columns:1fr 100px 100px;gap:6px;align-items:center;padding:5px 9px;background:#1a2030;border:1px solid rgba(255,255,255,.05);border-radius:3px}
-.ftot{display:flex;align-items:center;padding:7px 11px;font-family:'DM Mono',monospace;font-size:11px;font-weight:600;border-radius:4px}
+.fth{display:grid;grid-template-columns:1fr 100px 100px;gap:6px;padding:4px 9px;font-family:'Montserrat',sans-serif;font-size:9px;color:#3d5070;text-transform:uppercase;letter-spacing:.5px}
+.ftr{display:grid;grid-template-columns:1fr 100px 100px;gap:6px;align-items:center;padding:5px 9px;background:#201f1e;border:1px solid rgba(255,255,255,.05);border-radius:3px}
+.ftot{display:flex;align-items:center;padding:7px 11px;font-family:'Montserrat',sans-serif;font-size:11px;font-weight:600;border-radius:4px}
 .ftok{background:rgba(22,163,74,.08);border:1px solid rgba(22,163,74,.2);color:#4ade80}
 .ftwarn{background:rgba(217,119,6,.08);border:1px solid rgba(217,119,6,.2);color:#fbbf24}
 .desp-row{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .desp-modes{display:flex;gap:3px}
-.moeda-toggle{display:flex;align-items:center;gap:7px;padding:7px 14px;border-bottom:1px solid rgba(255,255,255,.07);background:#1c2333;flex-shrink:0}
+.moeda-toggle{display:flex;align-items:center;gap:7px;padding:7px 14px;border-bottom:1px solid rgba(255,255,255,.07);background:#2C2A29;flex-shrink:0}
 .moeda-toggle span{font-size:10px;font-weight:700;color:#5a6a84;letter-spacing:.4px;text-transform:uppercase}
 .moeda-toggle .rgb{flex:none;padding:4px 12px;font-size:11px}
-.bdc{background:#232c3d;border:1px solid rgba(255,255,255,.08);border-radius:8px;overflow:hidden}
+.bdc{background:#252322;border:1px solid rgba(255,255,255,.08);border-radius:8px;overflow:hidden}
 .bdr{display:flex;align-items:center;padding:4px 8px;gap:6px;border-bottom:1px solid rgba(255,255,255,.03)}
 .bdr.bdsub .bdl{color:#5a6a84}
-.bdl{flex:1;font-size:10px;color:#a8b5cc;line-height:1.3}
-.bdv{width:80px;text-align:right;font-family:'DM Mono',monospace;font-size:10px;font-weight:500;color:#a8b5cc;flex-shrink:0;display:flex;flex-direction:column;align-items:flex-end;gap:1px}
+.bdl{flex:1;font-size:10px;color:#C8C9CA;line-height:1.3}
+.bdv{width:80px;text-align:right;font-family:'Montserrat',sans-serif;font-size:10px;font-weight:500;color:#C8C9CA;flex-shrink:0;display:flex;flex-direction:column;align-items:flex-end;gap:1px}
 .bdv2{font-size:9px;color:#5a6a84;font-weight:400}
 
 /* Breakdown grupos colapsáveis */
 .bd-wrap{display:flex;flex-direction:column;gap:3px}
-.bd-grp{background:#232c3d;border:1px solid rgba(255,255,255,.07);border-radius:5px;overflow:hidden}
+.bd-grp{background:#252322;border:1px solid rgba(255,255,255,.07);border-radius:5px;overflow:hidden}
 .bd-grp-hd{display:flex;align-items:center;gap:5px;padding:7px 10px;cursor:pointer;user-select:none;transition:background .15s}
 .bd-grp-hd:hover{background:rgba(255,255,255,.03)}
 .bd-chevron{font-size:9px;color:#5a6a84;width:10px;flex-shrink:0}
-.bd-grp-lbl{font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;letter-spacing:.5px;color:#f0f4ff;white-space:nowrap;flex-shrink:0;min-width:100px}
+.bd-grp-lbl{font-family:'Montserrat',sans-serif;font-size:12px;font-weight:700;letter-spacing:.5px;color:#f0f4ff;white-space:nowrap;flex-shrink:0;min-width:100px}
 .bd-grp-bar{flex:1;height:5px;background:rgba(255,255,255,.06);border-radius:3px;overflow:hidden;min-width:20px}
-.bd-grp-pct{width:38px;text-align:right;font-family:'DM Mono',monospace;font-size:10px;font-weight:700;flex-shrink:0}
-.bd-grp-val{width:84px;text-align:right;font-family:'DM Mono',monospace;font-size:11px;font-weight:700;flex-shrink:0}
+.bd-grp-pct{width:38px;text-align:right;font-family:'Montserrat',sans-serif;font-size:10px;font-weight:700;flex-shrink:0}
+.bd-grp-val{width:84px;text-align:right;font-family:'Montserrat',sans-serif;font-size:11px;font-weight:700;flex-shrink:0}
 .bd-grp-body{padding:4px 0 6px;border-top:1px solid rgba(255,255,255,.05)}
-.bd-tot{display:flex;align-items:center;gap:4px;padding:7px 8px;background:#1a2030;border-radius:4px}
-.bd-tot-lbl{flex:1;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:#dce7f7}
-.bd-tot-pct{width:36px;text-align:right;font-family:'DM Mono',monospace;font-size:10px;color:#7a90b0;flex-shrink:0}
-.bd-tot-val{width:80px;text-align:right;font-family:'DM Mono',monospace;font-size:12px;font-weight:800;flex-shrink:0}
-.bd-preco{display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:linear-gradient(135deg,#0f2a6e,#0a1a45);border:1px solid rgba(37,99,235,.3);border-radius:5px}
-.bd-preco span:first-child{font-family:'Barlow Condensed',sans-serif;font-size:11px;font-weight:800;letter-spacing:1.5px;color:#93c5fd}
-::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:#1c2333}::-webkit-scrollbar-thumb{background:#2a3550;border-radius:3px}::-webkit-scrollbar-thumb:hover{background:#0047BB}
+.bd-tot{display:flex;align-items:center;gap:4px;padding:7px 8px;background:#201f1e;border-radius:4px}
+.bd-tot-lbl{flex:1;font-family:'Montserrat',sans-serif;font-size:13px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:#f0f0f0}
+.bd-tot-pct{width:36px;text-align:right;font-family:'Montserrat',sans-serif;font-size:10px;color:#A7A8AA;flex-shrink:0}
+.bd-tot-val{width:80px;text-align:right;font-family:'Montserrat',sans-serif;font-size:12px;font-weight:800;flex-shrink:0}
+.bd-preco{display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:linear-gradient(135deg,#1a2520,#0d1a18);border:1px solid rgba(60,219,192,.25);border-radius:5px}
+.bd-preco span:first-child{font-family:'Montserrat',sans-serif;font-size:11px;font-weight:800;letter-spacing:1.5px;color:#3CDBC0}
+::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:#2C2A29}::-webkit-scrollbar-thumb{background:#302e2d;border-radius:3px}::-webkit-scrollbar-thumb:hover{background:#3CDBC0}
 `;
 
 // ── APP ────────────────────────────────────────────────────────────────────────
@@ -2795,7 +2795,7 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
         <span className="bdf">{c.difal>0?`DIFAL ${pct(c.difal)}`:"DIFAL 0%"}</span>
         {/* Nome do registro */}
         {nomeAba&&(
-          <span style={{fontSize:11,fontWeight:600,color:"#93c5fd",padding:"2px 8px",background:"rgba(0,71,187,.15)",borderRadius:20,border:"1px solid rgba(0,71,187,.3)"}}>
+          <span style={{fontSize:11,fontWeight:600,color:"#3CDBC0",padding:"2px 8px",background:"rgba(60,219,192,.15)",borderRadius:20,border:"1px solid rgba(60,219,192,.3)"}}>
             {nomeAba}
           </span>
         )}
@@ -2805,35 +2805,35 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
           <span style={{fontSize:9,fontWeight:700,color:"#5a6a84",letterSpacing:.5,textTransform:"uppercase"}}>Dólar Custo</span>
           <span style={{fontSize:9,color:"#475569"}}>R$/USD</span>
           <input type="number" step="0.01" value={d.ptax} onChange={e=>S("ptax")(parseFloat(e.target.value)||0)}
-            style={{background:"none",border:"none",outline:"none",fontFamily:"'DM Mono',monospace",fontSize:12,fontWeight:700,color:"#93c5fd",width:52,textAlign:"right"}}/>
+            style={{background:"none",border:"none",outline:"none",fontFamily:"'Montserrat',sans-serif",fontSize:12,fontWeight:700,color:"#3CDBC0",width:52,textAlign:"right"}}/>
         </div>
         {/* Dólar Preço — cotação para precificação indexada em USD */}
-        <div style={{display:"flex",alignItems:"center",gap:6,padding:"3px 10px",background:"rgba(0,71,187,.06)",border:"1px solid rgba(0,71,187,.2)",borderRadius:8}}>
+        <div style={{display:"flex",alignItems:"center",gap:6,padding:"3px 10px",background:"rgba(60,219,192,.06)",border:"1px solid rgba(60,219,192,.2)",borderRadius:8}}>
           <span style={{fontSize:9,fontWeight:700,color:"#5a6a84",letterSpacing:.5,textTransform:"uppercase"}}>Dólar Preço</span>
           <span style={{fontSize:9,color:"#475569"}}>R$/USD</span>
           <input type="number" step="0.01" value={d.ptaxPreco||d.ptax} onChange={e=>S("ptaxPreco")(parseFloat(e.target.value)||0)}
-            style={{background:"none",border:"none",outline:"none",fontFamily:"'DM Mono',monospace",fontSize:12,fontWeight:700,color:"#60a5fa",width:52,textAlign:"right"}}/>
+            style={{background:"none",border:"none",outline:"none",fontFamily:"'Montserrat',sans-serif",fontSize:12,fontWeight:700,color:"#60a5fa",width:52,textAlign:"right"}}/>
         </div>
         {/* Registros — Novo / Salvar / Carregar */}
         <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
           <span style={{fontSize:8,fontWeight:700,color:"#5a6a84",letterSpacing:.8,textTransform:"uppercase"}}>Registros</span>
           <div style={{display:"flex",gap:4}}>
             <button onClick={()=>{setD({...DEF});setCalcs({...CALC_DEF});setTab("perfil");setIiStatus(null);if(onRenomear)onRenomear("Nova Precificação");}}
-              style={{padding:"4px 10px",background:"rgba(220,38,38,.15)",border:"1px solid rgba(220,38,38,.35)",color:"#f87171",fontFamily:"'Barlow Condensed',sans-serif",fontSize:11,fontWeight:700,letterSpacing:.5,cursor:"pointer",borderRadius:20}}>
+              style={{padding:"4px 10px",background:"rgba(220,38,38,.15)",border:"1px solid rgba(220,38,38,.35)",color:"#f87171",fontFamily:"'Montserrat',sans-serif",fontSize:11,fontWeight:700,letterSpacing:.5,cursor:"pointer",borderRadius:20}}>
               Novo
             </button>
             <button onClick={()=>setModal("registros")}
-              style={{padding:"4px 10px",background:"rgba(0,71,187,.2)",border:"1px solid rgba(0,71,187,.45)",color:"#93c5fd",fontFamily:"'Barlow Condensed',sans-serif",fontSize:11,fontWeight:700,letterSpacing:.5,cursor:"pointer",borderRadius:20}}>
+              style={{padding:"4px 10px",background:"rgba(60,219,192,.2)",border:"1px solid rgba(60,219,192,.45)",color:"#3CDBC0",fontFamily:"'Montserrat',sans-serif",fontSize:11,fontWeight:700,letterSpacing:.5,cursor:"pointer",borderRadius:20}}>
               Salvar
             </button>
             <button onClick={()=>setModal("registros")}
-              style={{padding:"4px 10px",background:"rgba(255,255,255,.05)",border:"1px solid rgba(255,255,255,.15)",color:"#a8b5cc",fontFamily:"'Barlow Condensed',sans-serif",fontSize:11,fontWeight:700,letterSpacing:.5,cursor:"pointer",borderRadius:20}}>
+              style={{padding:"4px 10px",background:"rgba(255,255,255,.05)",border:"1px solid rgba(255,255,255,.15)",color:"#a8b5cc",fontFamily:"'Montserrat',sans-serif",fontSize:11,fontWeight:700,letterSpacing:.5,cursor:"pointer",borderRadius:20}}>
               Carregar
             </button>
           </div>
         </div>
         {isAdmin&&<button onClick={()=>setModal("gestao")}
-          style={{padding:"4px 12px",background:"rgba(5,150,105,.15)",border:"1px solid rgba(5,150,105,.4)",color:"#34d399",fontFamily:"'Barlow Condensed',sans-serif",fontSize:11,fontWeight:700,letterSpacing:.5,cursor:"pointer",borderRadius:20,display:"flex",alignItems:"center",gap:5}}>
+          style={{padding:"4px 12px",background:"rgba(5,150,105,.15)",border:"1px solid rgba(5,150,105,.4)",color:"#34d399",fontFamily:"'Montserrat',sans-serif",fontSize:11,fontWeight:700,letterSpacing:.5,cursor:"pointer",borderRadius:20,display:"flex",alignItems:"center",gap:5}}>
           👥 Gestão de Usuários
         </button>}
       </div>
@@ -2843,32 +2843,32 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
           <div className="pscroll">
             <div className="price-hero">
               <div>
-                <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:9,fontWeight:700,letterSpacing:2,color:"#7a90b0",marginBottom:4}}>
+                <div style={{fontFamily:"'Montserrat',sans-serif",fontSize:9,fontWeight:700,letterSpacing:2,color:"#A7A8AA",marginBottom:4}}>
                   {d.modoCalc==="margem"?"MARGEM LÍQUIDA RESULTANTE":"PREÇO DE VENDA FINAL"}
                 </div>
                 {d.modoCalc==="margem"
-                  ? <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:44,fontWeight:800,letterSpacing:-1.5,lineHeight:1,display:"flex",alignItems:"flex-end",gap:4,
+                  ? <div style={{fontFamily:"'Montserrat',sans-serif",fontSize:44,fontWeight:800,letterSpacing:-1.5,lineHeight:1,display:"flex",alignItems:"flex-end",gap:4,
                       color:c.margemSugerida!==null?(c.margemSugerida>=0?"#34d399":"#f87171"):"#f1f5f9"}}>
                       {c.margemSugerida!==null?n3(c.margemSugerida):"—"}
                       <span style={{fontSize:18,fontWeight:400,marginBottom:6}}>%</span>
                     </div>
-                  : <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:44,fontWeight:800,color:"#f1f5f9",letterSpacing:-1.5,lineHeight:1,display:"flex",alignItems:"flex-start",gap:4}}>
-                      <span style={{fontSize:18,fontWeight:400,color:"#0047BB",marginTop:6}}>R$</span>{n3(c.pF)}
+                  : <div style={{fontFamily:"'Montserrat',sans-serif",fontSize:44,fontWeight:800,color:"#f1f5f9",letterSpacing:-1.5,lineHeight:1,display:"flex",alignItems:"flex-start",gap:4}}>
+                      <span style={{fontSize:18,fontWeight:400,color:"#3CDBC0",marginTop:6}}>R$</span>{n3(c.pF)}
                     </div>
                 }
-                <div style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:"#5a6a84",marginTop:4,lineHeight:1.6}}>
+                <div style={{fontFamily:"'Montserrat',sans-serif",fontSize:9,color:"#5a6a84",marginTop:4,lineHeight:1.6}}>
                   {d.modoCalc==="margem"&&d.precoSugerido>0&&<span style={{color:"#34d399"}}>Preço: {brl(d.precoSugerido)} · </span>}
                   {c.ipi>0&&`s/IPI ${brl(c.pSI)} · IPI ef. ${brl(c.ipiV)} · `}
                   {c.stV>0&&`ST ${brl(c.stV)} · `}
                   {c.difal>0&&`DIFAL ${brl(c.difalV)} · `}
-                  {(d.ptaxPreco||d.ptax)>0&&<span style={{color:"#0047BB"}}>{usd(c.pUSD)}{d.ptaxPreco>0&&<span style={{fontSize:9,color:"#5a6a84",marginLeft:3}}>×{n3(d.ptaxPreco)}</span>}</span>}
+                  {(d.ptaxPreco||d.ptax)>0&&<span style={{color:"#3CDBC0"}}>{usd(c.pUSD)}{d.ptaxPreco>0&&<span style={{fontSize:9,color:"#5a6a84",marginLeft:3}}>×{n3(d.ptaxPreco)}</span>}</span>}
                 </div>
               </div>
               <div style={{display:"flex",gap:5,flexWrap:"wrap",marginTop:8}}>
                 {[["CARGA","kpi-red",pct(c.cargaPct)],["ML","kpi-green",pct(c.margPct)],["MC","kpi-blue",pct(c.mc)],["MKP","",n3(c.mkp)+"x"]].map(([l,cls,v])=>(
                   <div key={l} className={`kpi ${cls}`} style={{minWidth:60}}>
-                    <span style={{display:"block",fontFamily:"'Barlow Condensed',sans-serif",fontSize:7,fontWeight:700,letterSpacing:1,color:"#475569",marginBottom:2}}>{l}</span>
-                    <span style={{fontFamily:"'DM Mono',monospace",fontSize:13,fontWeight:700}}>{v}</span>
+                    <span style={{display:"block",fontFamily:"'Montserrat',sans-serif",fontSize:7,fontWeight:700,letterSpacing:1,color:"#475569",marginBottom:2}}>{l}</span>
+                    <span style={{fontFamily:"'Montserrat',sans-serif",fontSize:13,fontWeight:700}}>{v}</span>
                   </div>
                 ))}
               </div>
@@ -2889,7 +2889,7 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
               <span style={{fontSize:10,fontWeight:700,color:"#5a6a84",letterSpacing:".4px",textTransform:"uppercase"}}>Moeda</span>
               <button className={`rgb ${isBRL?"on":""}`} style={{padding:"3px 10px",fontSize:10}} onClick={()=>S("moedaCusto")("BRL")}>BRL</button>
               <button className={`rgb ${!isBRL?"on":""}`} style={{padding:"3px 10px",fontSize:10}} onClick={()=>S("moedaCusto")("USD")}>USD</button>
-              {!isBRL&&<span style={{fontFamily:"'DM Mono',monospace",fontSize:9,color:"#7a90b0"}}>×{n3(d.ptax)}</span>}
+              {!isBRL&&<span style={{fontFamily:"'Montserrat',sans-serif",fontSize:9,color:"#A7A8AA"}}>×{n3(d.ptax)}</span>}
             </div>
           </div>
           <div className="pscroll">
@@ -2908,8 +2908,8 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
                       {ORIGENS.map(o=>(
                         <button key={o.id} onClick={()=>setOrigem(o.id)}
                           style={{flex:1,padding:"6px 4px",fontSize:10,fontWeight:700,cursor:"pointer",borderRadius:4,border:"1px solid",transition:".15s",
-                            background:d.origem===o.id?"rgba(0,71,187,.25)":"rgba(255,255,255,.04)",
-                            borderColor:d.origem===o.id?"#0047BB":"rgba(255,255,255,.1)",
+                            background:d.origem===o.id?"rgba(60,219,192,.25)":"rgba(255,255,255,.04)",
+                            borderColor:d.origem===o.id?"#3CDBC0":"rgba(255,255,255,.1)",
                             color:d.origem===o.id?"#93c5fd":"#7a90b0"}}>
                           {o.id}
                         </button>
@@ -2924,8 +2924,8 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
                       {MODALIDADES.map(m=>(
                         <button key={m.id} onClick={()=>setModalidade(m.id)}
                           style={{flex:1,padding:"6px 4px",fontSize:10,fontWeight:700,cursor:"pointer",borderRadius:4,border:"1px solid",transition:".15s",
-                            background:d.modalidade===m.id?(m.id==="CBU"?"rgba(220,38,38,.2)":m.id==="SKD"?"rgba(217,119,6,.2)":"rgba(0,71,187,.25)"):"rgba(255,255,255,.04)",
-                            borderColor:d.modalidade===m.id?(m.id==="CBU"?"#dc2626":m.id==="SKD"?"#d97706":"#0047BB"):"rgba(255,255,255,.1)",
+                            background:d.modalidade===m.id?(m.id==="CBU"?"rgba(220,38,38,.2)":m.id==="SKD"?"rgba(217,119,6,.2)":"rgba(60,219,192,.25)"):"rgba(255,255,255,.04)",
+                            borderColor:d.modalidade===m.id?(m.id==="CBU"?"#dc2626":m.id==="SKD"?"#d97706":"#3CDBC0"):"rgba(255,255,255,.1)",
                             color:d.modalidade===m.id?(m.id==="CBU"?"#f87171":m.id==="SKD"?"#fbbf24":"#93c5fd"):"#7a90b0"}}>
                           {m.id}
                         </button>
@@ -2939,8 +2939,8 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
                     )}
                     {d.modalidade==="CBU"&&(
                       <div style={{marginTop:6,padding:"8px 10px",borderRadius:4,fontSize:10,lineHeight:1.5,
-                        background: iiStatus==="ok"?"rgba(5,150,105,.1)":iiStatus==="err"?"rgba(220,38,38,.1)":"rgba(0,71,187,.08)",
-                        border:`1px solid ${iiStatus==="ok"?"rgba(5,150,105,.3)":iiStatus==="err"?"rgba(220,38,38,.3)":"rgba(0,71,187,.2)"}`,
+                        background: iiStatus==="ok"?"rgba(5,150,105,.1)":iiStatus==="err"?"rgba(220,38,38,.1)":"rgba(60,219,192,.08)",
+                        border:`1px solid ${iiStatus==="ok"?"rgba(5,150,105,.3)":iiStatus==="err"?"rgba(220,38,38,.3)":"rgba(60,219,192,.2)"}`,
                         color: iiStatus==="ok"?"#34d399":iiStatus==="err"?"#f87171":"#93c5fd"}}>
                         {iiStatus==="ok"&&`✓ II preenchido automaticamente (${n3(d.aliqII)}%) pela tabela TEC — confira na aba Importação.`}
                         {iiStatus==="err"&&"⚠️ NCM não encontrado na tabela TEC local. Preencha o II manualmente na aba Importação."}
@@ -2977,7 +2977,7 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
                       <div style={{flex:1}}>
                         <div style={{fontSize:10,fontWeight:600,color:d.pcZfmKey===e.k?"#93c5fd":"#94a3b8"}}>{e.label}</div>
                         <div style={{fontSize:9,color:"#475569",marginTop:2}}>{e.sub}</div>
-                        <div style={{fontFamily:"'DM Mono',monospace",fontSize:10,fontWeight:700,color:d.pcZfmKey===e.k?"#93c5fd":"#0047BB",marginTop:3}}>
+                        <div style={{fontFamily:"'Montserrat',sans-serif",fontSize:10,fontWeight:700,color:d.pcZfmKey===e.k?"#3CDBC0":"#2bc4ab",marginTop:3}}>
                           {e.pct===0?"Nao incidencia":pct(e.pct)+" debito vendedor"}
                         </div>
                       </div>
@@ -3006,7 +3006,7 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
                       :"Revenda para contribuinte: DIFAL e responsabilidade do destinatario."}
                   </Box>
                   <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}>
-                    <span style={{fontSize:12,fontWeight:600,color:"#dce7f7"}}>UF Destino</span>
+                    <span style={{fontSize:12,fontWeight:600,color:"#f0f0f0"}}>UF Destino</span>
                     <select className="fsel" value={d.ufDestino} onChange={e=>S("ufDestino")(e.target.value)}>
                       {UFS.map(u=><option key={u} value={u}>{u}</option>)}
                     </select>
@@ -3036,7 +3036,7 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
                   <DR label="CFR (FOB+Frete)" value={usd(c.cfrUSD)} bold/>
                   <div className="cvres">
                     <span>CFR em BRL <span style={{fontSize:9,color:"#5a6a84"}}>× {n3(d.ptax)}</span></span>
-                    <span style={{fontFamily:"'DM Mono',monospace",fontSize:16,fontWeight:700,color:"#93c5fd"}}>{brl(c.cfrBRL)}</span>
+                    <span style={{fontFamily:"'Montserrat',sans-serif",fontSize:16,fontWeight:700,color:"#3CDBC0"}}>{brl(c.cfrBRL)}</span>
                   </div>
                 </Sec>
                 {isZFM&&<Sec title="Isenções ZFM" tag="Lei 8.387/91">
@@ -3050,7 +3050,7 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
                   <DR label="II sobre CFR" value={brl(c.iiV)} accent="red"/>
                   <Field label={`Seguro (${sfxM})`} sfx={sfxM} value={toDisp(d.seguroBRL)} onChange={v=>S("seguroBRL")(toStore(v))}/>
                   <div className="desp-row">
-                    <span style={{fontSize:11,fontWeight:600,color:"#dce7f7"}}>Despesas Imp.</span>
+                    <span style={{fontSize:11,fontWeight:600,color:"#f0f0f0"}}>Despesas Imp.</span>
                     <div className="desp-modes">
                       <button className={`rgb ${d.despesasModo==="pct"?"on":""}`} style={{padding:"3px 8px",fontSize:9}} onClick={()=>S("despesasModo")("pct")}>% CFR</button>
                       <button className={`rgb ${d.despesasModo==="manual"?"on":""}`} style={{padding:"3px 8px",fontSize:9}} onClick={()=>S("despesasModo")("manual")}>{sfxM}</button>
@@ -3094,7 +3094,7 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
                         {item.id==="placa"&&<button className="cbtn" onClick={e=>{e.preventDefault();setModal("pcb");}}>PCB</button>}
                       </label>
                       {d.ppbAtivos[item.id]&&(
-                        <div style={{padding:"6px 10px",borderTop:"1px solid rgba(255,255,255,.08)",background:"#1a2030"}}>
+                        <div style={{padding:"6px 10px",borderTop:"1px solid rgba(255,255,255,.08)",background:"#201f1e"}}>
                           <Field label="Custo unitario" sfx={sfxM} value={toDisp(d.ppbVals[item.id]||0)}
                             onChange={v=>setD(p=>({...p,ppbVals:{...p.ppbVals,[item.id]:toStore(v)}}))}/>
                         </div>
@@ -3133,11 +3133,11 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
 
           {tab==="vpl"&&<>
             {/* Card VPL — modo de custo base */}
-            <div style={{background:"#161e30",border:"1px solid rgba(0,71,187,.3)",borderRadius:6,padding:"14px 16px",marginBottom:12}}>
+            <div style={{background:"#1a1918",border:"1px solid rgba(60,219,192,.3)",borderRadius:6,padding:"14px 16px",marginBottom:12}}>
               <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
                 <div>
-                  <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:9,fontWeight:700,letterSpacing:2,color:"#7a90b0",textTransform:"uppercase"}}>VPL — Valor de Pauta de Lote</div>
-                  <div style={{fontFamily:"'DM Mono',monospace",fontSize:22,fontWeight:700,color:"#93c5fd",marginTop:2}}>
+                  <div style={{fontFamily:"'Montserrat',sans-serif",fontSize:9,fontWeight:700,letterSpacing:2,color:"#A7A8AA",textTransform:"uppercase"}}>VPL — Valor de Pauta de Lote</div>
+                  <div style={{fontFamily:"'Montserrat',sans-serif",fontSize:22,fontWeight:700,color:"#3CDBC0",marginTop:2}}>
                     {brl(d.vplModo==="estimado"?c.vplEstimado:d.vplModo==="manual"?(d.vplManual||0):(produtoDB?.vpl_padrao||0))}
                   </div>
                 </div>
@@ -3160,13 +3160,13 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
               )}
               {d.vplModo==="manual"&&(
                 <div style={{display:"flex",alignItems:"center",gap:10,marginTop:4}}>
-                  <span style={{fontSize:11,color:"#7a90b0",flexShrink:0}}>VPL Manual (R$)</span>
+                  <span style={{fontSize:11,color:"#A7A8AA",flexShrink:0}}>VPL Manual (R$)</span>
                   <input type="number" step="0.01" value={d.vplManual||0} onChange={e=>S("vplManual")(parseFloat(e.target.value)||0)}
-                    style={{background:"#0c0e14",border:"1px solid rgba(255,255,255,.15)",color:"#f1f5f9",padding:"5px 10px",fontFamily:"'DM Mono',monospace",fontSize:13,fontWeight:600,outline:"none",width:160,borderRadius:3}}/>
+                    style={{background:"#2C2A29",border:"1px solid rgba(255,255,255,.15)",color:"#f1f5f9",padding:"5px 10px",fontFamily:"'Montserrat',sans-serif",fontSize:13,fontWeight:600,outline:"none",width:160,borderRadius:3}}/>
                 </div>
               )}
               {d.vplModo==="estimado"&&(
-                <div style={{fontSize:11,color:"#7a90b0"}}>Calculado a partir dos dados de Importação e PPB (abas visíveis acima).</div>
+                <div style={{fontSize:11,color:"#A7A8AA"}}>Calculado a partir dos dados de Importação e PPB (abas visíveis acima).</div>
               )}
             </div>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
@@ -3209,11 +3209,11 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
                 ))}
                 {/* Royalties — % ou USD */}
                 <div style={{display:"flex",alignItems:"center",gap:6,padding:"4px 0",borderTop:"1px solid rgba(255,255,255,.06)",marginTop:2}}>
-                  <span style={{fontSize:12,fontWeight:600,color:"#dce7f7",flex:1}}>Royalties / Qualcomm</span>
+                  <span style={{fontSize:12,fontWeight:600,color:"#f0f0f0",flex:1}}>Royalties / Qualcomm</span>
                   <button onClick={()=>S("royalModo")(d.royalModo==="usd"?"pct":"usd")}
                     style={{padding:"2px 8px",fontSize:9,fontWeight:700,cursor:"pointer",borderRadius:20,border:"1px solid",
-                      background:d.royalModo==="usd"?"rgba(0,71,187,.2)":"rgba(255,255,255,.05)",
-                      borderColor:d.royalModo==="usd"?"rgba(0,71,187,.5)":"rgba(255,255,255,.12)",
+                      background:d.royalModo==="usd"?"rgba(60,219,192,.2)":"rgba(255,255,255,.05)",
+                      borderColor:d.royalModo==="usd"?"rgba(60,219,192,.5)":"rgba(255,255,255,.12)",
                       color:d.royalModo==="usd"?"#93c5fd":"#7a90b0"}}>
                     {d.royalModo==="usd"?"USD":"% "}
                   </button>
@@ -3229,13 +3229,13 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
                 {/* Margem Gerencial / Agnóstica — sempre na ML */}
                 <div style={{borderTop:"1px solid rgba(255,255,255,.06)",marginTop:4,paddingTop:6}}>
                   <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
-                    <span style={{fontSize:12,fontWeight:600,color:"#dce7f7",flex:1}}>Margem Gerencial / Agnóstica</span>
+                    <span style={{fontSize:12,fontWeight:600,color:"#f0f0f0",flex:1}}>Margem Gerencial / Agnóstica</span>
                     <div className="fw" style={{minWidth:110}}>
                       <span className="fpre">%</span>
                       <input type="number" step="0.01"
                         value={d.margGer}
                         onChange={e=>{const v=e.target.value;if(v==="-"||v==="")S("margGer")(v===""?0:v);else{const n=parseFloat(v);if(!isNaN(n))S("margGer")(n);}}}
-                        style={{background:"none",border:"none",outline:"none",fontFamily:"'DM Mono',monospace",
+                        style={{background:"none",border:"none",outline:"none",fontFamily:"'Montserrat',sans-serif",
                           fontSize:11,fontWeight:500,color:d.margGer<0?"#f87171":"#a8b5cc",padding:"5px 8px",width:80,textAlign:"right"}}/>
                     </div>
                   </div>
@@ -3260,7 +3260,7 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
                     {d.cartaoAtivo?"● ON":"○ OFF"}
                   </button>
                   <span style={{fontSize:11,fontWeight:600,color:d.cartaoAtivo?"#fbbf24":"#5a6a84",flex:1}}>Taxa Cartão (+2%)</span>
-                  {d.cartaoAtivo&&<span style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:"#fbbf24"}}>{pct(c.cfVendaEf)}</span>}
+                  {d.cartaoAtivo&&<span style={{fontFamily:"'Montserrat',sans-serif",fontSize:10,color:"#fbbf24"}}>{pct(c.cfVendaEf)}</span>}
                 </div>
                 {[["Comissão","comis"],["Marketing","mkt"],["Rebate","rebate"],["PDD","pdd"],["Verba Extra","vbExtra"],["VPC","vpc"]
                 ].map(([l,k])=>(
@@ -3268,13 +3268,13 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
                 ))}
                 <div style={{display:"flex",alignItems:"flex-start",gap:8,justifyContent:"space-between"}}>
                   <div style={{flex:1}}>
-                    <span style={{fontSize:12,fontWeight:600,color:"#dce7f7"}}>Encargos s/ comissões</span>
-                    <div style={{fontSize:10,color:"#7a90b0",fontFamily:"'DM Mono',monospace"}}>{pct(c.comisXPct)} (auto)</div>
+                    <span style={{fontSize:12,fontWeight:600,color:"#f0f0f0"}}>Encargos s/ comissões</span>
+                    <div style={{fontSize:10,color:"#A7A8AA",fontFamily:"'Montserrat',sans-serif"}}>{pct(c.comisXPct)} (auto)</div>
                   </div>
                   <div className="fw fro" style={{minWidth:100}}>
                     <span className="fpre">%</span>
                     <input readOnly value={String(+(c.comisXPct||0).toFixed(3)).replace(".",",")}
-                      style={{background:"none",border:"none",outline:"none",fontFamily:"'DM Mono',monospace",fontSize:11,color:"#94a3b8",padding:"5px 8px",width:70,textAlign:"right"}}/>
+                      style={{background:"none",border:"none",outline:"none",fontFamily:"'Montserrat',sans-serif",fontSize:11,color:"#94a3b8",padding:"5px 8px",width:70,textAlign:"right"}}/>
                   </div>
                 </div>
                 <DR label="Total Índices" value={pct(c.indPct)} bold sep accent="blue"/>
@@ -3322,8 +3322,8 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
                     <span style={{fontSize:10,fontWeight:700,color:"#5a6a84",flex:1,textTransform:"uppercase",letterSpacing:.5}}>Calcular</span>
                     <button onClick={()=>S("modoCalc")("preco")}
                       style={{padding:"4px 12px",fontSize:10,fontWeight:700,cursor:"pointer",borderRadius:20,border:"1px solid",transition:".15s",
-                        background:d.modoCalc==="preco"?"rgba(0,71,187,.3)":"rgba(255,255,255,.04)",
-                        borderColor:d.modoCalc==="preco"?"#0047BB":"rgba(255,255,255,.1)",
+                        background:d.modoCalc==="preco"?"rgba(60,219,192,.3)":"rgba(255,255,255,.04)",
+                        borderColor:d.modoCalc==="preco"?"#3CDBC0":"rgba(255,255,255,.1)",
                         color:d.modoCalc==="preco"?"#93c5fd":"#7a90b0"}}>
                       Preço
                     </button>
@@ -3345,7 +3345,7 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
                     <Field label="Preço sugerido (c/ IPI)" sfx="R$" value={d.precoSugerido||""} onChange={v=>S("precoSugerido")(parseFloat(String(v).replace(",","."))||0)}
                       hint={d.modoCalc==="margem"&&c.margemSugerida!==null?`ML resultante: ${n3(c.margemSugerida)}%`:"informe o preço para calcular a ML"}/>
                     {d.modoCalc==="margem"&&c.margemSugerida!==null&&(
-                      <div style={{fontSize:11,fontFamily:"'DM Mono',monospace",color:"#34d399",textAlign:"right",marginTop:2}}>
+                      <div style={{fontSize:11,fontFamily:"'Montserrat',sans-serif",color:"#34d399",textAlign:"right",marginTop:2}}>
                         ML = {n3(c.margemSugerida)}%
                       </div>
                     )}
@@ -3353,7 +3353,7 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
                   {/* Toggle: impactar MC com Margem Gerencial/Agnóstica */}
                   <div style={{display:"flex",alignItems:"center",gap:8,padding:"6px 0",borderTop:"1px solid rgba(255,255,255,.06)",marginTop:4}}>
                     <button onClick={()=>S("margGerAtivo")(!d.margGerAtivo)}
-                      style={{padding:"3px 10px",fontSize:10,fontWeight:700,fontFamily:"'Barlow Condensed',sans-serif",
+                      style={{padding:"3px 10px",fontSize:10,fontWeight:700,fontFamily:"'Montserrat',sans-serif",
                         letterSpacing:.4,cursor:"pointer",borderRadius:20,border:"1px solid",transition:".15s",
                         background:d.margGerAtivo?"rgba(251,191,36,.2)":"rgba(255,255,255,.05)",
                         borderColor:d.margGerAtivo?"rgba(251,191,36,.5)":"rgba(255,255,255,.12)",
@@ -3449,7 +3449,7 @@ function RevCalc({precoAlvo,onChange,c,margem}){
             </div>
           </div>
         )}
-        {precoAlvo===0&&<span style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:"#334155"}}>Informe um preco alvo (c/ IPI) para ver a margem resultante</span>}
+        {precoAlvo===0&&<span style={{fontFamily:"'Montserrat',sans-serif",fontSize:10,color:"#334155"}}>Informe um preco alvo (c/ IPI) para ver a margem resultante</span>}
       </div>
     </div>
   );
@@ -3633,13 +3633,13 @@ function CadastroProdutos({user}){
     <div style={{display:"flex",flexDirection:"column",gap:3}}>
       <label style={{fontSize:10,fontWeight:600,color:"#7a7f96",textTransform:"uppercase",letterSpacing:.6}}>{label}{sfx&&<span style={{color:"#475569",marginLeft:3}}>{sfx}</span>}</label>
       <input type="number" step="any" value={form[k]||0} onChange={SF(k)}
-        style={{background:"#0c0e14",border:"1px solid rgba(255,255,255,.1)",color:"#e8eaf0",padding:"7px 10px",fontSize:13,outline:"none",fontFamily:"'DM Mono',monospace"}}/>
+        style={{background:"#2C2A29",border:"1px solid rgba(255,255,255,.1)",color:"#f0f0f0",padding:"7px 10px",fontSize:13,outline:"none",fontFamily:"'Montserrat',sans-serif"}}/>
     </div>
   );
   const FnRO=({label,k,sfx=""})=>(
     <div style={{display:"flex",flexDirection:"column",gap:3}}>
       <label style={{fontSize:10,fontWeight:600,color:"#7a7f96",textTransform:"uppercase",letterSpacing:.6}}>{label}{sfx&&<span style={{color:"#475569",marginLeft:3}}>{sfx}</span>}</label>
-      <div style={{background:"rgba(255,255,255,.03)",border:"1px solid rgba(255,255,255,.06)",color:"#7a7f96",padding:"7px 10px",fontSize:13,fontFamily:"'DM Mono',monospace",borderRadius:2}}>
+      <div style={{background:"rgba(255,255,255,.03)",border:"1px solid rgba(255,255,255,.06)",color:"#7a7f96",padding:"7px 10px",fontSize:13,fontFamily:"'Montserrat',sans-serif",borderRadius:2}}>
         {form[k]||0}
       </div>
     </div>
@@ -3648,7 +3648,7 @@ function CadastroProdutos({user}){
     <div style={{display:"flex",flexDirection:"column",gap:3}}>
       <label style={{fontSize:10,fontWeight:600,color:"#7a7f96",textTransform:"uppercase",letterSpacing:.6}}>{label}</label>
       <input type="text" value={form[k]||""} onChange={SF(k)} placeholder={placeholder}
-        style={{background:"#0c0e14",border:"1px solid rgba(255,255,255,.1)",color:"#e8eaf0",padding:"7px 10px",fontSize:13,outline:"none"}}/>
+        style={{background:"#2C2A29",border:"1px solid rgba(255,255,255,.1)",color:"#f0f0f0",padding:"7px 10px",fontSize:13,outline:"none"}}/>
     </div>
   );
 
@@ -3657,7 +3657,7 @@ function CadastroProdutos({user}){
     return(
       <div style={{border:"1px solid rgba(255,255,255,.07)",borderRadius:4,overflow:"hidden",marginBottom:8}}>
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"8px 14px",background:"rgba(255,255,255,.03)",cursor:"pointer"}} onClick={()=>toggleSecao(grupo.id)}>
-          <span style={{fontSize:12,fontWeight:700,color:"#7a90b0",textTransform:"uppercase",letterSpacing:.8}}>{grupo.icone} {grupo.label}</span>
+          <span style={{fontSize:12,fontWeight:700,color:"#A7A8AA",textTransform:"uppercase",letterSpacing:.8}}>{grupo.icone} {grupo.label}</span>
           <div style={{display:"flex",alignItems:"center",gap:8}}>
             {grupo.id==="impostos"&&!aberta&&(
               <a href="https://www.gov.br/receitafederal/pt-br/assuntos/aduana-e-comercio-exterior/classificacao-fiscal-de-mercadorias" target="_blank" rel="noopener noreferrer"
@@ -3666,7 +3666,7 @@ function CadastroProdutos({user}){
                 🔗 Consultar NCM
               </a>
             )}
-            <button style={{padding:"3px 10px",background:aberta?"rgba(0,71,187,.2)":"rgba(255,255,255,.06)",border:`1px solid ${aberta?"rgba(0,71,187,.4)":"rgba(255,255,255,.12)"}`,color:aberta?"#93c5fd":"#7a90b0",fontSize:10,fontWeight:700,cursor:"pointer",borderRadius:3}}>
+            <button style={{padding:"3px 10px",background:aberta?"rgba(60,219,192,.2)":"rgba(255,255,255,.06)",border:`1px solid ${aberta?"rgba(60,219,192,.4)":"rgba(255,255,255,.12)"}`,color:aberta?"#93c5fd":"#7a90b0",fontSize:10,fontWeight:700,cursor:"pointer",borderRadius:3}}>
               {aberta?"✕ Fechar":"✏ Alterar"}
             </button>
           </div>
@@ -3687,8 +3687,8 @@ function CadastroProdutos({user}){
         {!aberta&&(
           <div style={{padding:"8px 14px",display:"flex",flexWrap:"wrap",gap:12}}>
             {grupo.campos.map(c=>(
-              <span key={c.k} style={{fontSize:11,fontFamily:"'DM Mono',monospace",color:"#5a6a84"}}>
-                <span style={{color:"#7a90b0",marginRight:3}}>{c.l}:</span>{form[c.k]||0}{c.sfx}
+              <span key={c.k} style={{fontSize:11,fontFamily:"'Montserrat',sans-serif",color:"#5a6a84"}}>
+                <span style={{color:"#A7A8AA",marginRight:3}}>{c.l}:</span>{form[c.k]||0}{c.sfx}
               </span>
             ))}
           </div>
@@ -3709,7 +3709,7 @@ function CadastroProdutos({user}){
         <input className="tbl-search" placeholder="Buscar por nome, NCM ou ID..." value={busca} onChange={e=>setBusca(e.target.value)} style={{flex:1,minWidth:200}}/>
         {selecionados.size>0&&(
           <button onClick={abrirBulk}
-            style={{padding:"9px 18px",background:"rgba(0,71,187,.2)",border:"1px solid rgba(0,71,187,.4)",color:"#93c5fd",fontSize:12,fontWeight:700,cursor:"pointer",borderRadius:4,whiteSpace:"nowrap"}}>
+            style={{padding:"9px 18px",background:"rgba(60,219,192,.2)",border:"1px solid rgba(60,219,192,.4)",color:"#3CDBC0",fontSize:12,fontWeight:700,cursor:"pointer",borderRadius:4,whiteSpace:"nowrap"}}>
             ✏ Atualizar índices ({selecionados.size} produto{selecionados.size!==1?"s":""})
           </button>
         )}
@@ -3732,7 +3732,7 @@ function CadastroProdutos({user}){
             <tr>
               <th style={{width:36}}>
                 <input type="checkbox" checked={selecionados.size===filtrados.length&&filtrados.length>0}
-                  onChange={toggleTodos} style={{cursor:"pointer",accentColor:"#0047BB"}}/>
+                  onChange={toggleTodos} style={{cursor:"pointer",accentColor:"#3CDBC0"}}/>
               </th>
               <th>ID</th><th>SKU</th><th>NCM</th><th>Nome</th><th>VPL Padrão</th>
               <th>IPI MAO/IOS/CWB</th><th>Cred. MAO/IOS/CWB</th><th>Ações</th>
@@ -3740,17 +3740,17 @@ function CadastroProdutos({user}){
           </thead>
           <tbody>
             {filtrados.map(p=>(
-              <tr key={p.id} style={{background:selecionados.has(p.id)?"rgba(0,71,187,.08)":""}}>
-                <td><input type="checkbox" checked={selecionados.has(p.id)} onChange={()=>toggleSel(p.id)} style={{cursor:"pointer",accentColor:"#0047BB"}}/></td>
-                <td><code style={{fontSize:12,color:"#93c5fd"}}>{p.id}</code></td>
-                <td style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:"#7a90b0"}}>{p.sku||"—"}</td>
-                <td style={{fontFamily:"'DM Mono',monospace",fontSize:12}}>{p.ncm}</td>
+              <tr key={p.id} style={{background:selecionados.has(p.id)?"rgba(60,219,192,.08)":""}}>
+                <td><input type="checkbox" checked={selecionados.has(p.id)} onChange={()=>toggleSel(p.id)} style={{cursor:"pointer",accentColor:"#3CDBC0"}}/></td>
+                <td><code style={{fontSize:12,color:"#3CDBC0"}}>{p.id}</code></td>
+                <td style={{fontFamily:"'Montserrat',sans-serif",fontSize:11,color:"#A7A8AA"}}>{p.sku||"—"}</td>
+                <td style={{fontFamily:"'Montserrat',sans-serif",fontSize:12}}>{p.ncm}</td>
                 <td style={{fontWeight:600}}>{p.nome}</td>
-                <td style={{fontFamily:"'DM Mono',monospace",fontSize:12,color:(p.vpl_padrao||0)>0?"#34d399":"#7a7f96"}}>
+                <td style={{fontFamily:"'Montserrat',sans-serif",fontSize:12,color:(p.vpl_padrao||0)>0?"#34d399":"#7a7f96"}}>
                   {(p.vpl_padrao||0)>0?`R$ ${(+p.vpl_padrao).toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2})}`:"—"}
                 </td>
-                <td style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:"#a8b5cc"}}>{p.ipi_mao}% / {p.ipi_ios}% / {p.ipi_cwb}%</td>
-                <td style={{fontFamily:"'DM Mono',monospace",fontSize:11,color:"#a8b5cc"}}>{p.cred_mao}% / {p.cred_ios}% / {p.cred_cwb}%</td>
+                <td style={{fontFamily:"'Montserrat',sans-serif",fontSize:11,color:"#a8b5cc"}}>{p.ipi_mao}% / {p.ipi_ios}% / {p.ipi_cwb}%</td>
+                <td style={{fontFamily:"'Montserrat',sans-serif",fontSize:11,color:"#a8b5cc"}}>{p.cred_mao}% / {p.cred_ios}% / {p.cred_cwb}%</td>
                 <td>
                   <div className="act-row">
                     <button className="btn-sm btn-edit" onClick={()=>abrirEditar(p)}>Editar</button>
@@ -3775,20 +3775,20 @@ function CadastroProdutos({user}){
               {erroForm&&<div className="auth-msg err">{erroForm}</div>}
 
               {/* Identificação */}
-              <div style={{fontFamily:"'Syne',sans-serif",fontSize:12,fontWeight:700,color:"#7a90b0",textTransform:"uppercase",letterSpacing:1,borderBottom:"1px solid rgba(255,255,255,.06)",paddingBottom:6}}>Identificação</div>
+              <div style={{fontFamily:"'Montserrat',sans-serif",fontSize:12,fontWeight:700,color:"#A7A8AA",textTransform:"uppercase",letterSpacing:1,borderBottom:"1px solid rgba(255,255,255,.06)",paddingBottom:6}}>Identificação</div>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 2fr",gap:10,marginBottom:4}}>
                 <div style={{display:"flex",flexDirection:"column",gap:3}}>
                   <label style={{fontSize:10,fontWeight:600,color:"#7a7f96",textTransform:"uppercase",letterSpacing:.6}}>Categoria</label>
                   <select value={form.categoria||""} onChange={e=>handleCategoriaChange(e.target.value)}
                     disabled={modal==="editar"}
-                    style={{background:"#0c0e14",border:"1px solid rgba(255,255,255,.1)",color:form.categoria?"#e8eaf0":"#5a6a84",padding:"7px 10px",fontSize:13,outline:"none"}}>
+                    style={{background:"#2C2A29",border:"1px solid rgba(255,255,255,.1)",color:form.categoria?"#e8eaf0":"#5a6a84",padding:"7px 10px",fontSize:13,outline:"none"}}>
                     <option value="">— selecione —</option>
                     {categorias.map(c=><option key={c.id} value={c.id}>{c.nome} ({c.id})</option>)}
                   </select>
                 </div>
                 <div style={{display:"flex",flexDirection:"column",gap:3}}>
                   <label style={{fontSize:10,fontWeight:600,color:"#7a7f96",textTransform:"uppercase",letterSpacing:.6}}>ID Gerado</label>
-                  <div style={{background:"rgba(255,255,255,.03)",border:"1px solid rgba(255,255,255,.06)",color:"#93c5fd",padding:"7px 10px",fontSize:13,fontFamily:"'DM Mono',monospace",borderRadius:2}}>
+                  <div style={{background:"rgba(255,255,255,.03)",border:"1px solid rgba(255,255,255,.06)",color:"#3CDBC0",padding:"7px 10px",fontSize:13,fontFamily:"'Montserrat',sans-serif",borderRadius:2}}>
                     {formId||"—"}
                   </div>
                 </div>
@@ -3825,15 +3825,15 @@ function CadastroProdutos({user}){
             <div className="modal-body">
               {bulkPasso===1&&(
                 <>
-                  <div style={{fontSize:12,color:"#7a90b0",marginBottom:16}}>
+                  <div style={{fontSize:12,color:"#A7A8AA",marginBottom:16}}>
                     Selecione os índices que deseja atualizar para os {selecionados.size} produto{selecionados.size!==1?"s":""} selecionados:
                   </div>
                   {INDICES_GRUPOS.map(g=>(
                     <div key={g.id} style={{marginBottom:12}}>
-                      <div style={{fontSize:11,fontWeight:700,color:"#7a90b0",textTransform:"uppercase",letterSpacing:.8,marginBottom:6}}>{g.icone} {g.label}</div>
+                      <div style={{fontSize:11,fontWeight:700,color:"#A7A8AA",textTransform:"uppercase",letterSpacing:.8,marginBottom:6}}>{g.icone} {g.label}</div>
                       <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
                         {g.campos.map(c=>(
-                          <label key={c.k} style={{display:"flex",alignItems:"center",gap:5,padding:"4px 10px",background:bulkIndices.has(c.k)?"rgba(0,71,187,.2)":"rgba(255,255,255,.04)",border:`1px solid ${bulkIndices.has(c.k)?"rgba(0,71,187,.4)":"rgba(255,255,255,.1)"}`,borderRadius:20,cursor:"pointer",fontSize:11,color:bulkIndices.has(c.k)?"#93c5fd":"#7a90b0",userSelect:"none"}}>
+                          <label key={c.k} style={{display:"flex",alignItems:"center",gap:5,padding:"4px 10px",background:bulkIndices.has(c.k)?"rgba(60,219,192,.2)":"rgba(255,255,255,.04)",border:`1px solid ${bulkIndices.has(c.k)?"rgba(60,219,192,.4)":"rgba(255,255,255,.1)"}`,borderRadius:20,cursor:"pointer",fontSize:11,color:bulkIndices.has(c.k)?"#93c5fd":"#7a90b0",userSelect:"none"}}>
                             <input type="checkbox" checked={bulkIndices.has(c.k)} onChange={()=>toggleBulkIndice(c.k)} style={{display:"none"}}/>
                             {c.l} <span style={{opacity:.6}}>{c.sfx}</span>
                           </label>
@@ -3845,17 +3845,17 @@ function CadastroProdutos({user}){
               )}
               {bulkPasso===2&&(
                 <>
-                  <div style={{fontSize:12,color:"#7a90b0",marginBottom:12}}>
+                  <div style={{fontSize:12,color:"#A7A8AA",marginBottom:12}}>
                     Preencha os novos valores. Campos em branco não serão alterados.
                   </div>
                   <div style={{overflowX:"auto"}}>
                     <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
                       <thead>
                         <tr>
-                          <th style={{padding:"8px 12px",background:"#1a2030",textAlign:"left",color:"#7a90b0",fontWeight:700,fontSize:11,whiteSpace:"nowrap",position:"sticky",left:0,zIndex:2}}>Produto</th>
+                          <th style={{padding:"8px 12px",background:"#201f1e",textAlign:"left",color:"#A7A8AA",fontWeight:700,fontSize:11,whiteSpace:"nowrap",position:"sticky",left:0,zIndex:2}}>Produto</th>
                           {[...bulkIndices].map(k=>{
                             const campo=INDICES_GRUPOS.flatMap(g=>g.campos).find(c=>c.k===k);
-                            return <th key={k} style={{padding:"8px 10px",background:"#1a2030",textAlign:"center",color:"#93c5fd",fontWeight:700,fontSize:11,whiteSpace:"nowrap"}}>{campo?.l}<br/><span style={{color:"#475569",fontWeight:400}}>{campo?.sfx}</span></th>;
+                            return <th key={k} style={{padding:"8px 10px",background:"#201f1e",textAlign:"center",color:"#3CDBC0",fontWeight:700,fontSize:11,whiteSpace:"nowrap"}}>{campo?.l}<br/><span style={{color:"#475569",fontWeight:400}}>{campo?.sfx}</span></th>;
                           })}
                         </tr>
                       </thead>
@@ -3864,8 +3864,8 @@ function CadastroProdutos({user}){
                           const prod=produtos.find(p=>p.id===pid);
                           return(
                             <tr key={pid} style={{borderBottom:"1px solid rgba(255,255,255,.06)"}}>
-                              <td style={{padding:"8px 12px",color:"#dce7f7",fontWeight:600,whiteSpace:"nowrap",background:"#1a2030",position:"sticky",left:0}}>
-                                <code style={{fontSize:11,color:"#93c5fd",marginRight:6}}>{pid}</code>{prod?.nome}
+                              <td style={{padding:"8px 12px",color:"#f0f0f0",fontWeight:600,whiteSpace:"nowrap",background:"#201f1e",position:"sticky",left:0}}>
+                                <code style={{fontSize:11,color:"#3CDBC0",marginRight:6}}>{pid}</code>{prod?.nome}
                               </td>
                               {[...bulkIndices].map(k=>(
                                 <td key={k} style={{padding:"4px 6px",textAlign:"center"}}>
@@ -3876,7 +3876,7 @@ function CadastroProdutos({user}){
                                       const v=e.target.value;
                                       setBulkVals(prev=>({...prev,[pid]:{...(prev[pid]||{}),[k]:v===""?undefined:parseFloat(v)||0}}));
                                     }}
-                                    style={{width:80,background:"#0c0e14",border:"1px solid rgba(255,255,255,.12)",color:"#e8eaf0",padding:"5px 8px",fontSize:12,outline:"none",textAlign:"right",fontFamily:"'DM Mono',monospace"}}/>
+                                    style={{width:80,background:"#2C2A29",border:"1px solid rgba(255,255,255,.12)",color:"#f0f0f0",padding:"5px 8px",fontSize:12,outline:"none",textAlign:"right",fontFamily:"'Montserrat',sans-serif"}}/>
                                 </td>
                               ))}
                             </tr>
@@ -3917,7 +3917,7 @@ function CadastroProdutos({user}){
                 ? <div className="auth-msg ok">✓ Solicitação enviada! Os administradores serão notificados.</div>
                 : <>
                     {solErro&&<div className="auth-msg err">{solErro}</div>}
-                    <div style={{fontSize:12,color:"#7a90b0",marginBottom:16}}>
+                    <div style={{fontSize:12,color:"#A7A8AA",marginBottom:16}}>
                       A solicitação será analisada pelos administradores. Quando aprovada, a categoria ficará disponível para uso.
                     </div>
                     <div className="fld">
@@ -3986,7 +3986,7 @@ export default function App() {
               <div className="topbar-uperfil">{p.icone} {p.label}</div>
             </div>
             {isAdmin&&<button onClick={()=>document.dispatchEvent(new CustomEvent("openGestao"))}
-              style={{padding:"4px 10px",background:"rgba(5,150,105,.15)",border:"1px solid rgba(5,150,105,.4)",color:"#34d399",fontFamily:"'Barlow Condensed',sans-serif",fontSize:10,fontWeight:700,letterSpacing:.5,cursor:"pointer",borderRadius:20}}>
+              style={{padding:"4px 10px",background:"rgba(5,150,105,.15)",border:"1px solid rgba(5,150,105,.4)",color:"#34d399",fontFamily:"'Montserrat',sans-serif",fontSize:10,fontWeight:700,letterSpacing:.5,cursor:"pointer",borderRadius:20}}>
               👥 Gestão
             </button>}
             <button className="btn-logout" onClick={handleLogout}>Sair</button>
@@ -4042,7 +4042,7 @@ function PainelComparativo({abas, calcsMap, selecionadas, open, onToggle}){
       <span style={{flex:1,fontSize:11,color:grp?"#a8b5cc":"#7a90b0",fontWeight:grp?600:400}}>{label}</span>
       {abasComDados.map((a,i)=>{
         const v = fn(calcsMap[a.id]);
-        return <span key={a.id} style={{width:90,textAlign:"right",fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:grp?700:400,color:grp?cores[i%cores.length]:"#a8b5cc",flexShrink:0}}>{v}</span>;
+        return <span key={a.id} style={{width:90,textAlign:"right",fontFamily:"'Montserrat',sans-serif",fontSize:11,fontWeight:grp?700:400,color:grp?cores[i%cores.length]:"#a8b5cc",flexShrink:0}}>{v}</span>;
       })}
     </div>
   );
@@ -4051,9 +4051,9 @@ function PainelComparativo({abas, calcsMap, selecionadas, open, onToggle}){
     <div style={{borderBottom:"1px solid rgba(255,255,255,.06)"}}>
       <div onClick={()=>tog(id)} style={{display:"flex",alignItems:"center",padding:"6px 12px",cursor:"pointer",background:"rgba(255,255,255,.03)"}}>
         <span style={{fontSize:9,color:"#5a6a84",marginRight:6}}>{expanded[id]?"▼":"▶"}</span>
-        <span style={{flex:1,fontSize:11,fontWeight:700,color:"#dce7f7",textTransform:"uppercase",letterSpacing:.5}}>{label}</span>
+        <span style={{flex:1,fontSize:11,fontWeight:700,color:"#f0f0f0",textTransform:"uppercase",letterSpacing:.5}}>{label}</span>
         {abasComDados.map((a,i)=>(
-          <span key={a.id} style={{width:90,textAlign:"right",fontFamily:"'DM Mono',monospace",fontSize:11,fontWeight:700,color:cores[i%cores.length],flexShrink:0}}>{brl(fnTotal(calcsMap[a.id]))}</span>
+          <span key={a.id} style={{width:90,textAlign:"right",fontFamily:"'Montserrat',sans-serif",fontSize:11,fontWeight:700,color:cores[i%cores.length],flexShrink:0}}>{brl(fnTotal(calcsMap[a.id]))}</span>
         ))}
       </div>
       {expanded[id]&&<div>{children}</div>}
@@ -4064,7 +4064,7 @@ function PainelComparativo({abas, calcsMap, selecionadas, open, onToggle}){
   const CardLinha = ({label, valor, destaque, cor}) => (
     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"4px 0",borderBottom:"1px solid rgba(255,255,255,.04)"}}>
       <span style={{fontSize:destaque?12:11,color:destaque?"#dce7f7":"#7a90b0",fontWeight:destaque?600:400}}>{label}</span>
-      <span style={{fontFamily:"'DM Mono',monospace",fontSize:destaque?13:11,fontWeight:destaque?700:500,color:cor||(destaque?"#e8eaf0":"#a8b5cc")}}>{valor}</span>
+      <span style={{fontFamily:"'Montserrat',sans-serif",fontSize:destaque?13:11,fontWeight:destaque?700:500,color:cor||(destaque?"#e8eaf0":"#a8b5cc")}}>{valor}</span>
     </div>
   );
 
@@ -4091,14 +4091,14 @@ function PainelComparativo({abas, calcsMap, selecionadas, open, onToggle}){
         <div style={{background:corBg,borderBottom:`1px solid ${corBorder}`,padding:"12px 16px"}}>
           <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:8}}>
             <div style={{flex:1,minWidth:0}}>
-              <div style={{fontSize:13,fontWeight:700,color:"#e8eaf0",lineHeight:1.3,wordBreak:"break-word"}}>{aba.nome}</div>
+              <div style={{fontSize:13,fontWeight:700,color:"#f0f0f0",lineHeight:1.3,wordBreak:"break-word"}}>{aba.nome}</div>
               {prodNome && prodNome !== aba.nome && (
-                <div style={{fontSize:10,color:"#7a90b0",marginTop:2,lineHeight:1.3}}>{prodNome}</div>
+                <div style={{fontSize:10,color:"#A7A8AA",marginTop:2,lineHeight:1.3}}>{prodNome}</div>
               )}
             </div>
             <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:3,flexShrink:0}}>
               <span style={{fontSize:9,fontWeight:700,color:cor,background:`rgba(0,0,0,.3)`,padding:"2px 7px",borderRadius:10,letterSpacing:.5}}>{origemLabel(d.origem)}</span>
-              <span style={{fontSize:9,fontWeight:600,color:"#7a90b0",background:"rgba(0,0,0,.25)",padding:"2px 7px",borderRadius:10,letterSpacing:.5}}>{d.modalidade||"CKD"}</span>
+              <span style={{fontSize:9,fontWeight:600,color:"#A7A8AA",background:"rgba(0,0,0,.25)",padding:"2px 7px",borderRadius:10,letterSpacing:.5}}>{d.modalidade||"CKD"}</span>
             </div>
           </div>
         </div>
@@ -4106,8 +4106,8 @@ function PainelComparativo({abas, calcsMap, selecionadas, open, onToggle}){
         {/* Preço em destaque */}
         <div style={{padding:"16px",background:"rgba(0,0,0,.2)",borderBottom:`1px solid ${corBorder}`,textAlign:"center"}}>
           <div style={{fontSize:10,color:"#5a6a84",textTransform:"uppercase",letterSpacing:1,marginBottom:4}}>Preço Final</div>
-          <div style={{fontFamily:"'DM Mono',monospace",fontSize:28,fontWeight:800,color:cor,lineHeight:1}}>{brl(c.pF)}</div>
-          {d.fobUSD>0&&<div style={{fontSize:10,color:"#5a6a84",marginTop:5,fontFamily:"'DM Mono',monospace"}}>FOB {usd(d.fobUSD)}</div>}
+          <div style={{fontFamily:"'Montserrat',sans-serif",fontSize:28,fontWeight:800,color:cor,lineHeight:1}}>{brl(c.pF)}</div>
+          {d.fobUSD>0&&<div style={{fontSize:10,color:"#5a6a84",marginTop:5,fontFamily:"'Montserrat',sans-serif"}}>FOB {usd(d.fobUSD)}</div>}
         </div>
 
         {/* Corpo do card */}
@@ -4148,8 +4148,8 @@ function PainelComparativo({abas, calcsMap, selecionadas, open, onToggle}){
             <div style={{background:`linear-gradient(135deg, ${corML}18 0%, ${corML}08 100%)`,borderBottom:`1px solid ${corML}30`,padding:"14px 14px 12px"}}>
               <div style={{fontSize:9,fontWeight:700,color:"#5a6a84",textTransform:"uppercase",letterSpacing:1,marginBottom:8}}>Margem Líquida</div>
               <div style={{display:"flex",alignItems:"flex-end",justifyContent:"space-between",gap:8}}>
-                <span style={{fontFamily:"'DM Mono',monospace",fontSize:36,fontWeight:800,color:corML,lineHeight:1}}>{pct(mlPct)}</span>
-                <span style={{fontFamily:"'DM Mono',monospace",fontSize:15,fontWeight:700,color:corML,opacity:.8,paddingBottom:4}}>{brl(c.margV)}</span>
+                <span style={{fontFamily:"'Montserrat',sans-serif",fontSize:36,fontWeight:800,color:corML,lineHeight:1}}>{pct(mlPct)}</span>
+                <span style={{fontFamily:"'Montserrat',sans-serif",fontSize:15,fontWeight:700,color:corML,opacity:.8,paddingBottom:4}}>{brl(c.margV)}</span>
               </div>
             </div>
             {/* MC — bloco secundário */}
@@ -4158,13 +4158,13 @@ function PainelComparativo({abas, calcsMap, selecionadas, open, onToggle}){
                 <div>
                   <div style={{fontSize:9,fontWeight:700,color:"#5a6a84",textTransform:"uppercase",letterSpacing:1,marginBottom:4}}>Margem de Contribuição</div>
                   <div style={{display:"flex",alignItems:"baseline",gap:8}}>
-                    <span style={{fontFamily:"'DM Mono',monospace",fontSize:22,fontWeight:800,color:corMC,lineHeight:1}}>{pct(mcPct)}</span>
-                    <span style={{fontFamily:"'DM Mono',monospace",fontSize:12,fontWeight:600,color:corMC,opacity:.75}}>{brl(c.cfxV)}</span>
+                    <span style={{fontFamily:"'Montserrat',sans-serif",fontSize:22,fontWeight:800,color:corMC,lineHeight:1}}>{pct(mcPct)}</span>
+                    <span style={{fontFamily:"'Montserrat',sans-serif",fontSize:12,fontWeight:600,color:corMC,opacity:.75}}>{brl(c.cfxV)}</span>
                   </div>
                 </div>
                 <div style={{textAlign:"right"}}>
                   <div style={{fontSize:9,color:"#3a4a60",marginBottom:3}}>Markup</div>
-                  <div style={{fontFamily:"'DM Mono',monospace",fontSize:13,fontWeight:700,color:"#5a6a84"}}>{n3(c.mkp)}x</div>
+                  <div style={{fontFamily:"'Montserrat',sans-serif",fontSize:13,fontWeight:700,color:"#5a6a84"}}>{n3(c.mkp)}x</div>
                 </div>
               </div>
             </div>
@@ -4172,7 +4172,7 @@ function PainelComparativo({abas, calcsMap, selecionadas, open, onToggle}){
             {calcsMap[aba.id].d.margGer!==0&&(
               <div style={{background:"rgba(255,255,255,.02)",padding:"8px 14px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                 <span style={{fontSize:9,fontWeight:700,color:"#5a6a84",textTransform:"uppercase",letterSpacing:1}}>Mg. Gerencial</span>
-                <span style={{fontFamily:"'DM Mono',monospace",fontSize:12,fontWeight:600,color:"#a8b5cc"}}>{brl(c.margGerV)}</span>
+                <span style={{fontFamily:"'Montserrat',sans-serif",fontSize:12,fontWeight:600,color:"#a8b5cc"}}>{brl(c.margGerV)}</span>
               </div>
             )}
           </div>
@@ -4190,23 +4190,23 @@ function PainelComparativo({abas, calcsMap, selecionadas, open, onToggle}){
       <div style={{background:"#131925",border:"1px solid rgba(255,255,255,.12)",borderRadius:8,width:"95%",maxWidth:modalWidth,maxHeight:"90vh",display:"flex",flexDirection:"column",overflow:"hidden"}} onClick={e=>e.stopPropagation()}>
         {/* Header */}
         <div style={{display:"flex",alignItems:"center",padding:"12px 16px",borderBottom:"1px solid rgba(255,255,255,.08)",flexShrink:0,gap:8}}>
-          <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:700,color:"#dce7f7",letterSpacing:.5,flex:1}}>Comparativo de Precificações</span>
+          <span style={{fontFamily:"'Montserrat',sans-serif",fontSize:16,fontWeight:700,color:"#f0f0f0",letterSpacing:.5,flex:1}}>Comparativo de Precificações</span>
           {/* Toggle view */}
           <div style={{display:"flex",background:"rgba(255,255,255,.05)",borderRadius:6,padding:2,gap:2}}>
             <button onClick={()=>setView("tabela")}
-              style={{padding:"4px 12px",background:view==="tabela"?"rgba(0,71,187,.4)":"transparent",border:"none",color:view==="tabela"?"#93c5fd":"#5a6a84",fontSize:10,fontWeight:700,cursor:"pointer",borderRadius:4,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:.5,transition:".15s"}}>
+              style={{padding:"4px 12px",background:view==="tabela"?"rgba(60,219,192,.4)":"transparent",border:"none",color:view==="tabela"?"#93c5fd":"#5a6a84",fontSize:10,fontWeight:700,cursor:"pointer",borderRadius:4,fontFamily:"'Montserrat',sans-serif",letterSpacing:.5,transition:".15s"}}>
               Tabela
             </button>
             <button onClick={()=>setView("relatorio")}
-              style={{padding:"4px 12px",background:view==="relatorio"?"rgba(0,71,187,.4)":"transparent",border:"none",color:view==="relatorio"?"#93c5fd":"#5a6a84",fontSize:10,fontWeight:700,cursor:"pointer",borderRadius:4,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:.5,transition:".15s"}}>
+              style={{padding:"4px 12px",background:view==="relatorio"?"rgba(60,219,192,.4)":"transparent",border:"none",color:view==="relatorio"?"#93c5fd":"#5a6a84",fontSize:10,fontWeight:700,cursor:"pointer",borderRadius:4,fontFamily:"'Montserrat',sans-serif",letterSpacing:.5,transition:".15s"}}>
               Relatório
             </button>
           </div>
           <button onClick={()=>window.print()}
-            style={{padding:"5px 12px",background:"rgba(0,71,187,.2)",border:"1px solid rgba(0,71,187,.45)",color:"#93c5fd",fontFamily:"'Barlow Condensed',sans-serif",fontSize:10,fontWeight:700,cursor:"pointer",borderRadius:20}}>
+            style={{padding:"5px 12px",background:"rgba(60,219,192,.2)",border:"1px solid rgba(60,219,192,.45)",color:"#3CDBC0",fontFamily:"'Montserrat',sans-serif",fontSize:10,fontWeight:700,cursor:"pointer",borderRadius:20}}>
             Imprimir / PDF
           </button>
-          <button onClick={onToggle} style={{background:"none",border:"none",color:"#7a90b0",fontSize:20,cursor:"pointer",lineHeight:1}}>×</button>
+          <button onClick={onToggle} style={{background:"none",border:"none",color:"#A7A8AA",fontSize:20,cursor:"pointer",lineHeight:1}}>×</button>
         </div>
 
         {/* VIEW TABELA */}
@@ -4218,11 +4218,11 @@ function PainelComparativo({abas, calcsMap, selecionadas, open, onToggle}){
             ))}
           </div>
           <div style={{overflowY:"auto",flex:1}}>
-            <div style={{padding:"10px 12px",borderBottom:"1px solid rgba(255,255,255,.08)",background:"rgba(0,71,187,.06)"}}>
+            <div style={{padding:"10px 12px",borderBottom:"1px solid rgba(255,255,255,.08)",background:"rgba(60,219,192,.06)"}}>
               <div style={{display:"flex",alignItems:"center"}}>
-                <span style={{flex:1,fontSize:12,fontWeight:700,color:"#93c5fd",textTransform:"uppercase",letterSpacing:.5}}>Preço Final</span>
+                <span style={{flex:1,fontSize:12,fontWeight:700,color:"#3CDBC0",textTransform:"uppercase",letterSpacing:.5}}>Preço Final</span>
                 {abasComDados.map((a,i)=>(
-                  <span key={a.id} style={{width:90,textAlign:"right",fontFamily:"'DM Mono',monospace",fontSize:13,fontWeight:800,color:cores[i%cores.length],flexShrink:0}}>{brl(calcsMap[a.id].c.pF)}</span>
+                  <span key={a.id} style={{width:90,textAlign:"right",fontFamily:"'Montserrat',sans-serif",fontSize:13,fontWeight:800,color:cores[i%cores.length],flexShrink:0}}>{brl(calcsMap[a.id].c.pF)}</span>
                 ))}
               </div>
             </div>
@@ -4267,7 +4267,7 @@ function PainelComparativo({abas, calcsMap, selecionadas, open, onToggle}){
         {view==="relatorio"&&(
           <div style={{overflowY:"auto",flex:1,padding:"16px"}}>
             {/* Data do relatório */}
-            <div style={{fontSize:9,color:"#3a4a60",textAlign:"right",marginBottom:12,fontFamily:"'DM Mono',monospace"}}>
+            <div style={{fontSize:9,color:"#3a4a60",textAlign:"right",marginBottom:12,fontFamily:"'Montserrat',sans-serif"}}>
               Relatório gerado em {new Date().toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"})}
             </div>
             {/* Cards lado a lado */}
@@ -4344,7 +4344,7 @@ function MultiTab({ user }) {
               display: "flex", alignItems: "center", gap: 6,
               padding: "0 10px", cursor: "pointer", position: "relative",
               borderRight: "1px solid rgba(255,255,255,.06)",
-              borderBottom: idx === abaAtiva ? "2px solid #0047BB" : "2px solid transparent",
+              borderBottom: idx === abaAtiva ? "2px solid #3CDBC0" : "2px solid transparent",
               background: idx === abaAtiva ? "#1e2a3d" : "transparent",
               minWidth: 120, maxWidth: 200, flexShrink: 0, transition: ".15s",
             }}>
@@ -4354,8 +4354,8 @@ function MultiTab({ user }) {
                 title={sel ? "Remover do comparativo" : selecionadas.size >= 3 ? "Máximo 3 produtos" : "Incluir no comparativo"}
                 style={{
                   width:13,height:13,borderRadius:3,flexShrink:0,
-                  border:`1.5px solid ${sel?"#0047BB":podeSelecionar?"rgba(255,255,255,.2)":"rgba(255,255,255,.07)"}`,
-                  background:sel?"#0047BB":"transparent",
+                  border:`1.5px solid ${sel?"#3CDBC0":podeSelecionar?"rgba(255,255,255,.2)":"rgba(255,255,255,.07)"}`,
+                  background:sel?"#3CDBC0":"transparent",
                   cursor:podeSelecionar?"pointer":"not-allowed",
                   display:"flex",alignItems:"center",justifyContent:"center",transition:".15s",
                 }}>
@@ -4368,7 +4368,7 @@ function MultiTab({ user }) {
                 onBlur={confirmEdit}
                 onKeyDown={e => { if (e.key === "Enter") confirmEdit(); if (e.key === "Escape") setEditandoIdx(null); }}
                 onClick={e => e.stopPropagation()}
-                style={{ background: "none", border: "none", outline: "none", color: "#e8eaf0", fontSize: 11, fontWeight: 600, width: "100%", fontFamily: "'Instrument Sans', sans-serif" }}/>
+                style={{ background: "none", border: "none", outline: "none", color: "#e8eaf0", fontSize: 11, fontWeight: 600, width: "100%", fontFamily: "'Montserrat', sans-serif" }}/>
             ) : (
               <span onDoubleClick={e => { e.stopPropagation(); startEdit(idx); }}
                 style={{ fontSize: 11, fontWeight: idx === abaAtiva ? 600 : 400, color: idx === abaAtiva ? "#e8eaf0" : "#7a90b0", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", lineHeight: "38px" }}
@@ -4387,7 +4387,7 @@ function MultiTab({ user }) {
           title="Nova precificação">+</button>
         {selecionadas.size >= 2 && (
           <button onClick={()=>setComparOpen(true)}
-            style={{marginLeft:"auto",padding:"0 14px",background:"rgba(0,71,187,.2)",border:"none",borderLeft:"1px solid rgba(255,255,255,.06)",color:"#93c5fd",fontSize:11,fontWeight:700,cursor:"pointer",letterSpacing:.5,fontFamily:"'Barlow Condensed',sans-serif",flexShrink:0}}>
+            style={{marginLeft:"auto",padding:"0 14px",background:"rgba(60,219,192,.2)",border:"none",borderLeft:"1px solid rgba(255,255,255,.06)",color:"#3CDBC0",fontSize:11,fontWeight:700,cursor:"pointer",letterSpacing:.5,fontFamily:"'Montserrat',sans-serif",flexShrink:0}}>
             ⇄ Comparar ({selecionadas.size})
           </button>
         )}
