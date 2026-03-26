@@ -1119,6 +1119,15 @@ const PRODUTOS = [
   {id:"spg",  ncm:"8536.50.90", nome:"Smart Plug WiFi",               mva:38,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:3.25, ipiCWB:3.25, credMAO:12, credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:7 },
 ];
 
+// Converte produto do catálogo (snake_case) → shape da calculadora (camelCase)
+const normalizeProdutoDB = r => ({
+  id: r.id, ncm: r.ncm||"", nome: r.nome||"",
+  mva: r.mva||0, aliqST: r.aliq_st||0, fti: r.fti||0,
+  ipiMAO: r.ipi_mao||0, ipiIOS: r.ipi_ios||0, ipiCWB: r.ipi_cwb||0,
+  credMAO: r.cred_mao||0, credIOS: r.cred_ios||0, credCWB: r.cred_cwb||0,
+  icmsMAO: r.icms_mao||0, icmsIOS: r.icms_ios||0, icmsCWB: r.icms_cwb||0,
+});
+
 // ── ORIGENS e MODALIDADES ─────────────────────────────────────────────────────
 const ORIGENS = [
   { id:"MAO", label:"MAO — Manaus",      uf:"AM", zmf:true  },
@@ -2451,6 +2460,7 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
   const [modal,setModal]=useState(null);
   const [produtosDB,setProdutosDB]=useState([]);
   const [produtoDB,setProdutoDB]=useState(null);
+  const [categoriasDB,setCategoriasDB]=useState([]);
 
   // Escuta evento do botão Gestão no topbar
   useEffect(()=>{
@@ -2467,11 +2477,10 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
     setProdutoDB(null);
   },[currentUser?.id]);
 
-  // Carrega catálogo de produtos do Supabase
+  // Carrega catálogo de produtos e categorias do Supabase
   useEffect(()=>{
-    db.getProdutos().then(rows=>{
-      if(rows&&rows.length) setProdutosDB(rows);
-    }).catch(()=>{});
+    db.getProdutos().then(rows=>{ if(rows&&rows.length) setProdutosDB(rows); }).catch(()=>{});
+    db.getCategorias().then(rows=>{ if(rows&&rows.length) setCategoriasDB(rows); }).catch(()=>{});
   },[]);
 
   // Redireciona aba se vplModo mudar para não-estimado e aba for importacao/ppb
@@ -2487,15 +2496,21 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
   const toStore=v=>isBRL?v:+(v*d.ptax).toFixed(4);
   const sfxM=isBRL?"R$":"USD";
 
-  const prod=useMemo(()=>PRODUTOS.find(p=>p.id===d.prodId)||PRODUTOS[0],[d.prodId]);
+  const prod=useMemo(()=>{
+    if(produtosDB.length>0){
+      const r=produtosDB.find(p=>p.id===d.prodId);
+      if(r) return normalizeProdutoDB(r);
+    }
+    return PRODUTOS.find(p=>p.id===d.prodId)||PRODUTOS[0];
+  },[d.prodId,produtosDB]);
   const prodAtrib=useMemo(()=>getProdAtributos(prod,d.origem||"MAO",d.modalidade||"CKD"),[prod,d.origem,d.modalidade]);
   const isZFM=prodAtrib.isZFM;
   const isCBU=prodAtrib.isCBU;
   const pcEntry=PC_ZFM.find(e=>e.k===d.pcZfmKey)||PC_ZFM[1];
   const setProd=id=>{
-    const p=PRODUTOS.find(x=>x.id===id)||PRODUTOS[0];
     const dbRec=produtosDB.find(x=>x.id===id)||null;
     setProdutoDB(dbRec);
+    const p=dbRec?normalizeProdutoDB(dbRec):(PRODUTOS.find(x=>x.id===id)||PRODUTOS[0]);
     const defaults=dbRec?{
       producao:dbRec.producao||0,
       garantia:dbRec.garantia||0,
@@ -2897,10 +2912,33 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
           {tab==="perfil"&&<>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
               <div style={{display:"flex",flexDirection:"column",gap:10}}>
-                <Sec title="Produto" tag="NCM / PLAN_TRIB">
+                <Sec title="Produto" tag={produtosDB.length>0?"Catálogo":"NCM / PLAN_TRIB"}>
                   <select className="psel" value={d.prodId} onChange={e=>setProd(e.target.value)}>
-                    {PRODUTOS.map(p=><option key={p.id} value={p.id}>{p.ncm} — {p.nome}</option>)}
+                    {produtosDB.length>0?(()=>{
+                      // agrupar por prefixo de categoria
+                      const grupos={};
+                      produtosDB.forEach(p=>{
+                        const prefix=p.id.match(/^([A-Z]+)/)?.[1]||"?";
+                        if(!grupos[prefix])grupos[prefix]=[];
+                        grupos[prefix].push(p);
+                      });
+                      const catMap=Object.fromEntries(categoriasDB.map(c=>[c.id||c.prefixo,c.nome]));
+                      return[
+                        <option key="" value="">— Selecione o produto —</option>,
+                        ...Object.entries(grupos)
+                          .sort(([a],[b])=>(catMap[a]||a).localeCompare(catMap[b]||b))
+                          .map(([prefix,prods])=>(
+                            <optgroup key={prefix} label={catMap[prefix]||prefix}>
+                              {prods.map(p=><option key={p.id} value={p.id}>{p.nome}</option>)}
+                            </optgroup>
+                          ))
+                      ];
+                    })():PRODUTOS.map(p=><option key={p.id} value={p.id}>{p.ncm} — {p.nome}</option>)}
                   </select>
+                  {d.prodId&&produtosDB.length>0&&(()=>{
+                    const r=produtosDB.find(p=>p.id===d.prodId);
+                    return r?<div style={{fontSize:10,color:"#A7A8AA",marginTop:4}}>NCM {r.ncm}{r.sku?` · SKU ${r.sku}`:""}</div>:null;
+                  })()}
                   {/* Origem de Fabricação */}
                   <div style={{marginTop:6}}>
                     <div style={{fontSize:10,fontWeight:700,color:"#5a6a84",textTransform:"uppercase",letterSpacing:.5,marginBottom:5}}>Origem de Fabricação</div>
