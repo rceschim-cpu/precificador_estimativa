@@ -1169,10 +1169,11 @@ const getProdAtributos = (prod, origem, modalidade) => {
   // CKD/SKD em IOS/CWB: impostos cheios (CWB tem ICMS com possível deságio 35%)
   return {
     uf: o.uf,
-    ipi:  isCBU ? prod[`ipi${origem}`]  : prod[`ipi${origem}`],
+    // CBU: produto importado pronto — nunca tem isenção ZFM de IPI; usa alíquota cheia (ipiIOS ou ipiCWB)
+    ipi:  isCBU ? (prod.ipiIOS || prod.ipiCWB || prod[`ipi${origem}`] || 0) : prod[`ipi${origem}`],
     pcBase: o.zmf && !isCBU ? "zmf" : 9.25,
     icms: prod[`icms${origem}`],
-    cred: isCBU ? 0 : prod[`cred${origem}`],
+    cred: prod[`cred${origem}`],
     mva:  prod.mva,
     aliqST: prod.aliqST,
     fti:  o.zmf && !isCBU ? prod.fti : 0,
@@ -1913,7 +1914,7 @@ function ModalRegistros({onClose, onLoad, currentD, currentCalcs, prodNome, user
                                 {r.compartilhado&&<span title="Compartilhado" style={{marginRight:4}}>🌐</span>}{r.nome}
                               </div>
                               <div style={{fontSize:10,fontFamily:"'Montserrat',sans-serif",color:"#5a6a84",marginTop:2}}>
-                                {r.data} · {r.d?.ufDestino||""} · ML {r.d?.margem||0}%
+                                {r.data} · {r.d?.ufDestino||""} · MC {r.calcs?.mc!=null ? pct(r.calcs.mc) : `${r.d?.margem||0}%`}
                               </div>
                             </div>
                         }
@@ -2072,9 +2073,9 @@ function BreakdownPanel({c,d,prod,ppbTot,calcs}){
 
       {/* RESULTADO */}
       <Grp id="res" label="Resultado" total={mcV} color="#2563eb" accentColor="#93c5fd">
-        <Row l={`MC — Margem Contribuição${d.margGerAtivo&&d.margGer!==0?" (c/ MG)":""} (${pct(c.mc)})`} v={mcV} acc="blue"/>
+        <Row l={`MC — Margem Contribuição${d.margGerAtivo&&d.margGer!==0?" (c/ MG)":""} (${pct(c.mc)})`} v={mcV} acc="green"/>
         <Row l={`Custo Fixo (${pct(d.cfixo)})`} v={c.cfxV} indent sub/>
-        <Row l={`ML — Margem Líquida (${pct(c.margPct)})`} v={c.margV} acc="green"/>
+        <Row l={`ML — Margem Líquida (${pct(c.margPct)})`} v={c.margV} acc="blue"/>
         {d.margGer!==0&&<Row l={`  ↳ Margem Gerencial/Agnóstica (${pct(d.margGer)})`} v={c.margGerV} acc={d.margGer<0?"green":"red"} indent sub/>}
       </Grp>
 
@@ -2637,7 +2638,8 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
 
     // IPI: para IOS a base de cálculo é sobre preço sem IPI → IPI ef = IPI% / (1 + IPI%)
     const ipi=prodAtrib.ipi;
-    const ipiEfPct = d.origem==="IOS" && ipi>0 ? ipi/(1+ipi/100) : ipi;
+    // IPI efetivo: cálculo "por dentro" aplica-se a IOS e a CBU (importado — base = preço sem IPI)
+    const ipiEfPct = (d.origem==="IOS" || isCBU) && ipi>0 ? ipi/(1+ipi/100) : ipi;
 
     // P/C: para IOS base exclui IPI → pcEf = (9,25% × (1-ICMS%)) / (1+IPI%)
     // Para MAO/ZFM: usa lógica normal
