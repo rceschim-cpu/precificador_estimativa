@@ -2762,7 +2762,10 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
       difal,difalV:difalVf,ftiPct,ftiV:ftiVf,fcpPct,fcpV:fcpVf,ipi,ipiEfPct,ipiV:ipiVf,ipiCreditoV:ipiCreditoVf,ipiCreditoIOSPct,pSI:pSIfinal,pCI,
       margV:margVf,indPct,pdV:pdVf,cfxV:cfxVf,scV:scVf,ryV:ryVf,cfnV:cfnVf,cfVendaEf,cartaoPct,frV:frVf,cmV:cmVf,mktV:mktVf,rebateV:rebateVf,stV,stBase,
       pF:pFfinal,pUSD:pUSDf,
-      cargaTot:cargaTotf,cargaPct:cargaPctf,margPct:margPctf,mc:mcf,mkp:mkpf,ufO,intra,deveDifal,margemAlvo,margemSugerida,comisXPct,margGerPct,margGerV:margGerVf};
+      cargaTot:cargaTotf,cargaPct:cargaPctf,margPct:margPctf,mc:mcf,mkp:mkpf,ufO,intra,deveDifal,margemAlvo,margemSugerida,comisXPct,margGerPct,margGerV:margGerVf,
+      // MC equivalente nos modos precoAlvo e margem (ML + CF + MG)
+      mcAlvo:    margemAlvo    !== null ? margemAlvo    + d.cfixo + (d.margGerAtivo ? d.margGer : 0) : null,
+      mcSugerida:margemSugerida!== null ? margemSugerida+ d.cfixo + (d.margGerAtivo ? d.margGer : 0) : null};
   },[d,prod,prodAtrib,isZFM,isCBU,pcEntry,ppbTot,produtoDB]);
 
   // Notifica o MultiTab sempre que os cálculos mudarem (para o painel comparativo)
@@ -2970,12 +2973,12 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
             <div className="price-hero">
               <div>
                 <div style={{fontFamily:"'Montserrat',sans-serif",fontSize:9,fontWeight:700,letterSpacing:2,color:"#A7A8AA",marginBottom:4}}>
-                  {d.modoCalc==="margem"?"MARGEM LÍQUIDA RESULTANTE":"PREÇO DE VENDA FINAL"}
+                  {d.modoCalc==="margem"?"MC RESULTANTE":"PREÇO DE VENDA FINAL"}
                 </div>
                 {d.modoCalc==="margem"
                   ? <div style={{fontFamily:"'Montserrat',sans-serif",fontSize:44,fontWeight:800,letterSpacing:-1.5,lineHeight:1,display:"flex",alignItems:"flex-end",gap:4,
-                      color:c.margemSugerida!==null?(c.margemSugerida>=0?"#34d399":"#f87171"):"#f1f5f9"}}>
-                      {c.margemSugerida!==null?n3(c.margemSugerida):"—"}
+                      color:c.mcSugerida!==null?(c.mcSugerida>=0?"#4ade80":"#f87171"):"#f1f5f9"}}>
+                      {c.mcSugerida!==null?n3(c.mcSugerida):"—"}
                       <span style={{fontSize:18,fontWeight:400,marginBottom:6}}>%</span>
                     </div>
                   : <div style={{fontFamily:"'Montserrat',sans-serif",fontSize:44,fontWeight:800,color:"#f1f5f9",letterSpacing:-1.5,lineHeight:1,display:"flex",alignItems:"flex-start",gap:4}}>
@@ -3532,10 +3535,10 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
                   {/* Campo Preço Sugerido — habilitado só no modo Margem */}
                   <div style={{opacity:d.modoCalc==="margem"?1:.4,pointerEvents:d.modoCalc==="margem"?"auto":"none",marginTop:4}}>
                     <Field label="Preço sugerido (c/ IPI)" sfx="R$" value={d.precoSugerido||""} onChange={v=>S("precoSugerido")(parseFloat(String(v).replace(",","."))||0)}
-                      hint={d.modoCalc==="margem"&&c.margemSugerida!==null?`ML resultante: ${n3(c.margemSugerida)}%`:"informe o preço para calcular a ML"}/>
-                    {d.modoCalc==="margem"&&c.margemSugerida!==null&&(
-                      <div style={{fontSize:11,fontFamily:"'Montserrat',sans-serif",color:"#34d399",textAlign:"right",marginTop:2}}>
-                        ML = {n3(c.margemSugerida)}%
+                      hint={d.modoCalc==="margem"&&c.mcSugerida!==null?`MC resultante: ${n3(c.mcSugerida)}%`:"informe o preço para calcular a MC"}/>
+                    {d.modoCalc==="margem"&&c.mcSugerida!==null&&(
+                      <div style={{fontSize:11,fontFamily:"'Montserrat',sans-serif",color:"#4ade80",textAlign:"right",marginTop:2}}>
+                        MC = {n3(c.mcSugerida)}%
                       </div>
                     )}
                   </div>
@@ -3614,7 +3617,7 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
 
 function RevCalc({precoAlvo,onChange,c,margem}){
   const [raw,setRaw]=useState(precoAlvo===0?"":String(precoAlvo).replace(".",","));
-  const mr=c.margemAlvo;
+  const mr=c.mcAlvo; // MC como referência principal
   return(
     <div className="rcard">
       <div className="rlbl">PRECO ALVO -> MARGEM</div>
@@ -3630,7 +3633,7 @@ function RevCalc({precoAlvo,onChange,c,margem}){
         </div>
         {precoAlvo>0&&mr!==null&&(
           <div className={`rres ${mr<0?"rneg":"rpos"}`}>
-            <div className="rrmain"><span>Margem resultante</span><span className="rrv">{pct(mr)}</span></div>
+            <div className="rrmain"><span>MC resultante</span><span className="rrv">{pct(mr)}</span></div>
             <div className="rrsub">
               <span>Preco s/ IPI: {brl(precoAlvo/(1+c.ipi/100))}</span>
               <span style={{color:mr>=margem?"#4ade80":"#f87171"}}>{pct(Math.abs(mr-margem))} vs. margem atual ({pct(margem)})</span>
