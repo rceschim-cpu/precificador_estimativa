@@ -2991,7 +2991,7 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
                 </div>
               </div>
               <div style={{display:"flex",gap:5,flexWrap:"wrap",marginTop:8}}>
-                {[["CARGA","kpi-red",pct(c.cargaPct)],["ML","kpi-green",pct(c.margPct)],["MC","kpi-blue",pct(c.mc)],["MKP","",n3(c.mkp)+"x"]].map(([l,cls,v])=>(
+                {[["CARGA","kpi-red",pct(c.cargaPct)],["ML","kpi-blue",pct(c.margPct)],["MC","kpi-green",pct(c.mc)],["MKP","",n3(c.mkp)+"x"]].map(([l,cls,v])=>(
                   <div key={l} className={`kpi ${cls}`} style={{minWidth:60}}>
                     <span style={{display:"block",fontFamily:"'Montserrat',sans-serif",fontSize:7,fontWeight:700,letterSpacing:1,color:"#475569",marginBottom:2}}>{l}</span>
                     <span style={{fontFamily:"'Montserrat',sans-serif",fontSize:13,fontWeight:700}}>{v}</span>
