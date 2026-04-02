@@ -1173,7 +1173,8 @@ const getProdAtributos = (prod, origem, modalidade) => {
     ipi:  isCBU ? (prod.ipiIOS || prod.ipiCWB || prod[`ipi${origem}`] || 0) : prod[`ipi${origem}`],
     pcBase: o.zmf && !isCBU ? "zmf" : 9.25,
     icms: prod[`icms${origem}`],
-    cred: prod[`cred${origem}`],
+    // CBU: sem crédito presumido na venda (crédito presumido é benefício de fabricação, não de importação direta)
+    cred: isCBU ? 0 : prod[`cred${origem}`],
     mva:  prod.mva,
     aliqST: prod.aliqST,
     fti:  o.zmf && !isCBU ? prod.fti : 0,
