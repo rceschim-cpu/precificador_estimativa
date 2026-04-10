@@ -1190,6 +1190,27 @@ const MODALIDADES = [
     desc:"Produto 100% importado pronto para comercialização. PPB não se aplica." },
 ];
 
+// ── CANAIS — presets comerciais (fontes: planilhas abr/2026) ──────────────────
+// Campos: comis%, mkt%, rebate%, pdd%, vpc%, frete% (todos % s/ pF)
+// cfVenda não incluído — usar calculadora CF
+const CANAIS = [
+  { id:"",       label:"— Canal (opcional) —",         comis:null },
+  { id:"t1t2",   label:"T1/T2 Varejo",                 comis:0,    mkt:1.50, rebate:3.00, pdd:2.5, vpc:0    },
+  { id:"t3",     label:"T3 / Distribuidor",             comis:0.98, mkt:1.50, rebate:1.65, pdd:2.5, vpc:0    },
+  { id:"corp",   label:"Canais / Corporativo",          comis:2.98, mkt:1.40, rebate:0,    pdd:2.5, vpc:0    },
+  { id:"amzn",   label:"Amazon",                        comis:3.25, mkt:3.74, rebate:1.00, pdd:2.5, vpc:5.84 },
+  { id:"meli",   label:"MercadoLivre (Ebazar)",         comis:2.17, mkt:4.00, rebate:1.00, pdd:2.5, vpc:3.70 },
+  { id:"magalu", label:"Magazine Luiza",                comis:0,    mkt:1.50, rebate:1.00, pdd:2.5, vpc:0    },
+  { id:"csbahia",label:"Grupo Casas Bahia",             comis:0,    mkt:1.50, rebate:1.00, pdd:2.5, vpc:0.30 },
+  { id:"ameri",  label:"Americanas",                    comis:0,    mkt:1.50, rebate:1.00, pdd:2.5, vpc:2.00 },
+  { id:"carref", label:"Carrefour",                     comis:0,    mkt:1.50, rebate:1.00, pdd:2.5, vpc:7.81 },
+  { id:"cencosud",label:"Cencosud",                     comis:0,    mkt:1.50, rebate:1.00, pdd:2.5, vpc:4.20 },
+  { id:"leroy",  label:"Leroy Merlin",                  comis:3.25, mkt:2.00, rebate:1.00, pdd:2.5, vpc:3.20 },
+  { id:"telef",  label:"Telefônica / TIM",              comis:2.44, mkt:2.00, rebate:1.00, pdd:2.5, vpc:5.40 },
+  { id:"vd",     label:"Venda Direta (site próprio)",   comis:0,    mkt:1.50, rebate:0,    pdd:2.5, vpc:0    },
+  { id:"pseg",   label:"PosiSeg B2B (direto)",          comis:0,    mkt:4.00, rebate:0,    pdd:2.5, vpc:0    },
+];
+
 // Resolve atributos do produto baseado em origem + modalidade
 const getProdAtributos = (prod, origem, modalidade) => {
   const o = ORIGENS.find(x=>x.id===origem) || ORIGENS[0];
@@ -1292,6 +1313,7 @@ const DEF={
   producao:0,garantia:0,bkpPct:0,outrosBRL:0,embalagem:0,ftiAtivo:false,
   pd:0,cfixo:0,scrap:0,royal:0,cfVenda:0,frete:0,
   comis:0,comisX:0,mkt:0,rebate:0,pdd:0,vbExtra:0,vpc:0,margem:0,
+  canalId:"",
   cartaoAtivo:false,
   margGer:0,margGerAtivo:false,
   royalModo:"pct",royalUSD:0,
@@ -3513,6 +3535,24 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
               </div>
               <div style={{display:"flex",flexDirection:"column",gap:10}}>
                 <Sec title="Índices Comerciais" tag="% s/ preço">
+                {/* Preset de canal — auto-preenche comis/mkt/rebate/pdd/vpc */}
+                <div style={{display:"flex",flexDirection:"column",gap:4}}>
+                  <span style={{fontSize:11,fontWeight:600,color:"#A7A8AA"}}>Canal Padrão</span>
+                  <select
+                    value={d.canalId||""}
+                    onChange={e=>{
+                      const canal=CANAIS.find(c=>c.id===e.target.value);
+                      if(!canal||canal.comis===null){setD(p=>({...p,canalId:e.target.value}));return;}
+                      setD(p=>({...p,canalId:canal.id,comis:canal.comis,mkt:canal.mkt,rebate:canal.rebate,pdd:canal.pdd,vpc:canal.vpc}));
+                    }}
+                    style={{background:"#1a1a1a",border:"1px solid rgba(255,255,255,.12)",borderRadius:4,
+                      color:"#e2e8f0",fontSize:11,padding:"5px 8px",cursor:"pointer",outline:"none"}}>
+                    {CANAIS.map(c=><option key={c.id} value={c.id}>{c.label}</option>)}
+                  </select>
+                  {d.canalId&&<span style={{fontSize:9,color:"#5a6a84",fontFamily:"'Montserrat',sans-serif"}}>
+                    Campos preenchidos — edite abaixo para ajustar
+                  </span>}
+                </div>
                 <Field label="CF Venda" sfx="%" value={d.cfVenda}
                   onChange={calcs.cfVenda.applied?undefined:S("cfVenda")}
                   locked={calcs.cfVenda.applied} onUnlock={()=>SC("cfVenda")({applied:false})}
