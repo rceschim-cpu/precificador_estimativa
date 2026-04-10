@@ -1096,57 +1096,58 @@ function PainelAdmin({ currentUser }) {
 
 // ── PRODUTOS — NCM base sem fábrica ──────────────────────────────────────────
 // uf/ipi/pcBase são definidos dinamicamente pela origem escolhida pelo usuário
+// cfixoPad: custo fixo sugerido por categoria (% sobre pF) — fontes planilhas abr/2026
 const PRODUTOS = [
-  {id:"pos",  ncm:"8470.50.10", nome:"Terminal de Pagamento",         mva:0,   aliqST:0,   fti:2.2, ipiMAO:0,    ipiIOS:0,    ipiCWB:0,    credMAO:12, credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:4 },
-  {id:"nb12", ncm:"8471.30.12", nome:'Notebook/Tablet 8"-14"',        mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:15,   ipiCWB:15,   credMAO:12, credIOS:12, credCWB:7,  icmsMAO:12, icmsIOS:12, icmsCWB:7 },
-  {id:"nb19", ncm:"8471.30.19", nome:'Notebook/Tablet 15"+',          mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:15,   ipiCWB:15,   credMAO:12, credIOS:12, credCWB:7,  icmsMAO:12, icmsIOS:12, icmsCWB:7 },
-  {id:"tab7", ncm:"8471.30.11", nome:'Tablet 7"',                     mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:15,   ipiCWB:15,   credMAO:12, credIOS:12, credCWB:7,  icmsMAO:12, icmsIOS:12, icmsCWB:7 },
-  {id:"cpu",  ncm:"8471.50.10", nome:"CPU Pequena Capacidade",        mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:9.75, ipiCWB:9.75, credMAO:12, credIOS:12, credCWB:4,  icmsMAO:12, icmsIOS:12, icmsCWB:4 },
-  {id:"aio",  ncm:"8471.49.00", nome:"All In One / Servidor",         mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:9.75, ipiCWB:9.75, credMAO:12, credIOS:12, credCWB:4,  icmsMAO:12, icmsIOS:12, icmsCWB:4 },
-  {id:"smt",  ncm:"8517.13.00", nome:"Smartphone",                    mva:25,  aliqST:19,  fti:2.2, ipiMAO:0,    ipiIOS:15,   ipiCWB:15,   credMAO:12, credIOS:12, credCWB:4,  icmsMAO:12, icmsIOS:12, icmsCWB:4 },
-  {id:"fp",   ncm:"8517.14.31", nome:"Feature Phone (linha P)",       mva:25,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:11.25,ipiCWB:11.25,credMAO:12, credIOS:0,  credCWB:4,  icmsMAO:12, icmsIOS:12, icmsCWB:4 },
-  {id:"vpc",  ncm:"8517.62.77", nome:"Smart Video Porteiro",          mva:37,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:15,   ipiCWB:15,   credMAO:12, credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:7 },
-  {id:"rtr",  ncm:"8517.62.41", nome:"Router Mesh",                   mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:15,   ipiCWB:15,   credMAO:12, credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:4 },
-  {id:"gw",   ncm:"8517.62.94", nome:"Smart Central/Gateway",         mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:9.75, ipiCWB:9.75, credMAO:12, credIOS:0,  credCWB:4,  icmsMAO:12, icmsIOS:12, icmsCWB:4 },
-  {id:"cam",  ncm:"8525.89.29", nome:"Smart Camera WiFi",             mva:35,  aliqST:19,  fti:2.2, ipiMAO:0,    ipiIOS:15,   ipiCWB:15,   credMAO:12, credIOS:12, credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:7 },
-  {id:"mon",  ncm:"8528.52.00", nome:"Monitor PPB",                   mva:25,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:0,    ipiCWB:0,    credMAO:12, credIOS:12, credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:7 },
-  {id:"kbd",  ncm:"8471.60.52", nome:"Teclado Importação Direta",     mva:35,  aliqST:19,  fti:0,   ipiMAO:9.75, ipiIOS:9.75, ipiCWB:9.75, credMAO:3,  credIOS:3,  credCWB:0,  icmsMAO:4,  icmsIOS:12, icmsCWB:4 },
-  {id:"tot",  ncm:"8471.60.80", nome:"Totem",                         mva:0,   aliqST:0,   fti:0,   ipiMAO:0,    ipiIOS:9.75, ipiCWB:9.75, credMAO:12, credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:7 },
-  {id:"spk",  ncm:"8518.22.00", nome:"Caixa de Som Bluetooth",        mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:15,   ipiCWB:15,   credMAO:12, credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:4 },
-  {id:"chr",  ncm:"8504.40.10", nome:"Carregador Celular",            mva:50,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:5,    ipiCWB:5,    credMAO:12, credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:4 },
-  {id:"lmp",  ncm:"8539.52.00", nome:"Smart Lâmpada WiFi",            mva:63.67,aliqST:19, fti:0,   ipiMAO:0,    ipiIOS:6.5,  ipiCWB:6.5,  credMAO:12, credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:4 },
-  {id:"rob",  ncm:"8508.11.00", nome:"Smart Robô Aspirador",          mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:6.5,  ipiCWB:6.5,  credMAO:12, credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:4 },
-  {id:"spg",  ncm:"8536.50.90", nome:"Smart Plug WiFi",               mva:38,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:3.25, ipiCWB:3.25, credMAO:12, credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:7 },
+  {id:"pos",  ncm:"8470.50.10", nome:"Terminal de Pagamento",         cfixoPad:4.34, mva:0,   aliqST:0,   fti:2.2, ipiMAO:0,    ipiIOS:0,    ipiCWB:0,    credMAO:12, credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:4 },
+  {id:"nb12", ncm:"8471.30.12", nome:'Notebook/Tablet 8"-14"',        cfixoPad:4.34, mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:15,   ipiCWB:15,   credMAO:12, credIOS:12, credCWB:7,  icmsMAO:12, icmsIOS:12, icmsCWB:7 },
+  {id:"nb19", ncm:"8471.30.19", nome:'Notebook/Tablet 15"+',          cfixoPad:4.34, mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:15,   ipiCWB:15,   credMAO:12, credIOS:12, credCWB:7,  icmsMAO:12, icmsIOS:12, icmsCWB:7 },
+  {id:"tab7", ncm:"8471.30.11", nome:'Tablet 7"',                     cfixoPad:4.76, mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:15,   ipiCWB:15,   credMAO:12, credIOS:12, credCWB:7,  icmsMAO:12, icmsIOS:12, icmsCWB:7 },
+  {id:"cpu",  ncm:"8471.50.10", nome:"CPU Pequena Capacidade",        cfixoPad:4.34, mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:9.75, ipiCWB:9.75, credMAO:12, credIOS:12, credCWB:4,  icmsMAO:12, icmsIOS:12, icmsCWB:4 },
+  {id:"aio",  ncm:"8471.49.00", nome:"All In One / Servidor",         cfixoPad:4.34, mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:9.75, ipiCWB:9.75, credMAO:12, credIOS:12, credCWB:4,  icmsMAO:12, icmsIOS:12, icmsCWB:4 },
+  {id:"smt",  ncm:"8517.13.00", nome:"Smartphone",                    cfixoPad:4.76, mva:25,  aliqST:19,  fti:2.2, ipiMAO:0,    ipiIOS:15,   ipiCWB:15,   credMAO:12, credIOS:12, credCWB:4,  icmsMAO:12, icmsIOS:12, icmsCWB:4 },
+  {id:"fp",   ncm:"8517.14.31", nome:"Feature Phone (linha P)",       cfixoPad:2.00, mva:25,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:11.25,ipiCWB:11.25,credMAO:12, credIOS:0,  credCWB:4,  icmsMAO:12, icmsIOS:12, icmsCWB:4 },
+  {id:"vpc",  ncm:"8517.62.77", nome:"Smart Video Porteiro",          cfixoPad:7.14, mva:37,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:15,   ipiCWB:15,   credMAO:12, credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:7 },
+  {id:"rtr",  ncm:"8517.62.41", nome:"Router Mesh",                   cfixoPad:7.14, mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:15,   ipiCWB:15,   credMAO:12, credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:4 },
+  {id:"gw",   ncm:"8517.62.94", nome:"Smart Central/Gateway",         cfixoPad:7.14, mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:9.75, ipiCWB:9.75, credMAO:12, credIOS:0,  credCWB:4,  icmsMAO:12, icmsIOS:12, icmsCWB:4 },
+  {id:"cam",  ncm:"8525.89.29", nome:"Smart Camera WiFi",             cfixoPad:7.14, mva:35,  aliqST:19,  fti:2.2, ipiMAO:0,    ipiIOS:15,   ipiCWB:15,   credMAO:12, credIOS:12, credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:7 },
+  {id:"mon",  ncm:"8528.52.00", nome:"Monitor PPB",                   cfixoPad:4.34, mva:25,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:0,    ipiCWB:0,    credMAO:12, credIOS:12, credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:7 },
+  {id:"kbd",  ncm:"8471.60.52", nome:"Teclado Importação Direta",     cfixoPad:4.34, mva:35,  aliqST:19,  fti:0,   ipiMAO:9.75, ipiIOS:9.75, ipiCWB:9.75, credMAO:3,  credIOS:3,  credCWB:0,  icmsMAO:4,  icmsIOS:12, icmsCWB:4 },
+  {id:"tot",  ncm:"8471.60.80", nome:"Totem",                         cfixoPad:4.34, mva:0,   aliqST:0,   fti:0,   ipiMAO:0,    ipiIOS:9.75, ipiCWB:9.75, credMAO:12, credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:7 },
+  {id:"spk",  ncm:"8518.22.00", nome:"Caixa de Som Bluetooth",        cfixoPad:7.14, mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:15,   ipiCWB:15,   credMAO:12, credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:4 },
+  {id:"chr",  ncm:"8504.40.10", nome:"Carregador Celular",            cfixoPad:4.76, mva:50,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:5,    ipiCWB:5,    credMAO:12, credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:4 },
+  {id:"lmp",  ncm:"8539.52.00", nome:"Smart Lâmpada WiFi",            cfixoPad:7.14, mva:63.67,aliqST:19, fti:0,   ipiMAO:0,    ipiIOS:6.5,  ipiCWB:6.5,  credMAO:12, credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:4 },
+  {id:"rob",  ncm:"8508.11.00", nome:"Smart Robô Aspirador",          cfixoPad:7.14, mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:6.5,  ipiCWB:6.5,  credMAO:12, credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:4 },
+  {id:"spg",  ncm:"8536.50.90", nome:"Smart Plug WiFi",               cfixoPad:7.14, mva:38,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:3.25, ipiCWB:3.25, credMAO:12, credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:7 },
   // ── SmartHome — iluminação extra ─────────────────────────────────────────
-  {id:"lum1", ncm:"9405.11.90", nome:"Smart Luminária Painel/Embutir",mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:9.75, ipiCWB:9.75, credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
-  {id:"lum2", ncm:"9405.21.00", nome:"Smart Luminária de Mesa",       mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:9.75, ipiCWB:9.75, credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
-  {id:"fled", ncm:"9405.42.00", nome:"Smart Fita LED",                mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:0,    ipiCWB:0,    credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
+  {id:"lum1", ncm:"9405.11.90", nome:"Smart Luminária Painel/Embutir",cfixoPad:7.14, mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:9.75, ipiCWB:9.75, credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
+  {id:"lum2", ncm:"9405.21.00", nome:"Smart Luminária de Mesa",       cfixoPad:7.14, mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:9.75, ipiCWB:9.75, credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
+  {id:"fled", ncm:"9405.42.00", nome:"Smart Fita LED",                cfixoPad:7.14, mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:0,    ipiCWB:0,    credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
   // ── SmartHome — acessórios aspirador / casa ──────────────────────────────
-  {id:"rasp", ncm:"8508.70.00", nome:"Acessório Robô (tanque/filtro)",mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:6.5,  ipiCWB:6.5,  credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
-  {id:"petf", ncm:"8509.80.90", nome:"Alimentador PET / Robô Laser",  mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:6.5,  ipiCWB:6.5,  credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
-  {id:"ctrl", ncm:"8543.70.99", nome:"Sensor / Controle Eletrônico",  mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:6.5,  ipiCWB:6.5,  credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
-  {id:"hepa", ncm:"8421.39.90", nome:"Filtro HEPA",                   mva:0,   aliqST:0,   fti:0,   ipiMAO:0,    ipiIOS:0,    ipiCWB:0,    credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
-  {id:"brs",  ncm:"9603.50.00", nome:"Escova / Acessório Aspirador",  mva:0,   aliqST:0,   fti:0,   ipiMAO:0,    ipiIOS:0,    ipiCWB:0,    credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
-  {id:"mop",  ncm:"6307.10.00", nome:"Mop / Pano (acessório)",        mva:0,   aliqST:0,   fti:0,   ipiMAO:0,    ipiIOS:0,    ipiCWB:0,    credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:4,  icmsIOS:4,  icmsCWB:4 },
-  {id:"bag",  ncm:"6307.90.10", nome:"Saco de Poeira (acessório)",    mva:0,   aliqST:0,   fti:0,   ipiMAO:0,    ipiIOS:0,    ipiCWB:0,    credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:4,  icmsIOS:4,  icmsCWB:4 },
-  {id:"lock", ncm:"8301.40.00", nome:"Fechadura Eletrônica",          mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:0,    ipiCWB:0,    credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
+  {id:"rasp", ncm:"8508.70.00", nome:"Acessório Robô (tanque/filtro)",cfixoPad:7.14, mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:6.5,  ipiCWB:6.5,  credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
+  {id:"petf", ncm:"8509.80.90", nome:"Alimentador PET / Robô Laser",  cfixoPad:7.14, mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:6.5,  ipiCWB:6.5,  credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
+  {id:"ctrl", ncm:"8543.70.99", nome:"Sensor / Controle Eletrônico",  cfixoPad:7.14, mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:6.5,  ipiCWB:6.5,  credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
+  {id:"hepa", ncm:"8421.39.90", nome:"Filtro HEPA",                   cfixoPad:7.14, mva:0,   aliqST:0,   fti:0,   ipiMAO:0,    ipiIOS:0,    ipiCWB:0,    credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
+  {id:"brs",  ncm:"9603.50.00", nome:"Escova / Acessório Aspirador",  cfixoPad:7.14, mva:0,   aliqST:0,   fti:0,   ipiMAO:0,    ipiIOS:0,    ipiCWB:0,    credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
+  {id:"mop",  ncm:"6307.10.00", nome:"Mop / Pano (acessório)",        cfixoPad:7.14, mva:0,   aliqST:0,   fti:0,   ipiMAO:0,    ipiIOS:0,    ipiCWB:0,    credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:4,  icmsIOS:4,  icmsCWB:4 },
+  {id:"bag",  ncm:"6307.90.10", nome:"Saco de Poeira (acessório)",    cfixoPad:7.14, mva:0,   aliqST:0,   fti:0,   ipiMAO:0,    ipiIOS:0,    ipiCWB:0,    credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:4,  icmsIOS:4,  icmsCWB:4 },
+  {id:"lock", ncm:"8301.40.00", nome:"Fechadura Eletrônica",          cfixoPad:7.14, mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:0,    ipiCWB:0,    credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
   // ── Mobilidade ───────────────────────────────────────────────────────────
-  {id:"wtch", ncm:"9102.12.20", nome:"Smartwatch",                    mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:15,   ipiCWB:15,   credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
+  {id:"wtch", ncm:"9102.12.20", nome:"Smartwatch",                    cfixoPad:2.00, mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:15,   ipiCWB:15,   credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
   // ── PosiSeg — CFTV ───────────────────────────────────────────────────────
-  {id:"nvr",  ncm:"8521.90.00", nome:"DVR / XVR / NVR Gravador",     mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:15,   ipiCWB:15,   credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
-  {id:"caip", ncm:"8525.89.13", nome:"Câmera IP / Analógica Básica",  mva:0,   aliqST:0,   fti:0,   ipiMAO:0,    ipiIOS:13,   ipiCWB:13,   credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
+  {id:"nvr",  ncm:"8521.90.00", nome:"DVR / XVR / NVR Gravador",     cfixoPad:30.32,mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:15,   ipiCWB:15,   credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
+  {id:"caip", ncm:"8525.89.13", nome:"Câmera IP / Analógica Básica",  cfixoPad:30.32,mva:0,   aliqST:0,   fti:0,   ipiMAO:0,    ipiIOS:13,   ipiCWB:13,   credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
   // ── PosiSeg — Redes ──────────────────────────────────────────────────────
-  {id:"swt",  ncm:"8517.62.34", nome:"Switch PoE Ethernet",           mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:9.75, ipiCWB:9.75, credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
-  {id:"hdmx", ncm:"8517.62.59", nome:"Extensor HDMI",                 mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:15,   ipiCWB:15,   credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
+  {id:"swt",  ncm:"8517.62.34", nome:"Switch PoE Ethernet",           cfixoPad:30.32,mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:9.75, ipiCWB:9.75, credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
+  {id:"hdmx", ncm:"8517.62.59", nome:"Extensor HDMI",                 cfixoPad:30.32,mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:15,   ipiCWB:15,   credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
   // ── PosiSeg — Controle de Acesso ─────────────────────────────────────────
-  {id:"rfid", ncm:"8471.90.19", nome:"Leitor RFID / Facial",          mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:9.75, ipiCWB:9.75, credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
-  {id:"prox", ncm:"8523.52.10", nome:"Cartão Proximity / RFID",       mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:6.5,  ipiCWB:6.5,  credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
+  {id:"rfid", ncm:"8471.90.19", nome:"Leitor RFID / Facial",          cfixoPad:30.32,mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:9.75, ipiCWB:9.75, credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
+  {id:"prox", ncm:"8523.52.10", nome:"Cartão Proximity / RFID",       cfixoPad:30.32,mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:6.5,  ipiCWB:6.5,  credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
   // ── PosiSeg — Intrusão ───────────────────────────────────────────────────
-  {id:"alrm", ncm:"8531.10.90", nome:"Central de Alarme",             mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:9.75, ipiCWB:9.75, credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
+  {id:"alrm", ncm:"8531.10.90", nome:"Central de Alarme",             cfixoPad:30.32,mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:9.75, ipiCWB:9.75, credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
   // ── PosiSeg — Balun / Conectividade ─────────────────────────────────────
-  {id:"bln",  ncm:"8504.40.21", nome:"Balun / Power Balun",           mva:48,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:3.75, ipiCWB:3.75, credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
+  {id:"bln",  ncm:"8504.40.21", nome:"Balun / Power Balun",           cfixoPad:30.32,mva:48,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:3.75, ipiCWB:3.75, credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
   // ── PosiSeg — Armazenamento ──────────────────────────────────────────────
-  {id:"hddx", ncm:"8471.70.10", nome:"HDD (Disco Rígido)",            mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:10,   ipiCWB:10,   credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
+  {id:"hddx", ncm:"8471.70.10", nome:"HDD (Disco Rígido)",            cfixoPad:30.32,mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:10,   ipiCWB:10,   credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
 ];
 
 // Converte produto do catálogo (snake_case) → shape da calculadora (camelCase)
@@ -1170,6 +1171,7 @@ const normalizeProdutoDB = r => {
     icmsCWB: base.icmsCWB ?? r.icms_cwb ?? 0,
     // Índices — sempre do catálogo (valores inseridos por produto)
     fti: r.fti ?? 0,
+    cfixoPad: base.cfixoPad ?? r.cfixo_pad ?? 0,
   };
 };
 
@@ -1231,6 +1233,7 @@ const getProdAtributos = (prod, origem, modalidade) => {
     mva:  prod.mva,
     aliqST: prod.aliqST,
     fti:  o.zmf && !isCBU ? prod.fti : 0,
+    cfixoPad: prod.cfixoPad ?? 0,
     // CBU: PIS/COFINS cheio (pcBase vira 9.25 acima), sem FTI
     // CBU: ICMS da UF importadora (SP por padrão, editável)
     isCBU,
@@ -2857,7 +2860,7 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
       craCalcMAO,creditoCalcIOS,cfrExpandidoUSD,basePlacaUSD,
       pcPct,pcEf,pcLabel,pcV:pcVf,pcSubvPct,pcSubvV:pcSubvVf,pcBaseRedPct,aliqInter,aliqDest,icmsEfPct,icmsV,icmsEfV:icmsEfVf,
       difal,difalV:difalVf,ftiPct,ftiV:ftiVf,fcpPct,fcpV:fcpVf,ipi,ipiEfPct,ipiV:ipiVf,ipiCreditoV:ipiCreditoVf,ipiCreditoIOSPct,pSI:pSIfinal,pCI,
-      margV:margVf,indPct,footprintPct,footprintV:footprintVf,pdPad:oRef.pdPad||0,pdV:pdVf,cfxV:cfxVf,scV:scVf,ryV:ryVf,cfnV:cfnVf,cfVendaEf,cartaoPct,frV:frVf,cmV:cmVf,mktV:mktVf,rebateV:rebateVf,stV,stBase,
+      margV:margVf,indPct,footprintPct,footprintV:footprintVf,pdPad:oRef.pdPad||0,cfixoPad:prodAtrib.cfixoPad||0,pdV:pdVf,cfxV:cfxVf,scV:scVf,ryV:ryVf,cfnV:cfnVf,cfVendaEf,cartaoPct,frV:frVf,cmV:cmVf,mktV:mktVf,rebateV:rebateVf,stV,stBase,
       pF:pFfinal,pUSD:pUSDf,
       cargaTot:cargaTotf,cargaPct:cargaPctf,margPct:margPctf,mc:mcf,mkp:mkpf,ufO,intra,deveDifal,margemAlvo,margemSugerida,comisXPct,margGerPct,margGerV:margGerVf,
       // MC equivalente nos modos precoAlvo e margem (ML + CF + MG)
@@ -3623,7 +3626,8 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
                 </Sec>
                 <Sec title="Custo Fixo" tag="% s/ preço">
                   <Box t="gray">CF compõe a MC junto com a ML. MC = ML + CF</Box>
-                  <Field label="Custo Fixo" value={d.cfixo} onChange={S("cfixo")} sfx="%" hint={`≈ ${brl(c.cfxV)}`}/>
+                  <Field label="Custo Fixo" value={d.cfixo} onChange={S("cfixo")} sfx="%"
+                    hint={d.cfixo===0&&c.cfixoPad>0?`Padrão categoria: ${c.cfixoPad}% — ≈ ${brl(c.pF*(c.cfixoPad/100))}`:`≈ ${brl(c.cfxV)}`}/>
                 </Sec>
                 <Sec title="Margem Líquida (ML)" hl>
                   {/* Toggle modo de cálculo */}
