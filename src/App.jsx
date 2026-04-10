@@ -1117,6 +1117,36 @@ const PRODUTOS = [
   {id:"lmp",  ncm:"8539.52.00", nome:"Smart Lâmpada WiFi",            mva:63.67,aliqST:19, fti:0,   ipiMAO:0,    ipiIOS:6.5,  ipiCWB:6.5,  credMAO:12, credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:4 },
   {id:"rob",  ncm:"8508.11.00", nome:"Smart Robô Aspirador",          mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:6.5,  ipiCWB:6.5,  credMAO:12, credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:4 },
   {id:"spg",  ncm:"8536.50.90", nome:"Smart Plug WiFi",               mva:38,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:3.25, ipiCWB:3.25, credMAO:12, credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:7 },
+  // ── SmartHome — iluminação extra ─────────────────────────────────────────
+  {id:"lum1", ncm:"9405.11.90", nome:"Smart Luminária Painel/Embutir",mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:9.75, ipiCWB:9.75, credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
+  {id:"lum2", ncm:"9405.21.00", nome:"Smart Luminária de Mesa",       mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:9.75, ipiCWB:9.75, credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
+  {id:"fled", ncm:"9405.42.00", nome:"Smart Fita LED",                mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:0,    ipiCWB:0,    credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
+  // ── SmartHome — acessórios aspirador / casa ──────────────────────────────
+  {id:"rasp", ncm:"8508.70.00", nome:"Acessório Robô (tanque/filtro)",mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:6.5,  ipiCWB:6.5,  credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
+  {id:"petf", ncm:"8509.80.90", nome:"Alimentador PET / Robô Laser",  mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:6.5,  ipiCWB:6.5,  credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
+  {id:"ctrl", ncm:"8543.70.99", nome:"Sensor / Controle Eletrônico",  mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:6.5,  ipiCWB:6.5,  credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
+  {id:"hepa", ncm:"8421.39.90", nome:"Filtro HEPA",                   mva:0,   aliqST:0,   fti:0,   ipiMAO:0,    ipiIOS:0,    ipiCWB:0,    credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
+  {id:"brs",  ncm:"9603.50.00", nome:"Escova / Acessório Aspirador",  mva:0,   aliqST:0,   fti:0,   ipiMAO:0,    ipiIOS:0,    ipiCWB:0,    credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
+  {id:"mop",  ncm:"6307.10.00", nome:"Mop / Pano (acessório)",        mva:0,   aliqST:0,   fti:0,   ipiMAO:0,    ipiIOS:0,    ipiCWB:0,    credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:4,  icmsIOS:4,  icmsCWB:4 },
+  {id:"bag",  ncm:"6307.90.10", nome:"Saco de Poeira (acessório)",    mva:0,   aliqST:0,   fti:0,   ipiMAO:0,    ipiIOS:0,    ipiCWB:0,    credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:4,  icmsIOS:4,  icmsCWB:4 },
+  {id:"lock", ncm:"8301.40.00", nome:"Fechadura Eletrônica",          mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:0,    ipiCWB:0,    credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
+  // ── Mobilidade ───────────────────────────────────────────────────────────
+  {id:"wtch", ncm:"9102.12.20", nome:"Smartwatch",                    mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:15,   ipiCWB:15,   credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
+  // ── PosiSeg — CFTV ───────────────────────────────────────────────────────
+  {id:"nvr",  ncm:"8521.90.00", nome:"DVR / XVR / NVR Gravador",     mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:15,   ipiCWB:15,   credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
+  {id:"caip", ncm:"8525.89.13", nome:"Câmera IP / Analógica Básica",  mva:0,   aliqST:0,   fti:0,   ipiMAO:0,    ipiIOS:13,   ipiCWB:13,   credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
+  // ── PosiSeg — Redes ──────────────────────────────────────────────────────
+  {id:"swt",  ncm:"8517.62.34", nome:"Switch PoE Ethernet",           mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:9.75, ipiCWB:9.75, credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
+  {id:"hdmx", ncm:"8517.62.59", nome:"Extensor HDMI",                 mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:15,   ipiCWB:15,   credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
+  // ── PosiSeg — Controle de Acesso ─────────────────────────────────────────
+  {id:"rfid", ncm:"8471.90.19", nome:"Leitor RFID / Facial",          mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:9.75, ipiCWB:9.75, credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
+  {id:"prox", ncm:"8523.52.10", nome:"Cartão Proximity / RFID",       mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:6.5,  ipiCWB:6.5,  credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
+  // ── PosiSeg — Intrusão ───────────────────────────────────────────────────
+  {id:"alrm", ncm:"8531.10.90", nome:"Central de Alarme",             mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:9.75, ipiCWB:9.75, credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
+  // ── PosiSeg — Balun / Conectividade ─────────────────────────────────────
+  {id:"bln",  ncm:"8504.40.21", nome:"Balun / Power Balun",           mva:48,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:3.75, ipiCWB:3.75, credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
+  // ── PosiSeg — Armazenamento ──────────────────────────────────────────────
+  {id:"hddx", ncm:"8471.70.10", nome:"HDD (Disco Rígido)",            mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:10,   ipiCWB:10,   credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
 ];
 
 // Converte produto do catálogo (snake_case) → shape da calculadora (camelCase)
@@ -2555,6 +2585,7 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
   };
   // ── Tabela TEC local — II por NCM (valores verificados na Receita Federal) ───
   const TEC_II = {
+    // ── Informática ──────────────────────────────────────────────────────────
     "8470.50.10": 20,     // Terminal de Pagamento
     "8471.30.11": 0,      // Tablet 7"
     "8471.30.12": 16,     // Notebook/Tablet 8"-14"
@@ -2563,18 +2594,53 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
     "8471.50.10": 14.4,   // CPU Pequena Capacidade
     "8471.60.52": 10.8,   // Teclado
     "8471.60.80": 20,     // Totem
+    "8471.70.10": 16,     // HDD (Disco Rígido)
+    "8471.90.19": 16,     // Leitor RFID / Facial
+    // ── Carregadores / Balun ─────────────────────────────────────────────────
     "8504.40.10": 18,     // Carregador Celular
+    "8504.40.21": 16,     // Balun / Power Balun
+    // ── Aspiradores / Casa ───────────────────────────────────────────────────
     "8508.11.00": 18,     // Robô Aspirador
+    "8508.70.00": 18,     // Acessório Robô (tanque/filtro)
+    "8509.80.90": 18,     // Alimentador PET / Robô Laser
+    // ── Telecomunicações ─────────────────────────────────────────────────────
     "8517.13.00": 16,     // Smartphone
     "8517.14.31": 20,     // Feature Phone
+    "8517.62.34": 16,     // Switch PoE Ethernet
     "8517.62.41": 16,     // Router Mesh
+    "8517.62.59": 16,     // Extensor HDMI
     "8517.62.77": 20,     // Video Porteiro
-    "8517.62.94": 16,     // Gateway
+    "8517.62.94": 16,     // Gateway / Hub
+    // ── Áudio / Vídeo ────────────────────────────────────────────────────────
     "8518.22.00": 18,     // Caixa de Som Bluetooth
-    "8525.89.29": 20,     // Smart Camera WiFi
+    "8521.90.00": 20,     // DVR / XVR / NVR Gravador
+    "8523.52.10": 16,     // Cartão Proximity / RFID
+    // ── Câmeras ──────────────────────────────────────────────────────────────
+    "8525.89.13": 20,     // Câmera IP / Analógica Básica
+    "8525.89.29": 20,     // Câmera IP PoE / Smart Camera WiFi
     "8528.52.00": 10.8,   // Monitor
-    "8536.50.90": 16,     // Smart Plug
+    // ── Alarme / Segurança ───────────────────────────────────────────────────
+    "8531.10.90": 16,     // Central de Alarme
+    "8536.50.90": 16,     // Smart Plug / Interruptor
+    // ── Lâmpadas / Iluminação ────────────────────────────────────────────────
     "8539.52.00": 10.8,   // Smart Lâmpada
+    "8543.70.99": 16,     // Sensor / Controle Eletrônico
+    // ── Fechaduras ───────────────────────────────────────────────────────────
+    "8301.40.00": 16,     // Fechadura Eletrônica
+    // ── Filtros ──────────────────────────────────────────────────────────────
+    "8421.39.90": 10,     // Filtro HEPA
+    // ── Smartwatch ───────────────────────────────────────────────────────────
+    "9102.12.20": 20,     // Smartwatch
+    "9102.12.90": 20,     // Smartwatch (variante)
+    // ── Luminárias ───────────────────────────────────────────────────────────
+    "9405.11.90": 18,     // Smart Luminária Painel/Embutir
+    "9405.21.00": 18,     // Smart Luminária de Mesa
+    "9405.42.00": 18,     // Smart Fita LED
+    // ── Acessórios têxteis ───────────────────────────────────────────────────
+    "6307.10.00": 35,     // Mop / Pano (acessório aspirador)
+    "6307.90.10": 35,     // Saco de Poeira (acessório aspirador)
+    // ── Escovas ──────────────────────────────────────────────────────────────
+    "9603.50.00": 18,     // Escova / Acessório Aspirador
   };
 
   const setOrigem=origem=>setD(pv=>{
