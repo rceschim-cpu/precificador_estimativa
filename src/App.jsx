@@ -1174,10 +1174,12 @@ const normalizeProdutoDB = r => {
 };
 
 // ── ORIGENS e MODALIDADES ─────────────────────────────────────────────────────
+// footprint: custo/benefício operacional da fábrica (% sobre pF) — CKD/SKD apenas
+// pdPad: alíquota padrão P&D para CKD (confirmada pelas planilhas abr/2026)
 const ORIGENS = [
-  { id:"MAO", label:"MAO — Manaus",      uf:"AM", zmf:true  },
-  { id:"IOS", label:"IOS — Ilhéus (BA)", uf:"BA", zmf:false },
-  { id:"CWB", label:"CWB — Curitiba (PR)",uf:"PR", zmf:false },
+  { id:"MAO", label:"MAO — Manaus",       uf:"AM", zmf:true,  footprint:-0.71, pdPad:2.55 },
+  { id:"IOS", label:"IOS — Ilhéus (BA)",  uf:"BA", zmf:false, footprint: 1.00, pdPad:3.48 },
+  { id:"CWB", label:"CWB — Curitiba (PR)",uf:"PR", zmf:false, footprint: 0,    pdPad:3.48 },
 ];
 const MODALIDADES = [
   { id:"CKD", label:"CKD — Componentes importados + produção nacional",
@@ -1988,7 +1990,7 @@ function BreakdownPanel({c,d,prod,ppbTot,calcs}){
   const fobBRL=d.fobUSD*d.ptax;
   const freteBRL=d.freteUSD*d.ptax;
   const totalImpVenda=c.cargaTot+(c.ftiPct>0?c.ftiV:0)+(c.fcpPct>0?c.fcpV:0);
-  const totalIndGer=c.pdV+c.scV+c.ryV+c.frV;
+  const totalIndGer=c.pdV+c.scV+c.ryV+c.frV+(c.footprintV||0);
   const totalIndCom=c.cmV+(c.mktV||0)+(c.rebateV||0)+c.cfnV;
   const mcV=c.margV+c.cfxV;
 
@@ -2089,6 +2091,7 @@ function BreakdownPanel({c,d,prod,ppbTot,calcs}){
         <Row l={`Scrap (${pct(d.scrap)})`} v={c.scV}/>
         <Row l={`Royalties (${pct(d.royal)})`} v={c.ryV}/>
         <Row l={`Frete venda (${pct(d.frete)})`} v={c.frV}/>
+        {c.footprintPct!==0&&<Row l={`Footprint ${d.origem} (${pct(c.footprintPct)})`} v={c.footprintV} acc={c.footprintPct<0?"green":"red"} indent sub/>}
       </Grp>
 
       {/* ÍNDICES COMERCIAIS */}
@@ -2747,7 +2750,11 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
     const comisXPct=d.comis*(2/3);
     const cartaoPct=d.cartaoAtivo?2:0;
     const cfVendaEf=d.cfVenda+cartaoPct;
-    const indPct=d.pd+d.cfixo+d.scrap+d.royal+cfVendaEf+d.frete+d.comis+comisXPct+d.mkt+d.rebate+(d.pdd||0)+(d.vbExtra||0)+(d.vpc||0);
+    // Footprint: custo/benefício operacional da fábrica — aplica só em CKD/SKD
+    // MAO=-0,71% (benefício ZFM) | IOS=+1,00% (custo extra Ilhéus) | CWB=0%
+    const oRef = ORIGENS.find(x=>x.id===d.origem)||ORIGENS[0];
+    const footprintPct = !isCBU ? (oRef.footprint||0) : 0;
+    const indPct=d.pd+d.cfixo+d.scrap+d.royal+cfVendaEf+d.frete+d.comis+comisXPct+d.mkt+d.rebate+(d.pdd||0)+(d.vbExtra||0)+(d.vpc||0)+footprintPct;
     // MG é um índice independente — entra no soma como os outros índices
     // Valor negativo = crédito = eleva o preço (denominador menor)
     const margGerPct=(d.margGer||0);
@@ -2811,6 +2818,7 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
       ? margemSugerida
       : (d.margem+margGerPct);
     const margVf=pFbase*(margPctEf/100);
+    const footprintVf=pFbase*(footprintPct/100);
     const pdVf=pFbase*(d.pd/100),cfxVf=pFbase*(d.cfixo/100);
     const scVf=pFbase*(d.scrap/100),ryVf=pFbase*(d.royal/100);
     const cfnVf=pFbase*(cfVendaEf/100),frVf=pFbase*(d.frete/100),cmVf=pFbase*((d.comis+comisXPct)/100);
@@ -2827,7 +2835,7 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
       craCalcMAO,creditoCalcIOS,cfrExpandidoUSD,basePlacaUSD,
       pcPct,pcEf,pcLabel,pcV:pcVf,pcSubvPct,pcSubvV:pcSubvVf,pcBaseRedPct,aliqInter,aliqDest,icmsEfPct,icmsV,icmsEfV:icmsEfVf,
       difal,difalV:difalVf,ftiPct,ftiV:ftiVf,fcpPct,fcpV:fcpVf,ipi,ipiEfPct,ipiV:ipiVf,ipiCreditoV:ipiCreditoVf,ipiCreditoIOSPct,pSI:pSIfinal,pCI,
-      margV:margVf,indPct,pdV:pdVf,cfxV:cfxVf,scV:scVf,ryV:ryVf,cfnV:cfnVf,cfVendaEf,cartaoPct,frV:frVf,cmV:cmVf,mktV:mktVf,rebateV:rebateVf,stV,stBase,
+      margV:margVf,indPct,footprintPct,footprintV:footprintVf,pdPad:oRef.pdPad||0,pdV:pdVf,cfxV:cfxVf,scV:scVf,ryV:ryVf,cfnV:cfnVf,cfVendaEf,cartaoPct,frV:frVf,cmV:cmVf,mktV:mktVf,rebateV:rebateVf,stV,stBase,
       pF:pFfinal,pUSD:pUSDf,
       cargaTot:cargaTotf,cargaPct:cargaPctf,margPct:margPctf,mc:mcf,mkp:mkpf,ufO,intra,deveDifal,margemAlvo,margemSugerida,comisXPct,margGerPct,margGerV:margGerVf,
       // MC equivalente nos modos precoAlvo e margem (ML + CF + MG)
@@ -3462,7 +3470,9 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
               <div style={{display:"flex",flexDirection:"column",gap:10}}>
                 <Sec title="Índices Gerais" tag="% s/ preço">
                 <Box t="gray">Calculados por dentro do preço de venda.</Box>
-                {[["P&D","pd"],["Scrap","scrap"],["Frete venda","frete"]
+                <Field label="P&D" value={d.pd} onChange={S("pd")} sfx="%"
+                  hint={d.pd===0&&!isCBU?`Padrão ${d.origem}: ${c.pdPad}% — ≈ ${brl(c.pF*(c.pdPad/100))}`:`≈ ${brl(c.pF*(d.pd/100))}`}/>
+                {[["Scrap","scrap"],["Frete venda","frete"]
                 ].map(([l,k])=>(
                   <Field key={k} label={l} value={d[k]} onChange={S(k)} sfx="%" hint={`≈ ${brl(c.pF*(d[k]/100))}`}/>
                 ))}
@@ -4536,10 +4546,11 @@ function PainelComparativo({abas, calcsMap, selecionadas, open, onToggle}){
               <Linha label="ICMS Efetivo" fn={({c})=>brl(c.icmsEfV)}/>
               {abasComDados.some(a=>calcsMap[a.id].c.difal>0)&&<Linha label="DIFAL" fn={({c})=>c.difal>0?brl(c.difalV):"—"}/>}
             </Grp>
-            <Grp id="iger" label="Índices Gerais" fnTotal={({c})=>c.pdV+c.scV+c.ryV+c.frV}>
+            <Grp id="iger" label="Índices Gerais" fnTotal={({c})=>c.pdV+c.scV+c.ryV+c.frV+(c.footprintV||0)}>
               <Linha label="P&D" fn={({c})=>brl(c.pdV)}/>
               <Linha label="Scrap" fn={({c})=>brl(c.scV)}/>
               <Linha label="Royalties" fn={({c})=>brl(c.ryV)}/>
+              <Linha label="Footprint" fn={({c})=>c.footprintPct!==0?brl(c.footprintV):"—"}/>
               <Linha label="Frete venda" fn={({c})=>brl(c.frV)}/>
             </Grp>
             <Grp id="icom" label="Índices Comerciais" fnTotal={({c})=>c.cfnV+c.cmV+(c.mktV||0)+(c.rebateV||0)}>
