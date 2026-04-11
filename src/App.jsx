@@ -3505,6 +3505,35 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
           </>}
 
           {tab==="indices"&&<>
+            {/* ── Botão Aplicar Padrões ────────────────────────────────────── */}
+            {(c.cfixoPad||c.royalPad||c.scrapPad||c.fretePad||c.bkpPad||c.pdPad)>0&&(
+              <div style={{display:"flex",alignItems:"center",gap:10,padding:"8px 12px",
+                background:"rgba(60,219,192,.08)",border:"1px solid rgba(60,219,192,.25)",
+                borderRadius:6,marginBottom:4}}>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:11,fontWeight:700,color:"#3CDBC0"}}>Padrões disponíveis para este produto</div>
+                  <div style={{fontSize:9,color:"#5a6a84",fontFamily:"'Montserrat',sans-serif",marginTop:2}}>
+                    {[c.cfixoPad&&`CF ${c.cfixoPad}%`,!isCBU&&c.pdPad&&`P&D ${c.pdPad}%`,c.scrapPad&&`Scrap ${c.scrapPad}%`,
+                      c.fretePad&&`Frete ${c.fretePad}%`,c.royalPad&&`Royal ${c.royalPad}%`,c.bkpPad&&`BKP ${c.bkpPad}%`
+                    ].filter(Boolean).join("  ·  ")}
+                  </div>
+                </div>
+                <button onClick={()=>setD(p=>({...p,
+                  cfixo: c.cfixoPad||p.cfixo,
+                  pd:    (!isCBU&&c.pdPad)?c.pdPad:p.pd,
+                  scrap: c.scrapPad||p.scrap,
+                  frete: c.fretePad||p.frete,
+                  royal: c.royalPad||p.royal,
+                  bkpPct:c.bkpPad||p.bkpPct,
+                  pdd:   p.pdd||2.5,
+                }))}
+                  style={{padding:"6px 14px",fontSize:10,fontWeight:700,cursor:"pointer",borderRadius:20,
+                    border:"1px solid rgba(60,219,192,.5)",background:"rgba(60,219,192,.15)",
+                    color:"#3CDBC0",whiteSpace:"nowrap",flexShrink:0}}>
+                  ⚡ Aplicar Padrões
+                </button>
+              </div>
+            )}
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
               <div style={{display:"flex",flexDirection:"column",gap:10}}>
                 <Sec title="Índices Gerais" tag="% s/ preço">
