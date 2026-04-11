@@ -2027,17 +2027,30 @@ function BreakdownPanel({c,d,prod,ppbTot,calcs}){
   const freteBRL=d.freteUSD*d.ptax;
   const totalImpVenda=c.cargaTot+(c.ftiPct>0?c.ftiV:0)+(c.fcpPct>0?c.fcpV:0);
   const totalIndGer=c.pdV+c.scV+c.ryV+c.frV+(c.footprintV||0);
-  const totalIndCom=c.cmV+(c.mktV||0)+(c.rebateV||0)+c.cfnV;
+  const totalIndCom=c.cfnV+c.cmV+(c.mktV||0)+(c.rebateV||0)+(c.pddV||0)+(c.vbExtraV||0)+(c.vpcV||0);
   const mcV=c.margV+c.cfxV;
 
   // Linha item
-  const Row=({l,v,acc,indent,dual,sub})=>(
-    <div className={`bdr ${acc||""} ${sub?"bdsub":""}`} style={indent?{paddingLeft:20}:undefined}>
-      <span className="bdl">{l}</span>
-      <span className="bdv">
-        {dual&&<span className="bdv2">{dual}</span>}
-        <span style={acc==="red"?{color:"#f87171"}:acc==="green"?{color:"#4ade80"}:acc==="blue"?{color:"#3CDBC0"}:acc==="warn"?{color:"#fbbf24"}:{}}>{brl(v)}</span>
-      </span>
+  const Row=({l,v,acc,indent,dual,sub,showPct})=>{
+    const vPct=showPct&&c.pF>0?pct(Math.abs(v)/c.pF*100):null;
+    return(
+      <div className={`bdr ${acc||""} ${sub?"bdsub":""}`} style={indent?{paddingLeft:20}:undefined}>
+        <span className="bdl">{l}</span>
+        <span className="bdv">
+          {dual&&<span className="bdv2">{dual}</span>}
+          {vPct&&<span className="bdv2">{vPct}</span>}
+          <span style={acc==="red"?{color:"#f87171"}:acc==="green"?{color:"#4ade80"}:acc==="blue"?{color:"#3CDBC0"}:acc==="warn"?{color:"#fbbf24"}:{}}>{brl(v)}</span>
+        </span>
+      </div>
+    );
+  };
+
+  // Linha de subtotal no fundo de cada grupo expandido
+  const SubTot=({label,v,color})=>(
+    <div className="bd-subtot" style={{borderTop:`1px solid ${color||"rgba(255,255,255,.12)"}44`}}>
+      <span className="bd-subtot-lbl">{label}</span>
+      <span className="bd-subtot-pct">{c.pF>0?pct(Math.abs(v)/c.pF*100):"—"}</span>
+      <span className="bd-subtot-val">{brl(v)}</span>
     </div>
   );
 
@@ -2056,7 +2069,7 @@ function BreakdownPanel({c,d,prod,ppbTot,calcs}){
           <span className="bd-grp-pct" style={{color}}>{pctVal>=0.1?pct(pctVal):"—"}</span>
           <span className="bd-grp-val" style={{color:isOpen?"#dce7f7":accentColor||color}}>{brl(total)}</span>
         </div>
-        {isOpen&&<div className="bd-grp-body">{children}</div>}
+        {isOpen&&<div className="bd-grp-body">{children}<SubTot label={totLabel||label} v={total} color={color}/></div>}
       </div>
     );
   };
@@ -2074,22 +2087,22 @@ function BreakdownPanel({c,d,prod,ppbTot,calcs}){
     <div className="bd-wrap">
 
       {/* IMPORTAÇÃO */}
-      <Grp id="imp" label="Importação" total={c.cmvImp} color="#3b82f6">
-        <Row l="FOB" v={fobBRL} dual={usd(d.fobUSD)}/>
-        <Row l="Frete Internacional" v={freteBRL} dual={usd(d.freteUSD)} indent/>
-        <Row l={`II (${pct(d.aliqII)})`} v={c.iiV} acc="red" indent/>
-        <Row l="Seguro" v={d.seguroBRL} indent/>
-        <Row l={`Despesas${d.despesasModo==="pct"?" "+pct(d.despesasPct)+" CFR":""}`} v={c.despesas} acc="red" indent/>
-        {d.cfImp!==0&&<Row l="CF Importação" v={d.cfImp} acc={d.cfImp<0?"green":"blue"} indent/>}
+      <Grp id="imp" label="Importação" total={c.cmvImp} color="#3b82f6" totLabel="Total Importação">
+        <Row l="FOB" v={fobBRL} dual={usd(d.fobUSD)} showPct/>
+        <Row l="Frete Internacional" v={freteBRL} dual={usd(d.freteUSD)} indent showPct/>
+        <Row l={`II (${pct(d.aliqII)})`} v={c.iiV} acc="red" indent showPct/>
+        <Row l="Seguro" v={d.seguroBRL} indent showPct/>
+        <Row l={`Despesas${d.despesasModo==="pct"?" "+pct(d.despesasPct)+" CFR":""}`} v={c.despesas} acc="red" indent showPct/>
+        {d.cfImp!==0&&<Row l="CF Importação" v={d.cfImp} acc={d.cfImp<0?"green":"blue"} indent showPct/>}
       </Grp>
 
       {/* PPB */}
       {ppbTot>0&&(
-        <Grp id="ppb" label="PPB" total={ppbTot} color="#8b5cf6">
+        <Grp id="ppb" label="PPB" total={ppbTot} color="#8b5cf6" totLabel="Total PPB">
           {Object.entries(d.ppbAtivos).filter(([,v])=>v).map(([k])=>(
-            <Row key={k} l={PPB_ITEMS.find(i=>i.id===k)?.label||k} v={d.ppbVals[k]||0} indent/>
+            <Row key={k} l={PPB_ITEMS.find(i=>i.id===k)?.label||k} v={d.ppbVals[k]||0} indent showPct/>
           ))}
-          {(d.cra||0)>0&&<Row l="CRA / Créditos" v={d.cra} acc="green" indent/>}
+          {(d.cra||0)>0&&<Row l="CRA / Créditos" v={d.cra} acc="green" indent showPct/>}
         </Grp>
       )}
 
@@ -2097,56 +2110,56 @@ function BreakdownPanel({c,d,prod,ppbTot,calcs}){
       <Tot label={d.vplModo==="real"&&d.vplReal>0?"VPL — Real":"VPL"} v={c.vpl} color="#2563eb"/>
 
       {/* CUSTOS LOCAIS */}
-      <Grp id="local" label="Despesas Locais" total={d.garantia+c.bkpV+d.producao+d.outrosBRL} color="#0ea5e9">
-        <Row l="Garantia" v={d.garantia}/>
-        <Row l={`BKP (${pct(d.bkpPct)} × VPL)`} v={c.bkpV} indent sub/>
-        <Row l="Produção / Montagem" v={d.producao}/>
-        <Row l="Embalagem" v={d.embalagem||0} indent sub/>
-        <Row l="Outros Custos" v={d.outrosBRL} indent sub/>
+      <Grp id="local" label="Despesas Locais" total={d.garantia+c.bkpV+d.producao+d.outrosBRL} color="#0ea5e9" totLabel="Total Despesas Locais">
+        <Row l="Garantia" v={d.garantia} showPct/>
+        <Row l={`BKP (${pct(d.bkpPct)} × VPL)`} v={c.bkpV} indent sub showPct/>
+        <Row l="Produção / Montagem" v={d.producao} showPct/>
+        <Row l="Embalagem" v={d.embalagem||0} indent sub showPct/>
+        <Row l="Outros Custos" v={d.outrosBRL} indent sub showPct/>
       </Grp>
 
       {/* CUSTO TOTAL — fixo */}
       <Tot label="CUSTO TOTAL" v={c.cmvTotal} color="#3CDBC0"/>
 
       {/* IMPOSTOS DA VENDA */}
-      <Grp id="impvenda" label="Impostos da Venda" total={totalImpVenda} color="#ef4444">
-        {c.ipi>0&&<Row l={`IPI (${pct(c.ipi)})`} v={c.ipiV} acc="red"/>}
-        {c.ipiCreditoV>0&&<Row l={`  ↳ Crédito IPI IOS (-${pct(c.ipiCreditoIOSPct)})`} v={-c.ipiCreditoV} acc="green" indent sub/>}
-        <Row l={`P/C efetivo (${pct(c.pcEf)})`} v={c.pcV} acc="red"/>
-        {c.pcSubvPct>0.001&&<Row l={`P/C subvenção (${pct(c.pcSubvPct)})`} v={c.pcSubvV} acc="red" indent sub/>}
-        {c.icmsEfPct>0&&<Row l={`ICMS efetivo (${pct(c.icmsEfPct)})`} v={c.icmsEfV} acc="red"/>}
-        {c.difal>0&&<Row l={`DIFAL (${pct(c.difal)})`} v={c.difalV} acc="red"/>}
-        {c.stV>0&&<Row l="ICMS-ST" v={c.stV} acc="warn"/>}
-        {c.ftiPct>0&&<Row l={`FTI/UEA-AM (${pct(c.ftiPct)})`} v={c.ftiV} acc="red"/>}
-        {c.fcpPct>0&&<Row l={`Fundo Pobreza ${d.ufDestino}`} v={c.fcpV} acc="warn"/>}
+      <Grp id="impvenda" label="Impostos da Venda" total={totalImpVenda} color="#ef4444" totLabel="Total Impostos">
+        {c.ipi>0&&<Row l={`IPI (${pct(c.ipi)})`} v={c.ipiV} acc="red" showPct/>}
+        {c.ipiCreditoV>0&&<Row l={`  ↳ Crédito IPI IOS (-${pct(c.ipiCreditoIOSPct)})`} v={-c.ipiCreditoV} acc="green" indent sub showPct/>}
+        <Row l={`P/C efetivo (${pct(c.pcEf)})`} v={c.pcV} acc="red" showPct/>
+        {c.pcSubvPct>0.001&&<Row l={`P/C subvenção (${pct(c.pcSubvPct)})`} v={c.pcSubvV} acc="red" indent sub showPct/>}
+        {c.icmsEfPct>0&&<Row l={`ICMS efetivo (${pct(c.icmsEfPct)})`} v={c.icmsEfV} acc="red" showPct/>}
+        {c.difal>0&&<Row l={`DIFAL (${pct(c.difal)})`} v={c.difalV} acc="red" showPct/>}
+        {c.stV>0&&<Row l="ICMS-ST" v={c.stV} acc="warn" showPct/>}
+        {c.ftiPct>0&&<Row l={`FTI/UEA-AM (${pct(c.ftiPct)})`} v={c.ftiV} acc="red" showPct/>}
+        {c.fcpPct>0&&<Row l={`Fundo Pobreza ${d.ufDestino}`} v={c.fcpV} acc="warn" showPct/>}
       </Grp>
 
       {/* ÍNDICES GERAIS */}
-      <Grp id="iger" label="Índices Gerais" total={totalIndGer} color="#6b7280">
-        <Row l={`P&D (${pct(d.pd)})`} v={c.pdV}/>
-        <Row l={`Scrap (${pct(d.scrap)})`} v={c.scV}/>
-        <Row l={`Royalties (${pct(d.royal)})`} v={c.ryV}/>
-        <Row l={`Frete venda (${pct(d.frete)})`} v={c.frV}/>
-        {c.footprintPct!==0&&<Row l={`Footprint ${d.origem} (${pct(c.footprintPct)})`} v={c.footprintV} acc={c.footprintPct<0?"green":"red"} indent sub/>}
+      <Grp id="iger" label="Índices Gerais" total={totalIndGer} color="#6b7280" totLabel="Total Índices Gerais">
+        <Row l={`P&D (${pct(d.pd)})`} v={c.pdV} showPct/>
+        <Row l={`Scrap (${pct(d.scrap)})`} v={c.scV} showPct/>
+        <Row l={`Royalties (${pct(d.royal)})`} v={c.ryV} showPct/>
+        <Row l={`Frete venda (${pct(d.frete)})`} v={c.frV} showPct/>
+        {c.footprintPct!==0&&<Row l={`Footprint ${d.origem} (${pct(c.footprintPct)})`} v={c.footprintV} acc={c.footprintPct<0?"green":"red"} showPct/>}
       </Grp>
 
       {/* ÍNDICES COMERCIAIS */}
-      <Grp id="icom" label="Índices Comerciais" total={totalIndCom} color="#d97706">
-        <Row l={`CF Venda (${pct(c.cfVendaEf)}${c.cartaoPct>0?" c/ cartão":""})`} v={c.cfnV}/>
-        <Row l={`Comissão+Enc. (${pct(d.comis+c.comisXPct)})`} v={c.cmV}/>
-        {(d.mkt||0)>0&&<Row l={`Marketing (${pct(d.mkt)})`} v={c.mktV||0}/>}
-        {(d.rebate||0)>0&&<Row l={`Rebate (${pct(d.rebate)})`} v={c.rebateV||0}/>}
-        {(d.pdd||0)>0&&<Row l={`PDD (${pct(d.pdd)})`} v={c.pF*(d.pdd/100)}/>}
-        {(d.vbExtra||0)>0&&<Row l={`Verba Extra (${pct(d.vbExtra)})`} v={c.pF*(d.vbExtra/100)}/>}
-        {(d.vpc||0)>0&&<Row l={`VPC (${pct(d.vpc)})`} v={c.pF*(d.vpc/100)}/>}
+      <Grp id="icom" label="Índices Comerciais" total={totalIndCom} color="#d97706" totLabel="Total Comercial">
+        <Row l={`CF Venda (${pct(c.cfVendaEf)}${c.cartaoPct>0?" c/ cartão":""})`} v={c.cfnV} showPct/>
+        <Row l={`Comissão+Enc. (${pct(d.comis+c.comisXPct)})`} v={c.cmV} showPct/>
+        {(d.mkt||0)>0&&<Row l={`Marketing (${pct(d.mkt)})`} v={c.mktV||0} showPct/>}
+        {(d.rebate||0)>0&&<Row l={`Rebate (${pct(d.rebate)})`} v={c.rebateV||0} showPct/>}
+        {(d.pdd||0)>0&&<Row l={`PDD (${pct(d.pdd)})`} v={c.pddV||0} showPct/>}
+        {(d.vbExtra||0)>0&&<Row l={`Verba Extra (${pct(d.vbExtra)})`} v={c.vbExtraV||0} showPct/>}
+        {(d.vpc||0)>0&&<Row l={`VPC (${pct(d.vpc)})`} v={c.vpcV||0} showPct/>}
       </Grp>
 
       {/* RESULTADO */}
-      <Grp id="res" label="Resultado" total={mcV} color="#2563eb" accentColor="#93c5fd">
-        <Row l={`MC — Margem Contribuição${d.margGerAtivo&&d.margGer!==0?" (c/ MG)":""} (${pct(c.mc)})`} v={mcV} acc="green"/>
-        <Row l={`Custo Fixo (${pct(d.cfixo)})`} v={c.cfxV} indent sub/>
-        <Row l={`ML — Margem Líquida (${pct(c.margPct)})`} v={c.margV} acc="blue"/>
-        {d.margGer!==0&&<Row l={`  ↳ Margem Gerencial/Agnóstica (${pct(d.margGer)})`} v={c.margGerV} acc={d.margGer<0?"green":"red"} indent sub/>}
+      <Grp id="res" label="Resultado" total={mcV} color="#2563eb" accentColor="#93c5fd" totLabel="MC Total">
+        <Row l={`MC — Margem Contribuição${d.margGerAtivo&&d.margGer!==0?" (c/ MG)":""} (${pct(c.mc)})`} v={mcV} acc="green" showPct/>
+        <Row l={`Custo Fixo (${pct(d.cfixo)})`} v={c.cfxV} indent sub showPct/>
+        <Row l={`ML — Margem Líquida (${pct(c.margPct)})`} v={c.margV} acc="blue" showPct/>
+        {d.margGer!==0&&<Row l={`  ↳ Margem Gerencial/Agnóstica (${pct(d.margGer)})`} v={c.margGerV} acc={d.margGer<0?"green":"red"} indent sub showPct/>}
       </Grp>
 
       {/* PREÇO FINAL — fixo */}
@@ -2535,6 +2548,10 @@ input::-webkit-inner-spin-button,input::-webkit-outer-spin-button{-webkit-appear
 .bd-tot-val{width:80px;text-align:right;font-family:'Montserrat',sans-serif;font-size:12px;font-weight:800;flex-shrink:0}
 .bd-preco{display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:linear-gradient(135deg,#1a2520,#0d1a18);border:1px solid rgba(60,219,192,.25);border-radius:5px}
 .bd-preco span:first-child{font-family:'Montserrat',sans-serif;font-size:11px;font-weight:800;letter-spacing:1.5px;color:#3CDBC0}
+.bd-subtot{display:flex;align-items:center;gap:4px;padding:5px 8px 4px;margin:4px 6px 2px;background:rgba(255,255,255,.04);border-radius:3px}
+.bd-subtot-lbl{flex:1;font-family:'Montserrat',sans-serif;font-size:9.5px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:#7a8ba3}
+.bd-subtot-pct{width:36px;text-align:right;font-family:'Montserrat',sans-serif;font-size:10px;font-weight:600;color:#5a6a84;flex-shrink:0}
+.bd-subtot-val{width:80px;text-align:right;font-family:'Montserrat',sans-serif;font-size:11px;font-weight:700;color:#c8d6e8;flex-shrink:0}
 ::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:#2C2A29}::-webkit-scrollbar-thumb{background:#302e2d;border-radius:3px}::-webkit-scrollbar-thumb:hover{background:#3CDBC0}
 `;
 
@@ -2861,6 +2878,7 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
     const scVf=pFbase*(d.scrap/100),ryVf=pFbase*(d.royal/100);
     const cfnVf=pFbase*(cfVendaEf/100),frVf=pFbase*(d.frete/100),cmVf=pFbase*((d.comis+comisXPct)/100);
     const mktVf=pFbase*(d.mkt/100),rebateVf=pFbase*(d.rebate/100);
+    const pddVf=pFbase*((d.pdd||0)/100),vbExtraVf=pFbase*((d.vbExtra||0)/100),vpcVf=pFbase*((d.vpc||0)/100);
     const ipiVf=pFbase/(1+ipi/100)*(ipi/100); // ipiV sobre pSI derivado de pFfinal
     const pSIfinal = pFbase/(1+ipi/100);
     const cargaTotf=pcVf+ipiVf+icmsEfVf+difalVf+(stV||0)+fcpVf;
@@ -2875,7 +2893,7 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
       difal,difalV:difalVf,ftiPct,ftiV:ftiVf,fcpPct,fcpV:fcpVf,ipi,ipiEfPct,ipiV:ipiVf,ipiCreditoV:ipiCreditoVf,ipiCreditoIOSPct,pSI:pSIfinal,pCI,
       margV:margVf,indPct,footprintPct,footprintV:footprintVf,pdPad:oRef.pdPad||0,
       cfixoPad:prodAtrib.cfixoPad||0,royalPad:prodAtrib.royalPad||0,
-      scrapPad:prodAtrib.scrapPad||0,fretePad:prodAtrib.fretePad||0,bkpPad:prodAtrib.bkpPad||0,pdV:pdVf,cfxV:cfxVf,scV:scVf,ryV:ryVf,cfnV:cfnVf,cfVendaEf,cartaoPct,frV:frVf,cmV:cmVf,mktV:mktVf,rebateV:rebateVf,stV,stBase,
+      scrapPad:prodAtrib.scrapPad||0,fretePad:prodAtrib.fretePad||0,bkpPad:prodAtrib.bkpPad||0,pdV:pdVf,cfxV:cfxVf,scV:scVf,ryV:ryVf,cfnV:cfnVf,cfVendaEf,cartaoPct,frV:frVf,cmV:cmVf,mktV:mktVf,rebateV:rebateVf,pddV:pddVf,vbExtraV:vbExtraVf,vpcV:vpcVf,stV,stBase,
       pF:pFfinal,pUSD:pUSDf,
       cargaTot:cargaTotf,cargaPct:cargaPctf,margPct:margPctf,mc:mcf,mkp:mkpf,ufO,intra,deveDifal,margemAlvo,margemSugerida,comisXPct,margGerPct,margGerV:margGerVf,
       // MC equivalente nos modos precoAlvo e margem (ML + CF + MG)
@@ -4540,9 +4558,9 @@ function PainelComparativo({abas, calcsMap, selecionadas, open, onToggle}){
           {c.cmV>0&&<CardLinha label="Comissão+Enc." valor={brl(c.cmV)}/>}
           {(c.mktV||0)>0&&<CardLinha label="Marketing" valor={brl(c.mktV)}/>}
           {(c.rebateV||0)>0&&<CardLinha label="Rebate" valor={brl(c.rebateV)}/>}
-          {(d.pdd||0)>0&&<CardLinha label="PDD" valor={brl(c.pF*(d.pdd/100))}/>}
-          {(d.vbExtra||0)>0&&<CardLinha label="Verba Extra" valor={brl(c.pF*(d.vbExtra/100))}/>}
-          {(d.vpc||0)>0&&<CardLinha label="VPC" valor={brl(c.pF*(d.vpc/100))}/>}
+          {(d.pdd||0)>0&&<CardLinha label="PDD" valor={brl(c.pddV||0)}/>}
+          {(d.vbExtra||0)>0&&<CardLinha label="Verba Extra" valor={brl(c.vbExtraV||0)}/>}
+          {(d.vpc||0)>0&&<CardLinha label="VPC" valor={brl(c.vpcV||0)}/>}
 
           {/* Resultado — painel de margem em destaque */}
           <div style={{marginTop:14,borderRadius:8,overflow:"hidden",border:`1px solid ${corBorder}`}}>
@@ -4646,14 +4664,14 @@ function PainelComparativo({abas, calcsMap, selecionadas, open, onToggle}){
               <Linha label="Footprint" fn={({c})=>c.footprintPct!==0?brl(c.footprintV):"—"}/>
               <Linha label="Frete venda" fn={({c})=>brl(c.frV)}/>
             </Grp>
-            <Grp id="icom" label="Índices Comerciais" fnTotal={({c})=>c.cfnV+c.cmV+(c.mktV||0)+(c.rebateV||0)}>
+            <Grp id="icom" label="Índices Comerciais" fnTotal={({c})=>c.cfnV+c.cmV+(c.mktV||0)+(c.rebateV||0)+(c.pddV||0)+(c.vbExtraV||0)+(c.vpcV||0)}>
               <Linha label="CF Venda" fn={({c})=>brl(c.cfnV)}/>
               <Linha label="Comissão+Enc." fn={({c})=>brl(c.cmV)}/>
-              {abasComDados.some(a=>(calcsMap[a.id].d.mkt||0)>0)&&<Linha label="Marketing" fn={({c,d})=>brl(c.mktV||0)}/>}
+              {abasComDados.some(a=>(calcsMap[a.id].d.mkt||0)>0)&&<Linha label="Marketing" fn={({c})=>brl(c.mktV||0)}/>}
               {abasComDados.some(a=>(calcsMap[a.id].d.rebate||0)>0)&&<Linha label="Rebate" fn={({c})=>brl(c.rebateV||0)}/>}
-              {abasComDados.some(a=>(calcsMap[a.id].d.pdd||0)>0)&&<Linha label="PDD" fn={({c,d})=>brl(c.pF*(d.pdd/100))}/>}
-              {abasComDados.some(a=>(calcsMap[a.id].d.vbExtra||0)>0)&&<Linha label="Verba Extra" fn={({c,d})=>brl(c.pF*(d.vbExtra/100))}/>}
-              {abasComDados.some(a=>(calcsMap[a.id].d.vpc||0)>0)&&<Linha label="VPC" fn={({c,d})=>brl(c.pF*(d.vpc/100))}/>}
+              {abasComDados.some(a=>(calcsMap[a.id].d.pdd||0)>0)&&<Linha label="PDD" fn={({c})=>brl(c.pddV||0)}/>}
+              {abasComDados.some(a=>(calcsMap[a.id].d.vbExtra||0)>0)&&<Linha label="Verba Extra" fn={({c})=>brl(c.vbExtraV||0)}/>}
+              {abasComDados.some(a=>(calcsMap[a.id].d.vpc||0)>0)&&<Linha label="VPC" fn={({c})=>brl(c.vpcV||0)}/>}
             </Grp>
             <Grp id="res" label="Resultado (MC)" fnTotal={({c})=>c.margV+c.cfxV}>
               <Linha label="ML (%)" fn={({c})=>pct(c.margPct)}/>
