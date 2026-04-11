@@ -1318,7 +1318,7 @@ const DEF={
   pcZfmKey:"nao_cumulativo",regimeVendedor:"real",
   tipoComprador:"contrib",destinacaoCliente:"revenda",ufDestino:"SP",
   icmsDiferimento:0,
-  fobUSD:0,freteUSD:0,ptax:0,seguroBRL:0,aliqII:0,
+  fobUSD:0,freteUSD:0,ptax:5.31,seguroBRL:0,aliqII:0,
   despesas:0,despesasPct:0,despesasModo:"pct",
   cfImp:0,cra:0,
   conteudoLocal:0, plmPct:0,
@@ -1342,7 +1342,7 @@ const CALC_DEF={
   frete:{sUSD:0,aUSD:0,saUSD:0,pS:100,pA:0,pSA:0,applied:false},
   cfImp:{tr:30,pp:-30,tx:0.8,applied:false},
   pcb:{tl:0,vol:1000,tempo:0,pctFob:0},
-  cfVenda:{prazo:30,taxa:1.14,applied:false},
+  cfVenda:{prazo:60,taxa:1.14,applied:false},
 };
 
 // ── Storage de Registros ──────────────────────────────────────────────────────
