@@ -904,6 +904,7 @@ function PainelAdmin({ currentUser }) {
     { id: "usuarios",   icon: "👥", label: "Usuários" },
     { id: "perfis",     icon: "🔐", label: "Perfis" },
     { id: "categorias", icon: "📦", label: "Categorias", badge: solCatsPendentes.length },
+    { id: "canais",     icon: "🏪", label: "Canais" },
   ];
 
   // Se view === "calc", renderiza a Calculadora inline
@@ -1025,6 +1026,9 @@ function PainelAdmin({ currentUser }) {
         {/* PERFIS */}
         {view === "perfis" && <ViewPerfis users={users}/>}
 
+        {/* CANAIS */}
+        {view === "canais" && <ViewCanais/>}
+
         {/* CATEGORIAS */}
         {view === "categorias" && (
           <div className="tbl-wrap">
@@ -1093,6 +1097,120 @@ function PainelAdmin({ currentUser }) {
 
 // ── DASHBOARD USUÁRIO ─────────────────────────────────────────────────────────
 
+// ── ViewCanais — editor de taxas por canal × categoria ───────────────────────
+const VC_FIELDS = [
+  { id:"comis",  label:"Comissão" },
+  { id:"mkt",    label:"Marketing" },
+  { id:"rebate", label:"Rebate" },
+  { id:"pdd",    label:"PDD" },
+  { id:"vpc",    label:"VPC" },
+];
+
+function ViewCanais() {
+  const [taxas, setTaxas] = useState(loadCanaisTaxas);
+  const [openCanal, setOpenCanal] = useState({});
+
+  const persistir = t => { saveCanaisTaxas(t); setTaxas({...t}); };
+
+  const setRate = (canalId, catId, field, raw) => {
+    const num = parseFloat(raw);
+    const t = JSON.parse(JSON.stringify(taxas));
+    if(!t[canalId]) t[canalId]={};
+    if(!t[canalId][catId]) t[canalId][catId]={};
+    if(isNaN(num)) delete t[canalId][catId][field];
+    else t[canalId][catId][field]=num;
+    if(!Object.keys(t[canalId][catId]).length) delete t[canalId][catId];
+    if(!Object.keys(t[canalId]).length) delete t[canalId];
+    persistir(t);
+  };
+
+  const resetCanal = canalId => {
+    const t = {...taxas}; delete t[canalId]; persistir(t);
+  };
+
+  const thS={padding:"6px 10px",textAlign:"right",fontSize:10,fontWeight:700,color:"var(--muted)",
+    textTransform:"uppercase",letterSpacing:".8px",borderBottom:"1px solid var(--border)",whiteSpace:"nowrap"};
+  const tdS={padding:"4px 8px",borderBottom:"1px solid rgba(255,255,255,.04)",textAlign:"right"};
+
+  return(
+    <div className="tbl-wrap">
+      <div className="tbl-head">
+        <span className="tbl-head-title">🏪 Taxas por Canal × Categoria</span>
+        <span style={{fontSize:12,color:"var(--muted)"}}>Valores em destaque = personalizados por categoria</span>
+      </div>
+      <div style={{padding:12,display:"flex",flexDirection:"column",gap:6}}>
+        {CANAIS.filter(c=>c.default).map(canal=>{
+          const isOpen=openCanal[canal.id];
+          const hasOv=!!(taxas[canal.id]&&Object.keys(taxas[canal.id]).length);
+          return(
+            <div key={canal.id} style={{border:"1px solid rgba(255,255,255,.08)",borderRadius:6,overflow:"hidden"}}>
+              <div style={{display:"flex",alignItems:"center",gap:8,padding:"9px 14px",
+                background:"rgba(255,255,255,.02)",cursor:"pointer",userSelect:"none"}}
+                onClick={()=>setOpenCanal(p=>({...p,[canal.id]:!p[canal.id]}))}>
+                <span style={{fontSize:9,color:"#5a6a84",width:10}}>{isOpen?"▾":"▸"}</span>
+                <span style={{flex:1,fontFamily:"'Montserrat',sans-serif",fontSize:13,fontWeight:700,color:"#f0f4ff"}}>{canal.label}</span>
+                <span style={{fontSize:10,color:"#5a6a84",fontFamily:"'Montserrat',sans-serif"}}>
+                  {VC_FIELDS.map(f=>`${f.label.slice(0,3)}: ${canal.default[f.id]}%`).join(" · ")}
+                </span>
+                {hasOv&&<span style={{fontSize:9,background:"rgba(60,219,192,.15)",color:"#3CDBC0",
+                  padding:"2px 7px",borderRadius:10,fontWeight:700,marginLeft:4}}>personalizado</span>}
+                {hasOv&&<button style={{fontSize:10,color:"#f87171",background:"none",
+                  border:"1px solid rgba(248,113,113,.3)",borderRadius:3,padding:"2px 7px",cursor:"pointer",marginLeft:4}}
+                  onClick={e=>{e.stopPropagation();resetCanal(canal.id);}}>↺ reset</button>}
+              </div>
+              {isOpen&&(
+                <div style={{padding:"10px 12px",background:"rgba(0,0,0,.15)"}}>
+                  <div style={{marginBottom:8,fontSize:10,color:"#5a6a84"}}>
+                    Deixe igual ao padrão para usar o valor default. Campos em <span style={{color:"#3CDBC0"}}>verde</span> têm override ativo.
+                  </div>
+                  <div style={{overflowX:"auto"}}>
+                    <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
+                      <thead>
+                        <tr>
+                          <th style={{...thS,textAlign:"left",minWidth:140}}>Categoria</th>
+                          {VC_FIELDS.map(f=><th key={f.id} style={{...thS,minWidth:80}}>{f.label} %</th>)}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {CATS.map(cat=>(
+                          <tr key={cat.id} style={{transition:"background .1s"}}>
+                            <td style={{...tdS,textAlign:"left",paddingLeft:10}}>
+                              <span style={{fontWeight:600,color:"#c8d6e8"}}>{cat.icon} {cat.label}</span>
+                            </td>
+                            {VC_FIELDS.map(f=>{
+                              const ov=taxas[canal.id]?.[cat.id]?.[f.id];
+                              const isOv=ov!==undefined;
+                              const val=isOv?ov:canal.default[f.id];
+                              return(
+                                <td key={f.id} style={tdS}>
+                                  <input type="number" step="0.01" min="0"
+                                    value={val}
+                                    onChange={e=>setRate(canal.id,cat.id,f.id,e.target.value)}
+                                    onFocus={e=>{if(!isOv)setRate(canal.id,cat.id,f.id,canal.default[f.id]);}}
+                                    style={{width:68,textAlign:"right",
+                                      background:isOv?"rgba(60,219,192,.08)":"rgba(255,255,255,.03)",
+                                      border:`1px solid ${isOv?"rgba(60,219,192,.35)":"rgba(255,255,255,.08)"}`,
+                                      borderRadius:3,color:isOv?"#3CDBC0":"#6b7280",
+                                      padding:"4px 6px",fontSize:11,outline:"none",
+                                      fontFamily:"'Montserrat',sans-serif"}}/>
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 
 // ── PRODUTOS — NCM base sem fábrica ──────────────────────────────────────────
 // uf/ipi/pcBase são definidos dinamicamente pela origem escolhida pelo usuário
@@ -1101,56 +1219,56 @@ function PainelAdmin({ currentUser }) {
 //   fretePad: frete venda | bkpPad: backup/custódia (% sobre VPL)
 const PRODUTOS = [
   //                                                                                cfixo  royal  scrap  frete  bkp
-  {id:"pos",  ncm:"8470.50.10", nome:"Terminal de Pagamento",         cfixoPad:4.34, royalPad:0,    scrapPad:0.71, fretePad:1.20, bkpPad:2.54, mva:0,   aliqST:0,   fti:2.2, ipiMAO:0,    ipiIOS:0,    ipiCWB:0,    credMAO:12, credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:4 },
-  {id:"nb12", ncm:"8471.30.12", nome:'Notebook/Tablet 8"-14"',        cfixoPad:4.34, royalPad:0,    scrapPad:0.71, fretePad:2.18, bkpPad:2.54, mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:15,   ipiCWB:15,   credMAO:12, credIOS:12, credCWB:7,  icmsMAO:12, icmsIOS:12, icmsCWB:7 },
-  {id:"nb19", ncm:"8471.30.19", nome:'Notebook/Tablet 15"+',          cfixoPad:4.34, royalPad:0,    scrapPad:0.71, fretePad:2.18, bkpPad:2.54, mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:15,   ipiCWB:15,   credMAO:12, credIOS:12, credCWB:7,  icmsMAO:12, icmsIOS:12, icmsCWB:7 },
-  {id:"tab7", ncm:"8471.30.11", nome:'Tablet 7"',                     cfixoPad:4.76, royalPad:2.49, scrapPad:0.91, fretePad:1.70, bkpPad:2.54, mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:15,   ipiCWB:15,   credMAO:12, credIOS:12, credCWB:7,  icmsMAO:12, icmsIOS:12, icmsCWB:7 },
-  {id:"cpu",  ncm:"8471.50.10", nome:"CPU Pequena Capacidade",        cfixoPad:4.34, royalPad:0,    scrapPad:0.71, fretePad:1.65, bkpPad:2.54, mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:9.75, ipiCWB:9.75, credMAO:12, credIOS:12, credCWB:4,  icmsMAO:12, icmsIOS:12, icmsCWB:4 },
-  {id:"aio",  ncm:"8471.49.00", nome:"All In One / Servidor",         cfixoPad:4.34, royalPad:0,    scrapPad:0.71, fretePad:1.65, bkpPad:2.54, mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:9.75, ipiCWB:9.75, credMAO:12, credIOS:12, credCWB:4,  icmsMAO:12, icmsIOS:12, icmsCWB:4 },
-  {id:"smt",  ncm:"8517.13.00", nome:"Smartphone",                    cfixoPad:4.76, royalPad:2.01, scrapPad:1.12, fretePad:0.72, bkpPad:1.50, mva:25,  aliqST:19,  fti:2.2, ipiMAO:0,    ipiIOS:15,   ipiCWB:15,   credMAO:12, credIOS:12, credCWB:4,  icmsMAO:12, icmsIOS:12, icmsCWB:4 },
-  {id:"fp",   ncm:"8517.14.31", nome:"Feature Phone (linha P)",       cfixoPad:2.00, royalPad:0,    scrapPad:0.51, fretePad:1.54, bkpPad:1.50, mva:25,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:11.25,ipiCWB:11.25,credMAO:12, credIOS:0,  credCWB:4,  icmsMAO:12, icmsIOS:12, icmsCWB:4 },
-  {id:"vpc",  ncm:"8517.62.77", nome:"Smart Video Porteiro",          cfixoPad:7.14, royalPad:0,    scrapPad:1.09, fretePad:2.45, bkpPad:2.48, mva:37,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:15,   ipiCWB:15,   credMAO:12, credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:7 },
-  {id:"rtr",  ncm:"8517.62.41", nome:"Router Mesh",                   cfixoPad:7.14, royalPad:0,    scrapPad:1.09, fretePad:2.45, bkpPad:2.48, mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:15,   ipiCWB:15,   credMAO:12, credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:4 },
-  {id:"gw",   ncm:"8517.62.94", nome:"Smart Central/Gateway",         cfixoPad:7.14, royalPad:0,    scrapPad:1.09, fretePad:2.45, bkpPad:2.48, mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:9.75, ipiCWB:9.75, credMAO:12, credIOS:0,  credCWB:4,  icmsMAO:12, icmsIOS:12, icmsCWB:4 },
-  {id:"cam",  ncm:"8525.89.29", nome:"Smart Camera WiFi",             cfixoPad:7.14, royalPad:0,    scrapPad:1.09, fretePad:2.45, bkpPad:2.48, mva:35,  aliqST:19,  fti:2.2, ipiMAO:0,    ipiIOS:15,   ipiCWB:15,   credMAO:12, credIOS:12, credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:7 },
-  {id:"mon",  ncm:"8528.52.00", nome:"Monitor PPB",                   cfixoPad:4.34, royalPad:0,    scrapPad:0.71, fretePad:1.65, bkpPad:2.54, mva:25,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:0,    ipiCWB:0,    credMAO:12, credIOS:12, credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:7 },
-  {id:"kbd",  ncm:"8471.60.52", nome:"Teclado Importação Direta",     cfixoPad:4.34, royalPad:0,    scrapPad:0.71, fretePad:2.18, bkpPad:2.54, mva:35,  aliqST:19,  fti:0,   ipiMAO:9.75, ipiIOS:9.75, ipiCWB:9.75, credMAO:3,  credIOS:3,  credCWB:0,  icmsMAO:4,  icmsIOS:12, icmsCWB:4 },
-  {id:"tot",  ncm:"8471.60.80", nome:"Totem",                         cfixoPad:4.34, royalPad:0,    scrapPad:0.71, fretePad:1.20, bkpPad:2.54, mva:0,   aliqST:0,   fti:0,   ipiMAO:0,    ipiIOS:9.75, ipiCWB:9.75, credMAO:12, credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:7 },
-  {id:"spk",  ncm:"8518.22.00", nome:"Caixa de Som Bluetooth",        cfixoPad:7.14, royalPad:0,    scrapPad:1.09, fretePad:2.45, bkpPad:2.48, mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:15,   ipiCWB:15,   credMAO:12, credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:4 },
-  {id:"chr",  ncm:"8504.40.10", nome:"Carregador Celular",            cfixoPad:4.76, royalPad:0,    scrapPad:0.51, fretePad:1.54, bkpPad:1.50, mva:50,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:5,    ipiCWB:5,    credMAO:12, credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:4 },
-  {id:"lmp",  ncm:"8539.52.00", nome:"Smart Lâmpada WiFi",            cfixoPad:7.14, royalPad:0,    scrapPad:1.09, fretePad:2.45, bkpPad:1.28, mva:63.67,aliqST:19, fti:0,   ipiMAO:0,    ipiIOS:6.5,  ipiCWB:6.5,  credMAO:12, credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:4 },
-  {id:"rob",  ncm:"8508.11.00", nome:"Smart Robô Aspirador",          cfixoPad:7.14, royalPad:0,    scrapPad:1.09, fretePad:2.45, bkpPad:2.72, mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:6.5,  ipiCWB:6.5,  credMAO:12, credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:4 },
-  {id:"spg",  ncm:"8536.50.90", nome:"Smart Plug WiFi",               cfixoPad:7.14, royalPad:0,    scrapPad:1.09, fretePad:2.45, bkpPad:1.76, mva:38,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:3.25, ipiCWB:3.25, credMAO:12, credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:7 },
+  {id:"pos",  cat:"pos",         ncm:"8470.50.10", nome:"Terminal de Pagamento",         cfixoPad:4.34, royalPad:0,    scrapPad:0.71, fretePad:1.20, bkpPad:2.54, mva:0,   aliqST:0,   fti:2.2, ipiMAO:0,    ipiIOS:0,    ipiCWB:0,    credMAO:12, credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:4 },
+  {id:"nb12", cat:"informatica", ncm:"8471.30.12", nome:'Notebook/Tablet 8"-14"',        cfixoPad:4.34, royalPad:0,    scrapPad:0.71, fretePad:2.18, bkpPad:2.54, mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:15,   ipiCWB:15,   credMAO:12, credIOS:12, credCWB:7,  icmsMAO:12, icmsIOS:12, icmsCWB:7 },
+  {id:"nb19", cat:"informatica", ncm:"8471.30.19", nome:'Notebook/Tablet 15"+',          cfixoPad:4.34, royalPad:0,    scrapPad:0.71, fretePad:2.18, bkpPad:2.54, mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:15,   ipiCWB:15,   credMAO:12, credIOS:12, credCWB:7,  icmsMAO:12, icmsIOS:12, icmsCWB:7 },
+  {id:"tab7", cat:"informatica", ncm:"8471.30.11", nome:'Tablet 7"',                     cfixoPad:4.76, royalPad:2.49, scrapPad:0.91, fretePad:1.70, bkpPad:2.54, mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:15,   ipiCWB:15,   credMAO:12, credIOS:12, credCWB:7,  icmsMAO:12, icmsIOS:12, icmsCWB:7 },
+  {id:"cpu",  cat:"informatica", ncm:"8471.50.10", nome:"CPU Pequena Capacidade",        cfixoPad:4.34, royalPad:0,    scrapPad:0.71, fretePad:1.65, bkpPad:2.54, mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:9.75, ipiCWB:9.75, credMAO:12, credIOS:12, credCWB:4,  icmsMAO:12, icmsIOS:12, icmsCWB:4 },
+  {id:"aio",  cat:"informatica", ncm:"8471.49.00", nome:"All In One / Servidor",         cfixoPad:4.34, royalPad:0,    scrapPad:0.71, fretePad:1.65, bkpPad:2.54, mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:9.75, ipiCWB:9.75, credMAO:12, credIOS:12, credCWB:4,  icmsMAO:12, icmsIOS:12, icmsCWB:4 },
+  {id:"smt",  cat:"smartphones", ncm:"8517.13.00", nome:"Smartphone",                    cfixoPad:4.76, royalPad:2.01, scrapPad:1.12, fretePad:0.72, bkpPad:1.50, mva:25,  aliqST:19,  fti:2.2, ipiMAO:0,    ipiIOS:15,   ipiCWB:15,   credMAO:12, credIOS:12, credCWB:4,  icmsMAO:12, icmsIOS:12, icmsCWB:4 },
+  {id:"fp",   cat:"smartphones", ncm:"8517.14.31", nome:"Feature Phone (linha P)",       cfixoPad:2.00, royalPad:0,    scrapPad:0.51, fretePad:1.54, bkpPad:1.50, mva:25,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:11.25,ipiCWB:11.25,credMAO:12, credIOS:0,  credCWB:4,  icmsMAO:12, icmsIOS:12, icmsCWB:4 },
+  {id:"vpc",  cat:"smarthome",   ncm:"8517.62.77", nome:"Smart Video Porteiro",          cfixoPad:7.14, royalPad:0,    scrapPad:1.09, fretePad:2.45, bkpPad:2.48, mva:37,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:15,   ipiCWB:15,   credMAO:12, credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:7 },
+  {id:"rtr",  cat:"smarthome",   ncm:"8517.62.41", nome:"Router Mesh",                   cfixoPad:7.14, royalPad:0,    scrapPad:1.09, fretePad:2.45, bkpPad:2.48, mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:15,   ipiCWB:15,   credMAO:12, credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:4 },
+  {id:"gw",   cat:"smarthome",   ncm:"8517.62.94", nome:"Smart Central/Gateway",         cfixoPad:7.14, royalPad:0,    scrapPad:1.09, fretePad:2.45, bkpPad:2.48, mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:9.75, ipiCWB:9.75, credMAO:12, credIOS:0,  credCWB:4,  icmsMAO:12, icmsIOS:12, icmsCWB:4 },
+  {id:"cam",  cat:"smarthome",   ncm:"8525.89.29", nome:"Smart Camera WiFi",             cfixoPad:7.14, royalPad:0,    scrapPad:1.09, fretePad:2.45, bkpPad:2.48, mva:35,  aliqST:19,  fti:2.2, ipiMAO:0,    ipiIOS:15,   ipiCWB:15,   credMAO:12, credIOS:12, credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:7 },
+  {id:"mon",  cat:"informatica", ncm:"8528.52.00", nome:"Monitor PPB",                   cfixoPad:4.34, royalPad:0,    scrapPad:0.71, fretePad:1.65, bkpPad:2.54, mva:25,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:0,    ipiCWB:0,    credMAO:12, credIOS:12, credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:7 },
+  {id:"kbd",  cat:"informatica", ncm:"8471.60.52", nome:"Teclado Importação Direta",     cfixoPad:4.34, royalPad:0,    scrapPad:0.71, fretePad:2.18, bkpPad:2.54, mva:35,  aliqST:19,  fti:0,   ipiMAO:9.75, ipiIOS:9.75, ipiCWB:9.75, credMAO:3,  credIOS:3,  credCWB:0,  icmsMAO:4,  icmsIOS:12, icmsCWB:4 },
+  {id:"tot",  cat:"informatica", ncm:"8471.60.80", nome:"Totem",                         cfixoPad:4.34, royalPad:0,    scrapPad:0.71, fretePad:1.20, bkpPad:2.54, mva:0,   aliqST:0,   fti:0,   ipiMAO:0,    ipiIOS:9.75, ipiCWB:9.75, credMAO:12, credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:7 },
+  {id:"spk",  cat:"smarthome",   ncm:"8518.22.00", nome:"Caixa de Som Bluetooth",        cfixoPad:7.14, royalPad:0,    scrapPad:1.09, fretePad:2.45, bkpPad:2.48, mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:15,   ipiCWB:15,   credMAO:12, credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:4 },
+  {id:"chr",  cat:"mobilidade",  ncm:"8504.40.10", nome:"Carregador Celular",            cfixoPad:4.76, royalPad:0,    scrapPad:0.51, fretePad:1.54, bkpPad:1.50, mva:50,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:5,    ipiCWB:5,    credMAO:12, credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:4 },
+  {id:"lmp",  cat:"smarthome",   ncm:"8539.52.00", nome:"Smart Lâmpada WiFi",            cfixoPad:7.14, royalPad:0,    scrapPad:1.09, fretePad:2.45, bkpPad:1.28, mva:63.67,aliqST:19, fti:0,   ipiMAO:0,    ipiIOS:6.5,  ipiCWB:6.5,  credMAO:12, credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:4 },
+  {id:"rob",  cat:"smarthome",   ncm:"8508.11.00", nome:"Smart Robô Aspirador",          cfixoPad:7.14, royalPad:0,    scrapPad:1.09, fretePad:2.45, bkpPad:2.72, mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:6.5,  ipiCWB:6.5,  credMAO:12, credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:4 },
+  {id:"spg",  cat:"smarthome",   ncm:"8536.50.90", nome:"Smart Plug WiFi",               cfixoPad:7.14, royalPad:0,    scrapPad:1.09, fretePad:2.45, bkpPad:1.76, mva:38,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:3.25, ipiCWB:3.25, credMAO:12, credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:7 },
   // ── SmartHome — iluminação extra ─────────────────────────────────────────
-  {id:"lum1", ncm:"9405.11.90", nome:"Smart Luminária Painel/Embutir",cfixoPad:7.14, royalPad:0,    scrapPad:1.09, fretePad:2.45, bkpPad:1.84, mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:9.75, ipiCWB:9.75, credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
-  {id:"lum2", ncm:"9405.21.00", nome:"Smart Luminária de Mesa",       cfixoPad:7.14, royalPad:0,    scrapPad:1.09, fretePad:2.45, bkpPad:1.84, mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:9.75, ipiCWB:9.75, credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
-  {id:"fled", ncm:"9405.42.00", nome:"Smart Fita LED",                cfixoPad:7.14, royalPad:0,    scrapPad:1.09, fretePad:2.45, bkpPad:1.84, mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:0,    ipiCWB:0,    credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
+  {id:"lum1", cat:"smarthome",   ncm:"9405.11.90", nome:"Smart Luminária Painel/Embutir",cfixoPad:7.14, royalPad:0,    scrapPad:1.09, fretePad:2.45, bkpPad:1.84, mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:9.75, ipiCWB:9.75, credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
+  {id:"lum2", cat:"smarthome",   ncm:"9405.21.00", nome:"Smart Luminária de Mesa",       cfixoPad:7.14, royalPad:0,    scrapPad:1.09, fretePad:2.45, bkpPad:1.84, mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:9.75, ipiCWB:9.75, credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
+  {id:"fled", cat:"smarthome",   ncm:"9405.42.00", nome:"Smart Fita LED",                cfixoPad:7.14, royalPad:0,    scrapPad:1.09, fretePad:2.45, bkpPad:1.84, mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:0,    ipiCWB:0,    credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
   // ── SmartHome — acessórios aspirador / casa ──────────────────────────────
-  {id:"rasp", ncm:"8508.70.00", nome:"Acessório Robô (tanque/filtro)",cfixoPad:7.14, royalPad:0,    scrapPad:1.09, fretePad:2.45, bkpPad:1.84, mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:6.5,  ipiCWB:6.5,  credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
-  {id:"petf", ncm:"8509.80.90", nome:"Alimentador PET / Robô Laser",  cfixoPad:7.14, royalPad:0,    scrapPad:1.09, fretePad:2.45, bkpPad:1.84, mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:6.5,  ipiCWB:6.5,  credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
-  {id:"ctrl", ncm:"8543.70.99", nome:"Sensor / Controle Eletrônico",  cfixoPad:7.14, royalPad:0,    scrapPad:1.09, fretePad:2.45, bkpPad:1.84, mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:6.5,  ipiCWB:6.5,  credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
-  {id:"hepa", ncm:"8421.39.90", nome:"Filtro HEPA",                   cfixoPad:7.14, royalPad:0,    scrapPad:1.09, fretePad:2.45, bkpPad:1.84, mva:0,   aliqST:0,   fti:0,   ipiMAO:0,    ipiIOS:0,    ipiCWB:0,    credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
-  {id:"brs",  ncm:"9603.50.00", nome:"Escova / Acessório Aspirador",  cfixoPad:7.14, royalPad:0,    scrapPad:1.09, fretePad:2.45, bkpPad:1.84, mva:0,   aliqST:0,   fti:0,   ipiMAO:0,    ipiIOS:0,    ipiCWB:0,    credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
-  {id:"mop",  ncm:"6307.10.00", nome:"Mop / Pano (acessório)",        cfixoPad:7.14, royalPad:0,    scrapPad:1.09, fretePad:2.45, bkpPad:1.84, mva:0,   aliqST:0,   fti:0,   ipiMAO:0,    ipiIOS:0,    ipiCWB:0,    credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:4,  icmsIOS:4,  icmsCWB:4 },
-  {id:"bag",  ncm:"6307.90.10", nome:"Saco de Poeira (acessório)",    cfixoPad:7.14, royalPad:0,    scrapPad:1.09, fretePad:2.45, bkpPad:1.84, mva:0,   aliqST:0,   fti:0,   ipiMAO:0,    ipiIOS:0,    ipiCWB:0,    credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:4,  icmsIOS:4,  icmsCWB:4 },
-  {id:"lock", ncm:"8301.40.00", nome:"Fechadura Eletrônica",          cfixoPad:7.14, royalPad:0,    scrapPad:1.09, fretePad:2.45, bkpPad:2.72, mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:0,    ipiCWB:0,    credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
+  {id:"rasp", cat:"smarthome",   ncm:"8508.70.00", nome:"Acessório Robô (tanque/filtro)",cfixoPad:7.14, royalPad:0,    scrapPad:1.09, fretePad:2.45, bkpPad:1.84, mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:6.5,  ipiCWB:6.5,  credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
+  {id:"petf", cat:"smarthome",   ncm:"8509.80.90", nome:"Alimentador PET / Robô Laser",  cfixoPad:7.14, royalPad:0,    scrapPad:1.09, fretePad:2.45, bkpPad:1.84, mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:6.5,  ipiCWB:6.5,  credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
+  {id:"ctrl", cat:"smarthome",   ncm:"8543.70.99", nome:"Sensor / Controle Eletrônico",  cfixoPad:7.14, royalPad:0,    scrapPad:1.09, fretePad:2.45, bkpPad:1.84, mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:6.5,  ipiCWB:6.5,  credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
+  {id:"hepa", cat:"smarthome",   ncm:"8421.39.90", nome:"Filtro HEPA",                   cfixoPad:7.14, royalPad:0,    scrapPad:1.09, fretePad:2.45, bkpPad:1.84, mva:0,   aliqST:0,   fti:0,   ipiMAO:0,    ipiIOS:0,    ipiCWB:0,    credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
+  {id:"brs",  cat:"smarthome",   ncm:"9603.50.00", nome:"Escova / Acessório Aspirador",  cfixoPad:7.14, royalPad:0,    scrapPad:1.09, fretePad:2.45, bkpPad:1.84, mva:0,   aliqST:0,   fti:0,   ipiMAO:0,    ipiIOS:0,    ipiCWB:0,    credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
+  {id:"mop",  cat:"smarthome",   ncm:"6307.10.00", nome:"Mop / Pano (acessório)",        cfixoPad:7.14, royalPad:0,    scrapPad:1.09, fretePad:2.45, bkpPad:1.84, mva:0,   aliqST:0,   fti:0,   ipiMAO:0,    ipiIOS:0,    ipiCWB:0,    credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:4,  icmsIOS:4,  icmsCWB:4 },
+  {id:"bag",  cat:"smarthome",   ncm:"6307.90.10", nome:"Saco de Poeira (acessório)",    cfixoPad:7.14, royalPad:0,    scrapPad:1.09, fretePad:2.45, bkpPad:1.84, mva:0,   aliqST:0,   fti:0,   ipiMAO:0,    ipiIOS:0,    ipiCWB:0,    credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:4,  icmsIOS:4,  icmsCWB:4 },
+  {id:"lock", cat:"smarthome",   ncm:"8301.40.00", nome:"Fechadura Eletrônica",          cfixoPad:7.14, royalPad:0,    scrapPad:1.09, fretePad:2.45, bkpPad:2.72, mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:0,    ipiCWB:0,    credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
   // ── Mobilidade ───────────────────────────────────────────────────────────
-  {id:"wtch", ncm:"9102.12.20", nome:"Smartwatch",                    cfixoPad:2.00, royalPad:0,    scrapPad:0.51, fretePad:1.54, bkpPad:1.50, mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:15,   ipiCWB:15,   credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
+  {id:"wtch", cat:"mobilidade",  ncm:"9102.12.20", nome:"Smartwatch",                    cfixoPad:2.00, royalPad:0,    scrapPad:0.51, fretePad:1.54, bkpPad:1.50, mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:15,   ipiCWB:15,   credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
   // ── PosiSeg — CFTV ───────────────────────────────────────────────────────
-  {id:"nvr",  ncm:"8521.90.00", nome:"DVR / XVR / NVR Gravador",     cfixoPad:30.32,royalPad:0,    scrapPad:2.00, fretePad:1.09, bkpPad:1.20, mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:15,   ipiCWB:15,   credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
-  {id:"caip", ncm:"8525.89.13", nome:"Câmera IP / Analógica Básica",  cfixoPad:30.32,royalPad:0,    scrapPad:2.00, fretePad:1.09, bkpPad:1.20, mva:0,   aliqST:0,   fti:0,   ipiMAO:0,    ipiIOS:13,   ipiCWB:13,   credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
+  {id:"nvr",  cat:"posiseg",     ncm:"8521.90.00", nome:"DVR / XVR / NVR Gravador",     cfixoPad:30.32,royalPad:0,    scrapPad:2.00, fretePad:1.09, bkpPad:1.20, mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:15,   ipiCWB:15,   credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
+  {id:"caip", cat:"posiseg",     ncm:"8525.89.13", nome:"Câmera IP / Analógica Básica",  cfixoPad:30.32,royalPad:0,    scrapPad:2.00, fretePad:1.09, bkpPad:1.20, mva:0,   aliqST:0,   fti:0,   ipiMAO:0,    ipiIOS:13,   ipiCWB:13,   credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
   // ── PosiSeg — Redes ──────────────────────────────────────────────────────
-  {id:"swt",  ncm:"8517.62.34", nome:"Switch PoE Ethernet",           cfixoPad:30.32,royalPad:0,    scrapPad:2.00, fretePad:1.09, bkpPad:1.20, mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:9.75, ipiCWB:9.75, credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
-  {id:"hdmx", ncm:"8517.62.59", nome:"Extensor HDMI",                 cfixoPad:30.32,royalPad:0,    scrapPad:2.00, fretePad:1.09, bkpPad:1.20, mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:15,   ipiCWB:15,   credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
+  {id:"swt",  cat:"posiseg",     ncm:"8517.62.34", nome:"Switch PoE Ethernet",           cfixoPad:30.32,royalPad:0,    scrapPad:2.00, fretePad:1.09, bkpPad:1.20, mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:9.75, ipiCWB:9.75, credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
+  {id:"hdmx", cat:"posiseg",     ncm:"8517.62.59", nome:"Extensor HDMI",                 cfixoPad:30.32,royalPad:0,    scrapPad:2.00, fretePad:1.09, bkpPad:1.20, mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:15,   ipiCWB:15,   credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
   // ── PosiSeg — Controle de Acesso ─────────────────────────────────────────
-  {id:"rfid", ncm:"8471.90.19", nome:"Leitor RFID / Facial",          cfixoPad:30.32,royalPad:0,    scrapPad:2.00, fretePad:1.09, bkpPad:1.20, mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:9.75, ipiCWB:9.75, credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
-  {id:"prox", ncm:"8523.52.10", nome:"Cartão Proximity / RFID",       cfixoPad:30.32,royalPad:0,    scrapPad:2.00, fretePad:1.09, bkpPad:1.20, mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:6.5,  ipiCWB:6.5,  credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
+  {id:"rfid", cat:"posiseg",     ncm:"8471.90.19", nome:"Leitor RFID / Facial",          cfixoPad:30.32,royalPad:0,    scrapPad:2.00, fretePad:1.09, bkpPad:1.20, mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:9.75, ipiCWB:9.75, credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
+  {id:"prox", cat:"posiseg",     ncm:"8523.52.10", nome:"Cartão Proximity / RFID",       cfixoPad:30.32,royalPad:0,    scrapPad:2.00, fretePad:1.09, bkpPad:1.20, mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:6.5,  ipiCWB:6.5,  credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
   // ── PosiSeg — Intrusão ───────────────────────────────────────────────────
-  {id:"alrm", ncm:"8531.10.90", nome:"Central de Alarme",             cfixoPad:30.32,royalPad:0,    scrapPad:2.00, fretePad:1.09, bkpPad:1.20, mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:9.75, ipiCWB:9.75, credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
+  {id:"alrm", cat:"posiseg",     ncm:"8531.10.90", nome:"Central de Alarme",             cfixoPad:30.32,royalPad:0,    scrapPad:2.00, fretePad:1.09, bkpPad:1.20, mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:9.75, ipiCWB:9.75, credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
   // ── PosiSeg — Balun / Conectividade ─────────────────────────────────────
-  {id:"bln",  ncm:"8504.40.21", nome:"Balun / Power Balun",           cfixoPad:30.32,royalPad:0,    scrapPad:2.00, fretePad:1.09, bkpPad:1.20, mva:48,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:3.75, ipiCWB:3.75, credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
+  {id:"bln",  cat:"posiseg",     ncm:"8504.40.21", nome:"Balun / Power Balun",           cfixoPad:30.32,royalPad:0,    scrapPad:2.00, fretePad:1.09, bkpPad:1.20, mva:48,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:3.75, ipiCWB:3.75, credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
   // ── PosiSeg — Armazenamento ──────────────────────────────────────────────
-  {id:"hddx", ncm:"8471.70.10", nome:"HDD (Disco Rígido)",            cfixoPad:30.32,royalPad:0,    scrapPad:2.00, fretePad:1.09, bkpPad:1.20, mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:10,   ipiCWB:10,   credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
+  {id:"hddx", cat:"posiseg",     ncm:"8471.70.10", nome:"HDD (Disco Rígido)",            cfixoPad:30.32,royalPad:0,    scrapPad:2.00, fretePad:1.09, bkpPad:1.20, mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:10,   ipiCWB:10,   credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
 ];
 
 // Converte produto do catálogo (snake_case) → shape da calculadora (camelCase)
@@ -1199,25 +1317,45 @@ const MODALIDADES = [
     desc:"Produto 100% importado pronto para comercialização. PPB não se aplica." },
 ];
 
+// ── CATEGORIAS DE PRODUTO ─────────────────────────────────────────────────────
+const CATS = [
+  { id:"informatica", label:"Informática",              icon:"💻" },
+  { id:"smartphones",  label:"Smartphones",              icon:"📱" },
+  { id:"mobilidade",   label:"Mobilidade",               icon:"⌚" },
+  { id:"smarthome",    label:"Smart Home",               icon:"🏠" },
+  { id:"posiseg",      label:"PosiSeg (Segurança)",      icon:"🔒" },
+  { id:"pos",          label:"Terminais de Pagamento",   icon:"💳" },
+];
+
 // ── CANAIS — presets comerciais (fontes: planilhas abr/2026) ──────────────────
-// Campos: comis%, mkt%, rebate%, pdd%, vpc%, frete% (todos % s/ pF)
-// cfVenda não incluído — usar calculadora CF
+// Taxas padrão em `default`. Overrides por categoria ficam em localStorage.
+// getCanalRates(canalId, cat) → resolve: override salvo → default do canal
+const CANAIS_TAXAS_KEY = "canais_taxas_v1";
+const loadCanaisTaxas = () => { try{ return JSON.parse(localStorage.getItem(CANAIS_TAXAS_KEY))||{}; }catch{ return {}; } };
+const saveCanaisTaxas = v => localStorage.setItem(CANAIS_TAXAS_KEY, JSON.stringify(v));
+const getCanalRates = (canalId, cat) => {
+  const canal = CANAIS.find(c=>c.id===canalId);
+  if(!canal||!canal.default) return null;
+  const saved = loadCanaisTaxas();
+  return { ...canal.default, ...(saved[canalId]?.[cat]||{}) };
+};
+
 const CANAIS = [
-  { id:"",       label:"— Canal (opcional) —",         comis:null },
-  { id:"t1t2",   label:"T1/T2 Varejo",                 comis:0,    mkt:1.50, rebate:3.00, pdd:2.5, vpc:0    },
-  { id:"t3",     label:"T3 / Distribuidor",             comis:0.98, mkt:1.50, rebate:1.65, pdd:2.5, vpc:0    },
-  { id:"corp",   label:"Canais / Corporativo",          comis:2.98, mkt:1.40, rebate:0,    pdd:2.5, vpc:0    },
-  { id:"amzn",   label:"Amazon",                        comis:3.25, mkt:3.74, rebate:1.00, pdd:2.5, vpc:5.84 },
-  { id:"meli",   label:"MercadoLivre (Ebazar)",         comis:2.17, mkt:4.00, rebate:1.00, pdd:2.5, vpc:3.70 },
-  { id:"magalu", label:"Magazine Luiza",                comis:0,    mkt:1.50, rebate:1.00, pdd:2.5, vpc:0    },
-  { id:"csbahia",label:"Grupo Casas Bahia",             comis:0,    mkt:1.50, rebate:1.00, pdd:2.5, vpc:0.30 },
-  { id:"ameri",  label:"Americanas",                    comis:0,    mkt:1.50, rebate:1.00, pdd:2.5, vpc:2.00 },
-  { id:"carref", label:"Carrefour",                     comis:0,    mkt:1.50, rebate:1.00, pdd:2.5, vpc:7.81 },
-  { id:"cencosud",label:"Cencosud",                     comis:0,    mkt:1.50, rebate:1.00, pdd:2.5, vpc:4.20 },
-  { id:"leroy",  label:"Leroy Merlin",                  comis:3.25, mkt:2.00, rebate:1.00, pdd:2.5, vpc:3.20 },
-  { id:"telef",  label:"Telefônica / TIM",              comis:2.44, mkt:2.00, rebate:1.00, pdd:2.5, vpc:5.40 },
-  { id:"vd",     label:"Venda Direta (site próprio)",   comis:0,    mkt:1.50, rebate:0,    pdd:2.5, vpc:0    },
-  { id:"pseg",   label:"PosiSeg B2B (direto)",          comis:0,    mkt:4.00, rebate:0,    pdd:2.5, vpc:0    },
+  { id:"",        label:"— Canal (opcional) —", comis:null },
+  { id:"t1t2",    label:"T1/T2 Varejo",               default:{ comis:0,    mkt:1.50, rebate:3.00, pdd:2.5, vpc:0    } },
+  { id:"t3",      label:"T3 / Distribuidor",           default:{ comis:0.98, mkt:1.50, rebate:1.65, pdd:2.5, vpc:0    } },
+  { id:"corp",    label:"Canais / Corporativo",        default:{ comis:2.98, mkt:1.40, rebate:0,    pdd:2.5, vpc:0    } },
+  { id:"amzn",    label:"Amazon",                      default:{ comis:3.25, mkt:3.74, rebate:1.00, pdd:2.5, vpc:5.84 } },
+  { id:"meli",    label:"MercadoLivre (Ebazar)",       default:{ comis:2.17, mkt:4.00, rebate:1.00, pdd:2.5, vpc:3.70 } },
+  { id:"magalu",  label:"Magazine Luiza",              default:{ comis:0,    mkt:1.50, rebate:1.00, pdd:2.5, vpc:0    } },
+  { id:"csbahia", label:"Grupo Casas Bahia",           default:{ comis:0,    mkt:1.50, rebate:1.00, pdd:2.5, vpc:0.30 } },
+  { id:"ameri",   label:"Americanas",                  default:{ comis:0,    mkt:1.50, rebate:1.00, pdd:2.5, vpc:2.00 } },
+  { id:"carref",  label:"Carrefour",                   default:{ comis:0,    mkt:1.50, rebate:1.00, pdd:2.5, vpc:7.81 } },
+  { id:"cencosud",label:"Cencosud",                    default:{ comis:0,    mkt:1.50, rebate:1.00, pdd:2.5, vpc:4.20 } },
+  { id:"leroy",   label:"Leroy Merlin",                default:{ comis:3.25, mkt:2.00, rebate:1.00, pdd:2.5, vpc:3.20 } },
+  { id:"telef",   label:"Telefônica / TIM",            default:{ comis:2.44, mkt:2.00, rebate:1.00, pdd:2.5, vpc:5.40 } },
+  { id:"vd",      label:"Venda Direta (site próprio)", default:{ comis:0,    mkt:1.50, rebate:0,    pdd:2.5, vpc:0    } },
+  { id:"pseg",    label:"PosiSeg B2B (direto)",        default:{ comis:0,    mkt:4.00, rebate:0,    pdd:2.5, vpc:0    } },
 ];
 
 // Resolve atributos do produto baseado em origem + modalidade
@@ -1240,6 +1378,7 @@ const getProdAtributos = (prod, origem, modalidade) => {
     mva:  prod.mva,
     aliqST: prod.aliqST,
     fti:  o.zmf && !isCBU ? prod.fti : 0,
+    cat:      prod.cat      || "",
     cfixoPad: prod.cfixoPad ?? 0,
     royalPad: prod.royalPad ?? 0,
     scrapPad: prod.scrapPad ?? 0,
@@ -3610,15 +3749,16 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
                     value={d.canalId||""}
                     onChange={e=>{
                       const canal=CANAIS.find(c=>c.id===e.target.value);
-                      if(!canal||canal.comis===null){setD(p=>({...p,canalId:e.target.value}));return;}
-                      setD(p=>({...p,canalId:canal.id,comis:canal.comis,mkt:canal.mkt,rebate:canal.rebate,pdd:canal.pdd,vpc:canal.vpc}));
+                      if(!canal||!canal.default){setD(p=>({...p,canalId:e.target.value}));return;}
+                      const rates=getCanalRates(e.target.value, prodAtrib.cat||"");
+                      setD(p=>({...p,canalId:canal.id,comis:rates.comis,mkt:rates.mkt,rebate:rates.rebate,pdd:rates.pdd,vpc:rates.vpc}));
                     }}
                     style={{background:"#1a1a1a",border:"1px solid rgba(255,255,255,.12)",borderRadius:4,
                       color:"#e2e8f0",fontSize:11,padding:"5px 8px",cursor:"pointer",outline:"none"}}>
                     {CANAIS.map(c=><option key={c.id} value={c.id}>{c.label}</option>)}
                   </select>
                   {d.canalId&&<span style={{fontSize:9,color:"#5a6a84",fontFamily:"'Montserrat',sans-serif"}}>
-                    Campos preenchidos — edite abaixo para ajustar
+                    {(()=>{const cat=CATS.find(c=>c.id===prodAtrib.cat);return cat?`Taxas: ${cat.label} — edite abaixo para ajustar`:"Campos preenchidos — edite abaixo para ajustar";})()}
                   </span>}
                 </div>
                 <Field label="CF Venda" sfx="%" value={d.cfVenda}
