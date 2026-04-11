@@ -1326,7 +1326,7 @@ const DEF={
   ppbVals:{injecao:0,bateria:0,carregador:0,memoria:0,cabo:0,placa:0},
   producao:0,garantia:0,bkpPct:0,outrosBRL:0,embalagem:0,ftiAtivo:false,
   pd:0,cfixo:0,scrap:0,royal:0,cfVenda:0,frete:0,
-  comis:0,comisX:0,mkt:0,rebate:0,pdd:0,vbExtra:0,vpc:0,margem:0,
+  comis:0,comisX:0,mkt:0,rebate:0,pdd:2.5,vbExtra:0,vpc:0,margem:0,
   canalId:"",
   cartaoAtivo:false,
   margGer:0,margGerAtivo:false,
@@ -2619,7 +2619,9 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
       rebate:dbRec.rebate||0,
     }:{};
     const vplModo=dbRec&&(dbRec.vpl_padrao||0)>0?"cadastrado":d.vplModo;
-    setD(pv=>({...pv,prodId:id,stAtivo:p.mva>0,mva:p.mva,icmsDestST:p.aliqST,...defaults,vplModo}));
+    // PDD: preenche 2,5% se zerado ao trocar de produto (padrão universal das planilhas)
+    const pddAuto = !d.pdd ? 2.5 : d.pdd;
+    setD(pv=>({...pv,prodId:id,stAtivo:p.mva>0,mva:p.mva,icmsDestST:p.aliqST,...defaults,vplModo,pdd:pddAuto}));
     if(d.modalidade==="CBU") aplicarIICBU(p.ncm);
   };
   // ── Tabela TEC local — II por NCM (valores verificados na Receita Federal) ───
@@ -3619,10 +3621,12 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
                   <span style={{fontSize:11,fontWeight:600,color:d.cartaoAtivo?"#fbbf24":"#5a6a84",flex:1}}>Taxa Cartão (+2%)</span>
                   {d.cartaoAtivo&&<span style={{fontFamily:"'Montserrat',sans-serif",fontSize:10,color:"#fbbf24"}}>{pct(c.cfVendaEf)}</span>}
                 </div>
-                {[["Comissão","comis"],["Marketing","mkt"],["Rebate","rebate"],["PDD","pdd"],["Verba Extra","vbExtra"],["VPC","vpc"]
+                {[["Comissão","comis"],["Marketing","mkt"],["Rebate","rebate"],["Verba Extra","vbExtra"],["VPC","vpc"]
                 ].map(([l,k])=>(
                   <Field key={k} label={l} value={d[k]||0} onChange={S(k)} sfx="%" hint={`≈ ${brl(c.pF*((d[k]||0)/100))}`}/>
                 ))}
+                <Field label="PDD" value={d.pdd||0} onChange={S("pdd")} sfx="%"
+                  hint={(d.pdd||0)===0?`Padrão: 2,5% — ≈ ${brl(c.pF*0.025)}`:`≈ ${brl(c.pF*((d.pdd||0)/100))}`}/>
                 <div style={{display:"flex",alignItems:"flex-start",gap:8,justifyContent:"space-between"}}>
                   <div style={{flex:1}}>
                     <span style={{fontSize:12,fontWeight:600,color:"#f0f0f0"}}>Encargos s/ comissões</span>
