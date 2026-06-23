@@ -1109,7 +1109,9 @@ const VC_FIELDS = [
   { id:"pdd",         label:"PDD" },
   { id:"vpc",         label:"VPC" },
   { id:"custoFin",    label:"CF Canal ZV09" },
-  { id:"custoFixoCan",label:"CFixo Canal ZV11" },
+  { id:"custoFixoCan",label:"CFixo ZV11" },
+  { id:"pedCan",      label:"P&D ZV25" },
+  { id:"scrapCan",    label:"Scrap ZV29" },
 ];
 
 function ViewCanais() {
@@ -1348,20 +1350,20 @@ const getCanalRates = (canalId, cat) => {
 
 const CANAIS = [
   { id:"",        label:"— Canal (opcional) —", comis:null },
-  { id:"t1t2",    label:"T1/T2 Varejo",               default:{ comis:0,    mkt:1.50, rebate:3.00, pdd:2.5, vpc:0,    custoFin:0, custoFixoCan:0 } },
-  { id:"t3",      label:"T3 / Distribuidor",           default:{ comis:0.98, mkt:1.50, rebate:1.65, pdd:2.5, vpc:0,    custoFin:0, custoFixoCan:0 } },
-  { id:"corp",    label:"Canais / Corporativo",        default:{ comis:2.98, mkt:1.40, rebate:0,    pdd:2.5, vpc:0,    custoFin:0, custoFixoCan:0 } },
-  { id:"amzn",    label:"Amazon",                      default:{ comis:3.25, mkt:3.74, rebate:1.00, pdd:2.5, vpc:5.84, custoFin:0, custoFixoCan:0 } },
-  { id:"meli",    label:"MercadoLivre (Ebazar)",       default:{ comis:2.17, mkt:4.00, rebate:1.00, pdd:2.5, vpc:3.70, custoFin:0, custoFixoCan:0 } },
-  { id:"magalu",  label:"Magazine Luiza",              default:{ comis:0,    mkt:1.50, rebate:1.00, pdd:2.5, vpc:0,    custoFin:0, custoFixoCan:0 } },
-  { id:"csbahia", label:"Grupo Casas Bahia",           default:{ comis:0,    mkt:1.50, rebate:1.00, pdd:2.5, vpc:0.30, custoFin:0, custoFixoCan:0 } },
-  { id:"ameri",   label:"Americanas",                  default:{ comis:0,    mkt:1.50, rebate:1.00, pdd:2.5, vpc:2.00, custoFin:0, custoFixoCan:0 } },
-  { id:"carref",  label:"Carrefour",                   default:{ comis:0,    mkt:1.50, rebate:1.00, pdd:2.5, vpc:7.81, custoFin:0, custoFixoCan:0 } },
-  { id:"cencosud",label:"Cencosud",                    default:{ comis:0,    mkt:1.50, rebate:1.00, pdd:2.5, vpc:4.20, custoFin:0, custoFixoCan:0 } },
-  { id:"leroy",   label:"Leroy Merlin",                default:{ comis:3.25, mkt:2.00, rebate:1.00, pdd:2.5, vpc:3.20, custoFin:0, custoFixoCan:0 } },
-  { id:"telef",   label:"Telefônica / TIM",            default:{ comis:2.44, mkt:2.00, rebate:1.00, pdd:2.5, vpc:5.40, custoFin:0, custoFixoCan:0 } },
-  { id:"vd",      label:"Venda Direta (site próprio)", default:{ comis:0,    mkt:1.50, rebate:0,    pdd:2.5, vpc:0,    custoFin:0, custoFixoCan:0 } },
-  { id:"pseg",    label:"PosiSeg B2B (direto)",        default:{ comis:0,    mkt:4.00, rebate:0,    pdd:2.5, vpc:0,    custoFin:0, custoFixoCan:0 } },
+  { id:"t1t2",    label:"T1/T2 Varejo",               default:{ comis:0,    mkt:1.50, rebate:3.00, pdd:2.5, vpc:0,    custoFin:0, custoFixoCan:0, pedCan:0, scrapCan:0 } },
+  { id:"t3",      label:"T3 / Distribuidor",           default:{ comis:0.98, mkt:1.50, rebate:1.65, pdd:2.5, vpc:0,    custoFin:0, custoFixoCan:0, pedCan:0, scrapCan:0 } },
+  { id:"corp",    label:"Canais / Corporativo",        default:{ comis:2.98, mkt:1.40, rebate:0,    pdd:2.5, vpc:0,    custoFin:0, custoFixoCan:0, pedCan:0, scrapCan:0 } },
+  { id:"amzn",    label:"Amazon",                      default:{ comis:3.25, mkt:3.74, rebate:1.00, pdd:2.5, vpc:5.84, custoFin:0, custoFixoCan:0, pedCan:0, scrapCan:0 } },
+  { id:"meli",    label:"MercadoLivre (Ebazar)",       default:{ comis:2.17, mkt:4.00, rebate:1.00, pdd:2.5, vpc:3.70, custoFin:0, custoFixoCan:0, pedCan:0, scrapCan:0 } },
+  { id:"magalu",  label:"Magazine Luiza",              default:{ comis:0,    mkt:1.50, rebate:1.00, pdd:2.5, vpc:0,    custoFin:0, custoFixoCan:0, pedCan:0, scrapCan:0 } },
+  { id:"csbahia", label:"Grupo Casas Bahia",           default:{ comis:0,    mkt:1.50, rebate:1.00, pdd:2.5, vpc:0.30, custoFin:0, custoFixoCan:0, pedCan:0, scrapCan:0 } },
+  { id:"ameri",   label:"Americanas",                  default:{ comis:0,    mkt:1.50, rebate:1.00, pdd:2.5, vpc:2.00, custoFin:0, custoFixoCan:0, pedCan:0, scrapCan:0 } },
+  { id:"carref",  label:"Carrefour",                   default:{ comis:0,    mkt:1.50, rebate:1.00, pdd:2.5, vpc:7.81, custoFin:0, custoFixoCan:0, pedCan:0, scrapCan:0 } },
+  { id:"cencosud",label:"Cencosud",                    default:{ comis:0,    mkt:1.50, rebate:1.00, pdd:2.5, vpc:4.20, custoFin:0, custoFixoCan:0, pedCan:0, scrapCan:0 } },
+  { id:"leroy",   label:"Leroy Merlin",                default:{ comis:3.25, mkt:2.00, rebate:1.00, pdd:2.5, vpc:3.20, custoFin:0, custoFixoCan:0, pedCan:0, scrapCan:0 } },
+  { id:"telef",   label:"Telefônica / TIM",            default:{ comis:2.44, mkt:2.00, rebate:1.00, pdd:2.5, vpc:5.40, custoFin:0, custoFixoCan:0, pedCan:0, scrapCan:0 } },
+  { id:"vd",      label:"Venda Direta (site próprio)", default:{ comis:0,    mkt:1.50, rebate:0,    pdd:2.5, vpc:0,    custoFin:0, custoFixoCan:0, pedCan:0, scrapCan:0 } },
+  { id:"pseg",    label:"PosiSeg B2B (direto)",        default:{ comis:0,    mkt:4.00, rebate:0,    pdd:2.5, vpc:0,    custoFin:0, custoFixoCan:0, pedCan:0, scrapCan:0 } },
 ];
 
 // Resolve atributos do produto baseado em origem + modalidade
@@ -1472,7 +1474,7 @@ const DEF={
   producao:0,garantia:0,bkpPct:0,outrosBRL:0,embalagem:0,ftiAtivo:false,
   pd:0,cfixo:0,scrap:0,royal:0,cfVenda:0,frete:0,
   comis:0,comisX:0,mkt:0,rebate:0,pdd:2.5,vbExtra:0,vpc:0,margem:0,
-  custoFin:0,custoFixoCan:0,
+  custoFin:0,custoFixoCan:0,pedCan:0,scrapCan:0,
   canalId:"",
   cartaoAtivo:false,
   margGer:0,margGerAtivo:false,
@@ -2282,8 +2284,8 @@ function BreakdownPanel({c,d,prod,ppbTot,calcs}){
 
       {/* ÍNDICES GERAIS */}
       <Grp id="iger" label="Índices Gerais" total={totalIndGer} color="#6b7280" totLabel="Total Índices Gerais">
-        <Row l={`P&D (${pct(d.pd)})`} v={c.pdV} showPct/>
-        <Row l={`Scrap (${pct(d.scrap)})`} v={c.scV} showPct/>
+        <Row l={`P&D${(d.pedCan||0)>0?" (canal ZV25)":" (produto)"} (${pct(c.pdEf)})`} v={c.pdV} showPct/>
+        <Row l={`Scrap${(d.scrapCan||0)>0?" (canal ZV29)":" (produto)"} (${pct(c.scrapEf)})`} v={c.scV} showPct/>
         <Row l={`Royalties (${pct(d.royal)})`} v={c.ryV} showPct/>
         <Row l={`Frete venda (${pct(d.frete)})`} v={c.frV} showPct/>
         {c.footprintPct!==0&&<Row l={`Footprint ${d.origem} (${pct(c.footprintPct)})`} v={c.footprintV} acc={c.footprintPct<0?"green":"red"} showPct/>}
@@ -2961,9 +2963,11 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
     // MAO=-0,71% (benefício ZFM) | IOS=+1,00% (custo extra Ilhéus) | CWB=0%
     const oRef = ORIGENS.find(x=>x.id===d.origem)||ORIGENS[0];
     const footprintPct = !isCBU ? (oRef.footprint||0) : 0;
-    // Canal com ZV11 substitui cfixo do produto — nunca somam os dois
+    // Canal substitui produto — exclusão mútua para cfixo, pd e scrap
     const cfixoEf = (d.custoFixoCan||0) > 0 ? (d.custoFixoCan||0) : (d.cfixo||0);
-    const indPct=d.pd+cfixoEf+d.scrap+d.royal+cfVendaEf+d.frete+d.comis+comisXPct+d.mkt+d.rebate+(d.pdd||0)+(d.vbExtra||0)+(d.vpc||0)+footprintPct+(d.custoFin||0);
+    const pdEf    = (d.pedCan||0)       > 0 ? (d.pedCan||0)       : (d.pd||0);
+    const scrapEf = (d.scrapCan||0)     > 0 ? (d.scrapCan||0)     : (d.scrap||0);
+    const indPct=pdEf+cfixoEf+scrapEf+d.royal+cfVendaEf+d.frete+d.comis+comisXPct+d.mkt+d.rebate+(d.pdd||0)+(d.vbExtra||0)+(d.vpc||0)+footprintPct+(d.custoFin||0);
     // MG é um índice independente — entra no soma como os outros índices
     // Valor negativo = crédito = eleva o preço (denominador menor)
     const margGerPct=(d.margGer||0);
@@ -2987,8 +2991,8 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
     const ftiV=pF*(ftiPct/100),fcpV=pF*(fcpPct/100);
     const margGerV=pF*(margGerPct/100);
     const margV=pF*(d.margem/100);
-    const pdV=pF*(d.pd/100),cfxV=pF*(cfixoEf/100);
-    const scV=pF*(d.scrap/100),ryV=pF*(d.royal/100);
+    const pdV=pF*(pdEf/100),cfxV=pF*(cfixoEf/100);
+    const scV=pF*(scrapEf/100),ryV=pF*(d.royal/100);
     const cfnV=pF*(cfVendaEf/100),frV=pF*(d.frete/100),cmV=pF*((d.comis+comisXPct)/100);
     const mktV=pF*(d.mkt/100),rebateV=pF*(d.rebate/100);
     const pUSD=(d.ptaxPreco||d.ptax)>0?pF/(d.ptaxPreco||d.ptax):0;
@@ -3028,8 +3032,8 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
       : (d.margem+margGerPct);
     const margVf=pFbase*(margPctEf/100);
     const footprintVf=pFbase*(footprintPct/100);
-    const pdVf=pFbase*(d.pd/100),cfxVf=pFbase*(cfixoEf/100);
-    const scVf=pFbase*(d.scrap/100),ryVf=pFbase*(d.royal/100);
+    const pdVf=pFbase*(pdEf/100),cfxVf=pFbase*(cfixoEf/100);
+    const scVf=pFbase*(scrapEf/100),ryVf=pFbase*(d.royal/100);
     const cfnVf=pFbase*(cfVendaEf/100),frVf=pFbase*(d.frete/100),cmVf=pFbase*((d.comis+comisXPct)/100);
     const mktVf=pFbase*(d.mkt/100),rebateVf=pFbase*(d.rebate/100);
     const pddVf=pFbase*((d.pdd||0)/100),vbExtraVf=pFbase*((d.vbExtra||0)/100),vpcVf=pFbase*((d.vpc||0)/100);
@@ -3046,7 +3050,7 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
       craCalcMAO,creditoCalcIOS,cfrExpandidoUSD,basePlacaUSD,
       pcPct,pcEf,pcLabel,pcV:pcVf,pcSubvPct,pcSubvV:pcSubvVf,pcBaseRedPct,aliqInter,aliqDest,icmsEfPct,icmsV,icmsEfV:icmsEfVf,
       difal,difalV:difalVf,ftiPct,ftiV:ftiVf,fcpPct,fcpV:fcpVf,ipi,ipiEfPct,ipiV:ipiVf,ipiCreditoV:ipiCreditoVf,ipiCreditoIOSPct,pSI:pSIfinal,pCI,
-      margV:margVf,indPct,cfixoEf,footprintPct,footprintV:footprintVf,pdPad:oRef.pdPad||0,
+      margV:margVf,indPct,cfixoEf,pdEf,scrapEf,footprintPct,footprintV:footprintVf,pdPad:oRef.pdPad||0,
       cfixoPad:prodAtrib.cfixoPad||0,royalPad:prodAtrib.royalPad||0,
       scrapPad:prodAtrib.scrapPad||0,fretePad:prodAtrib.fretePad||0,bkpPad:prodAtrib.bkpPad||0,pdV:pdVf,cfxV:cfxVf,scV:scVf,ryV:ryVf,cfnV:cfnVf,cfVendaEf,cartaoPct,frV:frVf,cmV:cmVf,mktV:mktVf,rebateV:rebateVf,pddV:pddVf,vbExtraV:vbExtraVf,vpcV:vpcVf,custoFinV:custoFinVf,custoFixoCanV:custoFixoCanVf,stV,stBase,
       pF:pFfinal,pUSD:pUSDf,
@@ -3767,7 +3771,7 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
                       const canal=CANAIS.find(c=>c.id===e.target.value);
                       if(!canal||!canal.default){setD(p=>({...p,canalId:e.target.value}));return;}
                       const rates=getCanalRates(e.target.value, prodAtrib.cat||"");
-                      setD(p=>({...p,canalId:canal.id,comis:rates.comis,mkt:rates.mkt,rebate:rates.rebate,pdd:rates.pdd,vpc:rates.vpc,custoFin:rates.custoFin||0,custoFixoCan:rates.custoFixoCan||0}));
+                      setD(p=>({...p,canalId:canal.id,comis:rates.comis,mkt:rates.mkt,rebate:rates.rebate,pdd:rates.pdd,vpc:rates.vpc,custoFin:rates.custoFin||0,custoFixoCan:rates.custoFixoCan||0,pedCan:rates.pedCan||0,scrapCan:rates.scrapCan||0}));
                     }}
                     style={{background:"#1a1a1a",border:"1px solid rgba(255,255,255,.12)",borderRadius:4,
                       color:"#e2e8f0",fontSize:11,padding:"5px 8px",cursor:"pointer",outline:"none"}}>
@@ -3804,7 +3808,11 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
                 <Field label="Custo Fin. Canal (ZV09)" value={d.custoFin||0} onChange={S("custoFin")} sfx="%"
                   hint={`≈ ${brl(c.pF*((d.custoFin||0)/100))}`}/>
                 <Field label="CF Canal (ZV11)" value={d.custoFixoCan||0} onChange={S("custoFixoCan")} sfx="%"
-                  hint={`≈ ${brl(c.pF*((d.custoFixoCan||0)/100))} — entra no preço, fora da MC`}/>
+                  hint={`≈ ${brl(c.pF*((d.custoFixoCan||0)/100))} — substitui CF produto; fora da MC`}/>
+                <Field label="P&D Canal (ZV25)" value={d.pedCan||0} onChange={S("pedCan")} sfx="%"
+                  hint={`≈ ${brl(c.pF*((d.pedCan||0)/100))} — substitui P&D produto`}/>
+                <Field label="Scrap Canal (ZV29)" value={d.scrapCan||0} onChange={S("scrapCan")} sfx="%"
+                  hint={`≈ ${brl(c.pF*((d.scrapCan||0)/100))} — substitui Scrap produto`}/>
                 <div style={{display:"flex",alignItems:"flex-start",gap:8,justifyContent:"space-between"}}>
                   <div style={{flex:1}}>
                     <span style={{fontSize:12,fontWeight:600,color:"#f0f0f0"}}>Encargos s/ comissões</span>
