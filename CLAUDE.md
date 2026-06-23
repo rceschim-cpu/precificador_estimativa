@@ -134,11 +134,43 @@ Produtos com FTI: Terminal de Pagamento, Smartphone, Câmera (2,2%)
 ```
 margGerPct SEMPRE entra no soma (sempre impacta preço e ML)
 
-MC toggle OFF: MC = (margV + cfxV) / pF            ← MG não compõe MC
-MC toggle ON:  MC = (margV + cfxV + margGerV) / pF ← MG entra na MC
+REGRA CONFIRMADA (2026-06-23): custo fixo NUNCA entra em MC, independente da origem
 
-mcSugerida = margemSugerida + cfixo + (margGerAtivo ? margGer : 0)
-mcAlvo     = margemAlvo     + cfixo + (margGerAtivo ? margGer : 0)
+MC toggle OFF: MC = margV / pF                      ← cfixo e MG fora da MC
+MC toggle ON:  MC = (margV + margGerV) / pF         ← só MG entra; cfixo nunca entra
+
+mcSugerida = margemSugerida + (margGerAtivo ? margGer : 0)
+mcAlvo     = margemAlvo     + (margGerAtivo ? margGer : 0)
+
+cfixo: entra no soma (indPct) → compõe o preço → afeta ML
+       NÃO entra no cálculo de MC
+       Exibido como linha informativa no BreakdownPanel abaixo de ML
+```
+
+### Índices de Canal (novos campos — Fase 2 da migração)
+```
+Campos novos vindos de Lista_Canais / Supabase tabela canais:
+  custo_fin  (Custo Financeiro — ZV09)
+  ped        (P&D — ZV25)
+  custo_fixo (Custo Fixo — ZV11)   ← ATENÇÃO: regra de MC abaixo
+  scrap      (Quebra+Scrap — ZV29)
+
+REGRA CONFIRMADA por Rafael (2026-06-23):
+  TODOS entram no indPct → compõem o denominador → afetam o preço → compõem ML
+  custo_fixo NÃO entra na composição de MC
+    → ou seja: cfxV (usado em MC = margV + cfxV) deve continuar sendo
+       APENAS o d.cfixo atual (custo fixo do produto/PPB),
+       NÃO somar o custo_fixo vindo do canal
+    → pendente confirmar com Rafael: o d.cfixo do produto sai do MC
+       quando a fonte migrar para o canal, ou os dois coexistem?
+
+indPct (atualizado após Fase 2):
+  d.pd + d.cfixo + d.scrap + d.royal + cfVendaEf + d.frete
+  + d.comis + comisXPct + d.mkt + d.rebate + pdd + vpc + vbExtra
+  + footprintPct
+  + d.custoFin   ← NOVO (do canal)
+  + d.custoFixoCan ← NOVO (do canal, só entra em ML, não em cfxV/MC)
+  [ped e scrap do canal podem substituir ou somar ao d.pd e d.scrap do produto]
 ```
 
 ### Normalização do Catálogo (normalizeProdutoDB)

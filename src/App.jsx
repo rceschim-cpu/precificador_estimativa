@@ -2171,7 +2171,7 @@ function BreakdownPanel({c,d,prod,ppbTot,calcs}){
   const totalImpVenda=c.cargaTot+(c.ftiPct>0?c.ftiV:0)+(c.fcpPct>0?c.fcpV:0);
   const totalIndGer=c.pdV+c.scV+c.ryV+c.frV+(c.footprintV||0);
   const totalIndCom=c.cfnV+c.cmV+(c.mktV||0)+(c.rebateV||0)+(c.pddV||0)+(c.vbExtraV||0)+(c.vpcV||0);
-  const mcV=c.margV+c.cfxV;
+  const mcV=c.margV+(d.margGerAtivo?c.margGerV:0);
 
   // Linha item
   const Row=({l,v,acc,indent,dual,sub,showPct})=>{
@@ -2300,9 +2300,9 @@ function BreakdownPanel({c,d,prod,ppbTot,calcs}){
       {/* RESULTADO */}
       <Grp id="res" label="Resultado" total={mcV} color="#2563eb" accentColor="#93c5fd" totLabel="MC Total">
         <Row l={`MC — Margem Contribuição${d.margGerAtivo&&d.margGer!==0?" (c/ MG)":""} (${pct(c.mc)})`} v={mcV} acc="green" showPct/>
-        <Row l={`Custo Fixo (${pct(d.cfixo)})`} v={c.cfxV} indent sub showPct/>
-        <Row l={`ML — Margem Líquida (${pct(c.margPct)})`} v={c.margV} acc="blue" showPct/>
+        <Row l={`ML — Margem Líquida (${pct(c.margPct)})`} v={c.margV} acc="blue" indent sub showPct/>
         {d.margGer!==0&&<Row l={`  ↳ Margem Gerencial/Agnóstica (${pct(d.margGer)})`} v={c.margGerV} acc={d.margGer<0?"green":"red"} indent sub showPct/>}
+        {d.cfixo>0&&<Row l={`Custo Fixo (${pct(d.cfixo)})`} v={c.cfxV} indent sub showPct/>}
       </Grp>
 
       {/* PREÇO FINAL — fixo */}
@@ -2991,7 +2991,7 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
     const margPct=pF>0?(margV/pF)*100:0;
     // MC: toggle OFF → MG não entra na MC (abaixo da linha)
     //     toggle ON  → MG entra na MC junto com ML e CF
-    const mc=pF>0?((margV+cfxV+(d.margGerAtivo?margGerV:0))/pF)*100:0;
+    const mc=pF>0?((margV+(d.margGerAtivo?margGerV:0))/pF)*100:0;
     const mkp=cmvTotal>0?pF/cmvTotal:0;
     let margemAlvo=null;
     if(d.precoAlvo>0){
@@ -3032,7 +3032,7 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
     const cargaTotf=pcVf+ipiVf+icmsEfVf+difalVf+(stV||0)+fcpVf;
     const cargaPctf=pFbase>0?(cargaTotf/pFbase)*100:0;
     const margPctf=margPctEf;  // já é o valor correto para ambos os modos
-    const mcf=pFbase>0?((margVf+cfxVf+(d.margGerAtivo?margGerVf:0))/pFbase)*100:0;
+    const mcf=pFbase>0?((margVf+(d.margGerAtivo?margGerVf:0))/pFbase)*100:0;
     const mkpf=cmvTotal>0?pFbase/cmvTotal:0;
     const pUSDf=(d.ptaxPreco||d.ptax)>0?pFbase/(d.ptaxPreco||d.ptax):0;
     return{cfrUSD,cfrBRL,iiV:iiV,iiUSD,vpl,vplEstimado,bkpV,bkpBase,cfrImp,cmvImp,cmvTotal,ppbTot,despesas,
@@ -3044,9 +3044,9 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
       scrapPad:prodAtrib.scrapPad||0,fretePad:prodAtrib.fretePad||0,bkpPad:prodAtrib.bkpPad||0,pdV:pdVf,cfxV:cfxVf,scV:scVf,ryV:ryVf,cfnV:cfnVf,cfVendaEf,cartaoPct,frV:frVf,cmV:cmVf,mktV:mktVf,rebateV:rebateVf,pddV:pddVf,vbExtraV:vbExtraVf,vpcV:vpcVf,stV,stBase,
       pF:pFfinal,pUSD:pUSDf,
       cargaTot:cargaTotf,cargaPct:cargaPctf,margPct:margPctf,mc:mcf,mkp:mkpf,ufO,intra,deveDifal,margemAlvo,margemSugerida,comisXPct,margGerPct,margGerV:margGerVf,
-      // MC equivalente nos modos precoAlvo e margem (ML + CF + MG)
-      mcAlvo:    margemAlvo    !== null ? margemAlvo    + d.cfixo + (d.margGerAtivo ? d.margGer : 0) : null,
-      mcSugerida:margemSugerida!== null ? margemSugerida+ d.cfixo + (d.margGerAtivo ? d.margGer : 0) : null};
+      // MC equivalente nos modos precoAlvo e margem (ML + MG; custo fixo NUNCA entra em MC)
+      mcAlvo:    margemAlvo    !== null ? margemAlvo    + (d.margGerAtivo ? d.margGer : 0) : null,
+      mcSugerida:margemSugerida!== null ? margemSugerida+ (d.margGerAtivo ? d.margGer : 0) : null};
   },[d,prod,prodAtrib,isZFM,isCBU,pcEntry,ppbTot,produtoDB]);
 
   // Notifica o MultiTab sempre que os cálculos mudarem (para o painel comparativo)
@@ -4728,7 +4728,6 @@ function PainelComparativo({abas, calcsMap, selecionadas, open, onToggle}){
                   <div style={{fontSize:9,fontWeight:700,color:"#5a6a84",textTransform:"uppercase",letterSpacing:1,marginBottom:4}}>Margem de Contribuição</div>
                   <div style={{display:"flex",alignItems:"baseline",gap:8}}>
                     <span style={{fontFamily:"'Montserrat',sans-serif",fontSize:22,fontWeight:800,color:corMC,lineHeight:1}}>{pct(mcPct)}</span>
-                    <span style={{fontFamily:"'Montserrat',sans-serif",fontSize:12,fontWeight:600,color:corMC,opacity:.75}}>{brl(c.cfxV)}</span>
                   </div>
                 </div>
                 <div style={{textAlign:"right"}}>
@@ -4822,12 +4821,12 @@ function PainelComparativo({abas, calcsMap, selecionadas, open, onToggle}){
               {abasComDados.some(a=>(calcsMap[a.id].d.vbExtra||0)>0)&&<Linha label="Verba Extra" fn={({c})=>brl(c.vbExtraV||0)}/>}
               {abasComDados.some(a=>(calcsMap[a.id].d.vpc||0)>0)&&<Linha label="VPC" fn={({c})=>brl(c.vpcV||0)}/>}
             </Grp>
-            <Grp id="res" label="Resultado (MC)" fnTotal={({c})=>c.margV+c.cfxV}>
+            <Grp id="res" label="Resultado (MC)" fnTotal={({c})=>c.pF*(c.mc/100)}>
+              <Linha label="MC (%)" fn={({c})=>pct(c.mc)}/>
               <Linha label="ML (%)" fn={({c})=>pct(c.margPct)}/>
               <Linha label="ML (R$)" fn={({c})=>brl(c.margV)}/>
-              <Linha label="CF (R$)" fn={({c})=>brl(c.cfxV)}/>
-              <Linha label="MC (%)" fn={({c})=>pct(c.mc)}/>
               {abasComDados.some(a=>calcsMap[a.id].d.margGer!==0)&&<Linha label="Marg. Gerencial" fn={({c})=>brl(c.margGerV)}/>}
+              {abasComDados.some(a=>(calcsMap[a.id].d.cfixo||0)>0)&&<Linha label="CF (R$)" fn={({c})=>brl(c.cfxV)}/>}
             </Grp>
             <Linha label="Markup" fn={({c})=>n3(c.mkp)+"x"} grp/>
           </div>
@@ -4984,3 +4983,4 @@ function MultiTab({ user }) {
     </div>
   );
 }
+                                                 
