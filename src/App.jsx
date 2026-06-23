@@ -2173,7 +2173,7 @@ function BreakdownPanel({c,d,prod,ppbTot,calcs}){
   const freteBRL=d.freteUSD*d.ptax;
   const totalImpVenda=c.cargaTot+(c.ftiPct>0?c.ftiV:0)+(c.fcpPct>0?c.fcpV:0);
   const totalIndGer=c.pdV+c.scV+c.ryV+c.frV+(c.footprintV||0);
-  const totalIndCom=c.cfnV+c.cmV+(c.mktV||0)+(c.rebateV||0)+(c.pddV||0)+(c.vbExtraV||0)+(c.vpcV||0)+(c.custoFinV||0)+(c.custoFixoCanV||0);
+  const totalIndCom=c.cfnV+c.cmV+(c.mktV||0)+(c.rebateV||0)+(c.pddV||0)+(c.vbExtraV||0)+(c.vpcV||0)+(c.custoFinV||0);
   const mcV=c.margV+(d.margGerAtivo?c.margGerV:0);
 
   // Linha item
@@ -2299,7 +2299,6 @@ function BreakdownPanel({c,d,prod,ppbTot,calcs}){
         {(d.vbExtra||0)>0&&<Row l={`Verba Extra (${pct(d.vbExtra)})`} v={c.vbExtraV||0} showPct/>}
         {(d.vpc||0)>0&&<Row l={`VPC (${pct(d.vpc)})`} v={c.vpcV||0} showPct/>}
         {(d.custoFin||0)>0&&<Row l={`Custo Fin. Canal — ZV09 (${pct(d.custoFin)})`} v={c.custoFinV||0} showPct/>}
-        {(d.custoFixoCan||0)>0&&<Row l={`CF Canal — ZV11 (${pct(d.custoFixoCan)})`} v={c.custoFixoCanV||0} showPct/>}
       </Grp>
 
       {/* RESULTADO */}
@@ -2307,7 +2306,7 @@ function BreakdownPanel({c,d,prod,ppbTot,calcs}){
         <Row l={`MC — Margem Contribuição${d.margGerAtivo&&d.margGer!==0?" (c/ MG)":""} (${pct(c.mc)})`} v={mcV} acc="green" showPct/>
         <Row l={`ML — Margem Líquida (${pct(c.margPct)})`} v={c.margV} acc="blue" indent sub showPct/>
         {d.margGer!==0&&<Row l={`  ↳ Margem Gerencial/Agnóstica (${pct(d.margGer)})`} v={c.margGerV} acc={d.margGer<0?"green":"red"} indent sub showPct/>}
-        {d.cfixo>0&&<Row l={`Custo Fixo (${pct(d.cfixo)}) — no preço, fora da MC`} v={c.cfxV} showPct/>}
+        {c.cfixoEf>0&&<Row l={`Custo Fixo${(d.custoFixoCan||0)>0?" (canal ZV11)":" (produto)"} (${pct(c.cfixoEf)}) — no preço, fora da MC`} v={c.cfxV} showPct/>}
       </Grp>
 
       {/* PREÇO FINAL — fixo */}
@@ -2962,7 +2961,9 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
     // MAO=-0,71% (benefício ZFM) | IOS=+1,00% (custo extra Ilhéus) | CWB=0%
     const oRef = ORIGENS.find(x=>x.id===d.origem)||ORIGENS[0];
     const footprintPct = !isCBU ? (oRef.footprint||0) : 0;
-    const indPct=d.pd+d.cfixo+d.scrap+d.royal+cfVendaEf+d.frete+d.comis+comisXPct+d.mkt+d.rebate+(d.pdd||0)+(d.vbExtra||0)+(d.vpc||0)+footprintPct+(d.custoFin||0)+(d.custoFixoCan||0);
+    // Canal com ZV11 substitui cfixo do produto — nunca somam os dois
+    const cfixoEf = (d.custoFixoCan||0) > 0 ? (d.custoFixoCan||0) : (d.cfixo||0);
+    const indPct=d.pd+cfixoEf+d.scrap+d.royal+cfVendaEf+d.frete+d.comis+comisXPct+d.mkt+d.rebate+(d.pdd||0)+(d.vbExtra||0)+(d.vpc||0)+footprintPct+(d.custoFin||0);
     // MG é um índice independente — entra no soma como os outros índices
     // Valor negativo = crédito = eleva o preço (denominador menor)
     const margGerPct=(d.margGer||0);
@@ -2986,7 +2987,7 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
     const ftiV=pF*(ftiPct/100),fcpV=pF*(fcpPct/100);
     const margGerV=pF*(margGerPct/100);
     const margV=pF*(d.margem/100);
-    const pdV=pF*(d.pd/100),cfxV=pF*(d.cfixo/100);
+    const pdV=pF*(d.pd/100),cfxV=pF*(cfixoEf/100);
     const scV=pF*(d.scrap/100),ryV=pF*(d.royal/100);
     const cfnV=pF*(cfVendaEf/100),frV=pF*(d.frete/100),cmV=pF*((d.comis+comisXPct)/100);
     const mktV=pF*(d.mkt/100),rebateV=pF*(d.rebate/100);
@@ -3027,7 +3028,7 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
       : (d.margem+margGerPct);
     const margVf=pFbase*(margPctEf/100);
     const footprintVf=pFbase*(footprintPct/100);
-    const pdVf=pFbase*(d.pd/100),cfxVf=pFbase*(d.cfixo/100);
+    const pdVf=pFbase*(d.pd/100),cfxVf=pFbase*(cfixoEf/100);
     const scVf=pFbase*(d.scrap/100),ryVf=pFbase*(d.royal/100);
     const cfnVf=pFbase*(cfVendaEf/100),frVf=pFbase*(d.frete/100),cmVf=pFbase*((d.comis+comisXPct)/100);
     const mktVf=pFbase*(d.mkt/100),rebateVf=pFbase*(d.rebate/100);
@@ -3045,7 +3046,7 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
       craCalcMAO,creditoCalcIOS,cfrExpandidoUSD,basePlacaUSD,
       pcPct,pcEf,pcLabel,pcV:pcVf,pcSubvPct,pcSubvV:pcSubvVf,pcBaseRedPct,aliqInter,aliqDest,icmsEfPct,icmsV,icmsEfV:icmsEfVf,
       difal,difalV:difalVf,ftiPct,ftiV:ftiVf,fcpPct,fcpV:fcpVf,ipi,ipiEfPct,ipiV:ipiVf,ipiCreditoV:ipiCreditoVf,ipiCreditoIOSPct,pSI:pSIfinal,pCI,
-      margV:margVf,indPct,footprintPct,footprintV:footprintVf,pdPad:oRef.pdPad||0,
+      margV:margVf,indPct,cfixoEf,footprintPct,footprintV:footprintVf,pdPad:oRef.pdPad||0,
       cfixoPad:prodAtrib.cfixoPad||0,royalPad:prodAtrib.royalPad||0,
       scrapPad:prodAtrib.scrapPad||0,fretePad:prodAtrib.fretePad||0,bkpPad:prodAtrib.bkpPad||0,pdV:pdVf,cfxV:cfxVf,scV:scVf,ryV:ryVf,cfnV:cfnVf,cfVendaEf,cartaoPct,frV:frVf,cmV:cmVf,mktV:mktVf,rebateV:rebateVf,pddV:pddVf,vbExtraV:vbExtraVf,vpcV:vpcVf,custoFinV:custoFinVf,custoFixoCanV:custoFixoCanVf,stV,stBase,
       pF:pFfinal,pUSD:pUSDf,
