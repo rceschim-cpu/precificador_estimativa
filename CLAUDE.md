@@ -158,19 +158,16 @@ Campos novos vindos de Lista_Canais / Supabase tabela canais:
 REGRA CONFIRMADA por Rafael (2026-06-23):
   TODOS entram no indPct → compõem o denominador → afetam o preço → compõem ML
   custo_fixo NÃO entra na composição de MC
-    → ou seja: cfxV (usado em MC = margV + cfxV) deve continuar sendo
-       APENAS o d.cfixo atual (custo fixo do produto/PPB),
-       NÃO somar o custo_fixo vindo do canal
-    → pendente confirmar com Rafael: o d.cfixo do produto sai do MC
-       quando a fonte migrar para o canal, ou os dois coexistem?
+  custo_fixo CANAL substitui cfixo do PRODUTO — nunca somam (exclusão mútua confirmada)
+    cfixoEf = custoFixoCan > 0 ? custoFixoCan : cfixo
+    cfxV = pF × cfixoEf / 100
 
 indPct (atualizado após Fase 2):
-  d.pd + d.cfixo + d.scrap + d.royal + cfVendaEf + d.frete
+  d.pd + cfixoEf + d.scrap + d.royal + cfVendaEf + d.frete
   + d.comis + comisXPct + d.mkt + d.rebate + pdd + vpc + vbExtra
   + footprintPct
-  + d.custoFin   ← NOVO (do canal)
-  + d.custoFixoCan ← NOVO (do canal, só entra em ML, não em cfxV/MC)
-  [ped e scrap do canal podem substituir ou somar ao d.pd e d.scrap do produto]
+  + d.custoFin   ← NOVO (do canal, ZV09)
+  [ped e scrap do canal: pendente confirmar se substituem ou somam ao d.pd e d.scrap do produto]
 ```
 
 ### Normalização do Catálogo (normalizeProdutoDB)
