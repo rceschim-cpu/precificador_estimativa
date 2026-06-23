@@ -207,3 +207,10 @@ comisXPct       = comis × (2/3)  ← encargos automáticos sobre comissão
 - ModalRegistros (salvar/carregar com pastas e subpastas)
 - MultiTab (múltiplas abas de precificação)
 - PainelComparativo (modal de comparação entre abas)
+
+---
+
+## FEATURE: Chat LLM (a implementar)
+
+### Objetivo
+Sidebar de chat onde o usuário desc
