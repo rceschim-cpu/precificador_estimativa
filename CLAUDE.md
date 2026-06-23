@@ -167,7 +167,8 @@ indPct (atualizado após Fase 2):
   + d.comis + comisXPct + d.mkt + d.rebate + pdd + vpc + vbExtra
   + footprintPct
   + d.custoFin   ← NOVO (do canal, ZV09)
-  [ped e scrap do canal: pendente confirmar se substituem ou somam ao d.pd e d.scrap do produto]
+  pedEf    = pedCan   > 0 ? pedCan   : pd    ← ZV25 substitui pd do produto (confirmado)
+  scrapEf  = scrapCan > 0 ? scrapCan : scrap ← ZV29 substitui scrap do produto (confirmado)
 ```
 
 ### Normalização do Catálogo (normalizeProdutoDB)
