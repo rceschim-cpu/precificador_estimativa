@@ -1260,6 +1260,15 @@ const PRODUTOS = [
   {id:"mop",  cat:"smarthome",   ncm:"6307.10.00", nome:"Mop / Pano (acessório)",        cfixoPad:7.14, royalPad:0,    scrapPad:1.09, fretePad:2.45, bkpPad:1.84, mva:0,   aliqST:0,   fti:0,   ipiMAO:0,    ipiIOS:0,    ipiCWB:0,    credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:4,  icmsIOS:4,  icmsCWB:4 },
   {id:"bag",  cat:"smarthome",   ncm:"6307.90.10", nome:"Saco de Poeira (acessório)",    cfixoPad:7.14, royalPad:0,    scrapPad:1.09, fretePad:2.45, bkpPad:1.84, mva:0,   aliqST:0,   fti:0,   ipiMAO:0,    ipiIOS:0,    ipiCWB:0,    credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:4,  icmsIOS:4,  icmsCWB:4 },
   {id:"lock", cat:"smarthome",   ncm:"8301.40.00", nome:"Fechadura Eletrônica",          cfixoPad:7.14, royalPad:0,    scrapPad:1.09, fretePad:2.45, bkpPad:2.72, mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:0,    ipiCWB:0,    credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
+  // ── Periféricos / Acessórios ─────────────────────────────────────────────
+  {id:"mse",  cat:"informatica", ncm:"8471.60.53", nome:"Mouse",                         cfixoPad:4.34, royalPad:0,    scrapPad:0.71, fretePad:2.18, bkpPad:2.54, mva:35,  aliqST:19,  fti:0,   ipiMAO:9.75, ipiIOS:9.75, ipiCWB:9.75, credMAO:3,  credIOS:12, credCWB:4,  icmsMAO:4,  icmsIOS:12, icmsCWB:4  },
+  {id:"mpad", cat:"informatica", ncm:"4016.10.90", nome:"Mousepad",                      cfixoPad:4.34, royalPad:0,    scrapPad:0.71, fretePad:2.18, bkpPad:2.54, mva:0,   aliqST:0,   fti:0,   ipiMAO:0,    ipiIOS:0,    ipiCWB:0,    credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:7  },
+  {id:"dock", cat:"informatica", ncm:"8471.80.00", nome:"Docking Station / Microbit",    cfixoPad:4.34, royalPad:0,    scrapPad:0.71, fretePad:2.18, bkpPad:2.54, mva:0,   aliqST:0,   fti:0,   ipiMAO:9.75, ipiIOS:9.75, ipiCWB:9.75, credMAO:3,  credIOS:3,  credCWB:0,  icmsMAO:4,  icmsIOS:4,  icmsCWB:4  },
+  {id:"mlt",  cat:"informatica", ncm:"4202.92.00", nome:"Maleta para Notebook",          cfixoPad:4.34, royalPad:0,    scrapPad:0.71, fretePad:2.18, bkpPad:2.54, mva:45,  aliqST:19,  fti:0,   ipiMAO:6.5,  ipiIOS:6.5,  ipiCWB:6.5,  credMAO:3,  credIOS:3,  credCWB:0,  icmsMAO:12, icmsIOS:4,  icmsCWB:4  },
+  {id:"fone", cat:"mobilidade",  ncm:"8517.62.72", nome:"Fone / Headset Bluetooth",      cfixoPad:4.76, royalPad:0,    scrapPad:0.51, fretePad:1.54, bkpPad:1.50, mva:37,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:15,   ipiCWB:15,   credMAO:12, credIOS:12, credCWB:4,  icmsMAO:12, icmsIOS:12, icmsCWB:4  },
+  {id:"cabo", cat:"mobilidade",  ncm:"8544.42.00", nome:"Cabo para Carregador",          cfixoPad:4.76, royalPad:0,    scrapPad:0.51, fretePad:1.54, bkpPad:1.50, mva:36,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:5,    ipiCWB:5,    credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:4  },
+  {id:"pwrb", cat:"mobilidade",  ncm:"8507.60.00", nome:"Power Bank",                    cfixoPad:4.76, royalPad:0,    scrapPad:0.51, fretePad:1.54, bkpPad:1.50, mva:0,   aliqST:0,   fti:0,   ipiMAO:0,    ipiIOS:15,   ipiCWB:15,   credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:4  },
+  {id:"cap",  cat:"mobilidade",  ncm:"3926.90.90", nome:"Capinha / Película",            cfixoPad:4.76, royalPad:0,    scrapPad:0.51, fretePad:1.54, bkpPad:1.50, mva:0,   aliqST:0,   fti:0,   ipiMAO:0,    ipiIOS:9.75, ipiCWB:9.75, credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:4  },
   // ── Mobilidade ───────────────────────────────────────────────────────────
   {id:"wtch", cat:"mobilidade",  ncm:"9102.12.20", nome:"Smartwatch",                    cfixoPad:2.00, royalPad:0,    scrapPad:0.51, fretePad:1.54, bkpPad:1.50, mva:35,  aliqST:19,  fti:0,   ipiMAO:0,    ipiIOS:15,   ipiCWB:15,   credMAO:0,  credIOS:0,  credCWB:0,  icmsMAO:12, icmsIOS:12, icmsCWB:12},
   // ── PosiSeg — CFTV ───────────────────────────────────────────────────────
@@ -1350,20 +1359,21 @@ const getCanalRates = (canalId, cat) => {
 
 const CANAIS = [
   { id:"",        label:"— Canal (opcional) —", comis:null },
-  { id:"t1t2",    label:"T1/T2 Varejo",               default:{ comis:0,    mkt:1.50, rebate:3.00, pdd:2.5, vpc:0,    custoFin:0, custoFixoCan:0, pedCan:0, scrapCan:0 } },
-  { id:"t3",      label:"T3 / Distribuidor",           default:{ comis:0.98, mkt:1.50, rebate:1.65, pdd:2.5, vpc:0,    custoFin:0, custoFixoCan:0, pedCan:0, scrapCan:0 } },
-  { id:"corp",    label:"Canais / Corporativo",        default:{ comis:2.98, mkt:1.40, rebate:0,    pdd:2.5, vpc:0,    custoFin:0, custoFixoCan:0, pedCan:0, scrapCan:0 } },
-  { id:"amzn",    label:"Amazon",                      default:{ comis:3.25, mkt:3.74, rebate:1.00, pdd:2.5, vpc:5.84, custoFin:0, custoFixoCan:0, pedCan:0, scrapCan:0 } },
-  { id:"meli",    label:"MercadoLivre (Ebazar)",       default:{ comis:2.17, mkt:4.00, rebate:1.00, pdd:2.5, vpc:3.70, custoFin:0, custoFixoCan:0, pedCan:0, scrapCan:0 } },
-  { id:"magalu",  label:"Magazine Luiza",              default:{ comis:0,    mkt:1.50, rebate:1.00, pdd:2.5, vpc:0,    custoFin:0, custoFixoCan:0, pedCan:0, scrapCan:0 } },
-  { id:"csbahia", label:"Grupo Casas Bahia",           default:{ comis:0,    mkt:1.50, rebate:1.00, pdd:2.5, vpc:0.30, custoFin:0, custoFixoCan:0, pedCan:0, scrapCan:0 } },
-  { id:"ameri",   label:"Americanas",                  default:{ comis:0,    mkt:1.50, rebate:1.00, pdd:2.5, vpc:2.00, custoFin:0, custoFixoCan:0, pedCan:0, scrapCan:0 } },
-  { id:"carref",  label:"Carrefour",                   default:{ comis:0,    mkt:1.50, rebate:1.00, pdd:2.5, vpc:7.81, custoFin:0, custoFixoCan:0, pedCan:0, scrapCan:0 } },
-  { id:"cencosud",label:"Cencosud",                    default:{ comis:0,    mkt:1.50, rebate:1.00, pdd:2.5, vpc:4.20, custoFin:0, custoFixoCan:0, pedCan:0, scrapCan:0 } },
-  { id:"leroy",   label:"Leroy Merlin",                default:{ comis:3.25, mkt:2.00, rebate:1.00, pdd:2.5, vpc:3.20, custoFin:0, custoFixoCan:0, pedCan:0, scrapCan:0 } },
-  { id:"telef",   label:"Telefônica / TIM",            default:{ comis:2.44, mkt:2.00, rebate:1.00, pdd:2.5, vpc:5.40, custoFin:0, custoFixoCan:0, pedCan:0, scrapCan:0 } },
-  { id:"vd",      label:"Venda Direta (site próprio)", default:{ comis:0,    mkt:1.50, rebate:0,    pdd:2.5, vpc:0,    custoFin:0, custoFixoCan:0, pedCan:0, scrapCan:0 } },
-  { id:"pseg",    label:"PosiSeg B2B (direto)",        default:{ comis:0,    mkt:4.00, rebate:0,    pdd:2.5, vpc:0,    custoFin:0, custoFixoCan:0, pedCan:0, scrapCan:0 } },
+  // ZV09=custoFin, ZV11=custoFixoCan, ZV25=pedCan, ZV29=scrapCan — fonte: Lista_Canais.csv (DRE real 2025, Informatica)
+  { id:"t1t2",    label:"T1/T2 Varejo",               default:{ comis:0,    mkt:1.50, rebate:3.00, pdd:2.5, vpc:5.50, custoFin:4.20, custoFixoCan:5.40, pedCan:2.55, scrapCan:0.71 } },
+  { id:"t3",      label:"T3 / Distribuidor",           default:{ comis:0.98, mkt:1.50, rebate:5.65, pdd:2.5, vpc:0.80, custoFin:5.38, custoFixoCan:4.34, pedCan:2.55, scrapCan:0.71 } },
+  { id:"corp",    label:"Canais / Corporativo",        default:{ comis:2.98, mkt:1.40, rebate:10.80,pdd:2.5, vpc:0,    custoFin:2.23, custoFixoCan:7.90, pedCan:3.48, scrapCan:0.59 } },
+  { id:"amzn",    label:"Amazon",                      default:{ comis:3.25, mkt:2.30, rebate:1.08, pdd:2.5, vpc:5.84, custoFin:1.41, custoFixoCan:6.19, pedCan:3.47, scrapCan:0.71 } },
+  { id:"meli",    label:"MercadoLivre (Ebazar)",       default:{ comis:2.17, mkt:2.30, rebate:1.08, pdd:2.5, vpc:3.70, custoFin:1.41, custoFixoCan:6.19, pedCan:3.47, scrapCan:0.71 } },
+  { id:"magalu",  label:"Magazine Luiza",              default:{ comis:0,    mkt:2.30, rebate:1.08, pdd:2.5, vpc:0,    custoFin:1.41, custoFixoCan:6.19, pedCan:3.47, scrapCan:0.71 } },
+  { id:"csbahia", label:"Grupo Casas Bahia",           default:{ comis:0,    mkt:2.30, rebate:1.08, pdd:2.5, vpc:0.30, custoFin:1.41, custoFixoCan:6.19, pedCan:3.47, scrapCan:0.71 } },
+  { id:"ameri",   label:"Americanas",                  default:{ comis:0,    mkt:2.30, rebate:1.08, pdd:2.5, vpc:2.00, custoFin:1.41, custoFixoCan:6.19, pedCan:3.47, scrapCan:0.71 } },
+  { id:"carref",  label:"Carrefour",                   default:{ comis:0,    mkt:2.30, rebate:1.08, pdd:2.5, vpc:7.81, custoFin:1.41, custoFixoCan:6.19, pedCan:3.47, scrapCan:0.71 } },
+  { id:"cencosud",label:"Cencosud",                    default:{ comis:0,    mkt:2.30, rebate:1.08, pdd:2.5, vpc:4.20, custoFin:1.41, custoFixoCan:6.19, pedCan:3.47, scrapCan:0.71 } },
+  { id:"leroy",   label:"Leroy Merlin",                default:{ comis:3.25, mkt:2.30, rebate:1.08, pdd:2.5, vpc:3.20, custoFin:1.41, custoFixoCan:6.19, pedCan:3.47, scrapCan:0.71 } },
+  { id:"telef",   label:"Telefônica / TIM",            default:{ comis:2.44, mkt:1.50, rebate:4.00, pdd:2.5, vpc:5.40, custoFin:4.20, custoFixoCan:4.76, pedCan:3.47, scrapCan:0.91 } },
+  { id:"vd",      label:"Venda Direta (site próprio)", default:{ comis:0,    mkt:2.00, rebate:0,    pdd:2.5, vpc:0,    custoFin:1.92, custoFixoCan:6.30, pedCan:3.48, scrapCan:0.59 } },
+  { id:"pseg",    label:"PosiSeg B2B (direto)",        default:{ comis:0,    mkt:0.10, rebate:0,    pdd:2.5, vpc:0,    custoFin:3.19, custoFixoCan:4.00, pedCan:3.43, scrapCan:0.68 } },
 ];
 
 // Resolve atributos do produto baseado em origem + modalidade
