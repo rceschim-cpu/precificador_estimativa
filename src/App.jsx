@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 
 // ── SUPABASE CONFIG ───────────────────────────────────────────────────────────
 const SB_URL = "https://eiihpyzihiqhhwirqwxe.supabase.co";
@@ -2709,12 +2709,210 @@ input::-webkit-inner-spin-button,input::-webkit-outer-spin-button{-webkit-appear
 ::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:#0d0d15}::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:3px}::-webkit-scrollbar-thumb:hover{background:#3CDBC0}
 `;
 
+// ── CHAT LLM ──────────────────────────────────────────────────────────────────
+const CHAT_SYSTEM_PROMPT = `Você é o assistente de precificação da Positivo Tecnologia.
+Sua função é preencher os campos da calculadora tributária com base no que o usuário descreve.
+
+REGRAS OBRIGATÓRIAS:
+- Use SEMPRE as ferramentas disponíveis para preencher os campos — nunca responda só com texto quando puder agir.
+- Após preencher os campos, chame get_resultado para mostrar o preço calculado.
+- Percentuais: "2%" ou "2" → passe 2 (nunca 0.02).
+- Se o usuário mencionar produto ambíguo (ex: "notebook" sem modelo), pergunte BU/modelo antes de chamar set_produto.
+- Não recalcule manualmente tributos — a calculadora faz isso; use get_resultado.
+- Se faltar alguma informação obrigatória (custo ou produto), pergunte antes de agir.
+- Formato de valores monetários: R$ com 2 casas decimais.
+- Seja direto. Confirme o que foi preenchido em uma linha.
+
+CONTEXTO DA CALCULADORA (injetado dinamicamente):
+{CONTEXT}`;
+
+const CALC_TOOLS = [
+  { name:"set_produto", description:"Seleciona o produto na calculadora pelo ID do catálogo",
+    input_schema:{ type:"object", properties:{ produto_id:{type:"string",description:"ID do produto em produtos_catalogo"} }, required:["produto_id"] } },
+  { name:"set_origem_modalidade", description:"Define fábrica de origem e modalidade de importação",
+    input_schema:{ type:"object", properties:{ origem:{type:"string",enum:["MAO","IOS","CWB"]}, modalidade:{type:"string",enum:["CKD","SKD","CBU"]} }, required:["origem","modalidade"] } },
+  { name:"set_canal", description:"Seleciona canal de venda",
+    input_schema:{ type:"object", properties:{ canal_id:{type:"string",description:"ID do canal (ex: 't3', 'corp', 'amzn')"} }, required:["canal_id"] } },
+  { name:"set_custo", description:"Define custo do produto",
+    input_schema:{ type:"object", properties:{ vpl_usd:{type:"number",description:"Custo em USD (VPL)"}, dolar:{type:"number",description:"Taxa do dólar (ptax)"}, producao:{type:"number",description:"Custo de produção em R$"} } } },
+  { name:"set_uf_destino", description:"Define UF de destino (para cálculo de ICMS e DIFAL)",
+    input_schema:{ type:"object", properties:{ uf:{type:"string",description:"Sigla do estado (ex: SP, RJ, MG)"} }, required:["uf"] } },
+  { name:"set_margem", description:"Define margem líquida alvo (ML%)",
+    input_schema:{ type:"object", properties:{ margem:{type:"number",description:"Percentual de margem líquida"} }, required:["margem"] } },
+  { name:"set_indices", description:"Sobrescreve índices comerciais específicos",
+    input_schema:{ type:"object", properties:{ rebate:{type:"number"}, mkt:{type:"number"}, frete:{type:"number"}, vpc:{type:"number"}, pdd:{type:"number"}, comis:{type:"number"} } } },
+  { name:"get_resultado", description:"Retorna o preço calculado atual (pF, ML%, MC%, markup). Chamar sempre ao final.",
+    input_schema:{ type:"object", properties:{} } },
+];
+
+function ChatPanel({ d, setD, c, produtosDB, onClose }) {
+  const [messages, setMessages] = useState([]);
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
+  const scrollRef = useRef(null);
+
+  useEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+  }, [messages]);
+
+  const buildCalcContext = () => {
+    const prod = produtosDB.find(p => p.id === d.prodId);
+    const canal = CANAIS.find(c => c.id === d.canalId);
+    return `Produto: ${prod?.nome || d.prodId || "não selecionado"}
+Origem: ${d.origem} | Modalidade: ${d.modalidade}
+UF destino: ${d.ufDestino}
+Câmbio: R$ ${d.ptax}/USD | Custo FOB: USD ${d.fobUSD}
+Canal: ${canal?.label || "nenhum"}
+Margem alvo (ML): ${d.margem}%
+Índices: comis ${d.comis}% mkt ${d.mkt}% rebate ${d.rebate}% pdd ${d.pdd||2.5}% vpc ${d.vpc||0}%
+Resultado: pF R$ ${c.pF?.toFixed(2)||"—"} | ML ${c.margPct?.toFixed(2)||"—"}% | MC ${c.mc?.toFixed(2)||"—"}%`;
+  };
+
+  const handleToolCall = (name, inp) => {
+    if (name === "set_produto") {
+      setD(p => ({...p, prodId: inp.produto_id}));
+      const prod = produtosDB.find(p => p.id === inp.produto_id);
+      return { ok:true, msg:`Produto: ${prod?.nome || inp.produto_id}` };
+    }
+    if (name === "set_origem_modalidade") {
+      setD(p => ({...p, origem: inp.origem, modalidade: inp.modalidade}));
+      return { ok:true, msg:`${inp.origem} / ${inp.modalidade}` };
+    }
+    if (name === "set_canal") {
+      const canal = CANAIS.find(c => c.id === inp.canal_id);
+      if (!canal?.default) return { ok:false, msg:"Canal não encontrado" };
+      const rates = getCanalRates(inp.canal_id, "");
+      setD(p => ({...p, canalId:canal.id, comis:rates.comis, mkt:rates.mkt, rebate:rates.rebate, pdd:rates.pdd, vpc:rates.vpc, custoFin:rates.custoFin||0, custoFixoCan:rates.custoFixoCan||0, pedCan:rates.pedCan||0, scrapCan:rates.scrapCan||0}));
+      return { ok:true, msg:`Canal: ${canal.label}` };
+    }
+    if (name === "set_custo") {
+      const upd = {};
+      if (inp.vpl_usd  !== undefined) upd.fobUSD   = inp.vpl_usd;
+      if (inp.dolar    !== undefined) upd.ptax      = inp.dolar;
+      if (inp.producao !== undefined) upd.producao  = inp.producao;
+      setD(p => ({...p, ...upd}));
+      return { ok:true, msg:"Custo atualizado" };
+    }
+    if (name === "set_uf_destino") {
+      setD(p => ({...p, ufDestino: inp.uf.toUpperCase()}));
+      return { ok:true, msg:`UF: ${inp.uf.toUpperCase()}` };
+    }
+    if (name === "set_margem") {
+      setD(p => ({...p, margem: inp.margem}));
+      return { ok:true, msg:`ML: ${inp.margem}%` };
+    }
+    if (name === "set_indices") {
+      const upd = {};
+      ["rebate","mkt","frete","vpc","pdd","comis"].forEach(k => { if (inp[k] !== undefined) upd[k] = inp[k]; });
+      setD(p => ({...p, ...upd}));
+      return { ok:true, msg:"Índices atualizados" };
+    }
+    if (name === "get_resultado") {
+      return { pF: c.pF, ml: c.margPct, mc: c.mc, markup: c.mkp };
+    }
+    return { ok:false, msg:"Tool desconhecida" };
+  };
+
+  const send = async () => {
+    if (!input.trim() || loading) return;
+    const userText = input.trim();
+    setInput("");
+    const newMsgs = [...messages, { role:"user", content:userText }];
+    setMessages(newMsgs);
+    setLoading(true);
+    try {
+      let apiMsgs = newMsgs.map(m => ({ role:m.role, content:m.content }));
+      while (true) {
+        const res = await fetch("https://api.anthropic.com/v1/messages", {
+          method:"POST",
+          headers:{ "x-api-key": import.meta.env.VITE_CLAUDE_KEY, "anthropic-version":"2023-06-01", "content-type":"application/json" },
+          body: JSON.stringify({ model:"claude-haiku-4-5-20251001", max_tokens:1024,
+            system: CHAT_SYSTEM_PROMPT.replace("{CONTEXT}", buildCalcContext()),
+            tools: CALC_TOOLS, messages: apiMsgs }),
+        });
+        if (!res.ok) throw new Error(`Erro API: ${res.status}`);
+        const data = await res.json();
+        apiMsgs.push({ role:"assistant", content:data.content });
+        if (data.stop_reason === "end_turn") {
+          const txt = data.content.filter(b=>b.type==="text").map(b=>b.text).join("\n");
+          if (txt) setMessages(prev => [...prev, { role:"assistant", content:txt }]);
+          break;
+        }
+        if (data.stop_reason === "tool_use") {
+          const toolResults = []; const names = [];
+          for (const blk of data.content) {
+            if (blk.type === "tool_use") {
+              const result = handleToolCall(blk.name, blk.input);
+              toolResults.push({ type:"tool_result", tool_use_id:blk.id, content:JSON.stringify(result) });
+              names.push(blk.name.replace(/_/g," "));
+            }
+          }
+          setMessages(prev => [...prev, { role:"tool", content:names.join(" · ") }]);
+          apiMsgs.push({ role:"user", content:toolResults });
+        }
+      }
+    } catch(e) {
+      setMessages(prev => [...prev, { role:"error", content:e.message }]);
+    } finally { setLoading(false); }
+  };
+
+  const S={fontFamily:"'Montserrat',sans-serif"};
+  return (
+    <div style={{position:"fixed",top:0,right:0,bottom:0,width:380,background:"#0d0d15",borderLeft:"1px solid rgba(255,255,255,.1)",display:"flex",flexDirection:"column",zIndex:1000,...S}}>
+      <div style={{padding:"14px 16px",borderBottom:"1px solid rgba(255,255,255,.08)",display:"flex",alignItems:"center",gap:10,flexShrink:0}}>
+        <span style={{fontSize:18}}>🤖</span>
+        <div style={{flex:1}}>
+          <div style={{fontSize:13,fontWeight:700,color:"#f0f4ff"}}>Assistente Positec</div>
+          <div style={{fontSize:10,color:"#5a6a84"}}>Descreva o cenário — eu preencho os campos</div>
+        </div>
+        <button onClick={onClose} style={{background:"none",border:"none",color:"#5a6a84",cursor:"pointer",fontSize:18,lineHeight:1,padding:"2px 6px"}}>✕</button>
+      </div>
+      <div ref={scrollRef} style={{flex:1,overflowY:"auto",padding:"12px 14px",display:"flex",flexDirection:"column",gap:10}}>
+        {messages.length===0&&(
+          <div style={{color:"#5a6a84",fontSize:11,textAlign:"center",marginTop:24}}>
+            <div style={{fontSize:28,marginBottom:8}}>💬</div>
+            <div style={{marginBottom:6}}>Exemplo de uso:</div>
+            <div style={{padding:"10px 14px",background:"rgba(255,255,255,.04)",borderRadius:8,color:"#7a90b0",lineHeight:1.6,textAlign:"left"}}>
+              "Precifica notebook Celeron 14 pra T3 SP, custo USD 320, dólar 5,85, margem 12%"
+            </div>
+          </div>
+        )}
+        {messages.map((m,i) => m.role==="tool" ? (
+          <div key={i} style={{fontSize:10,color:"#3CDBC0",padding:"3px 10px",background:"rgba(60,219,192,.06)",border:"1px solid rgba(60,219,192,.12)",borderRadius:4,alignSelf:"center"}}>⚙ {m.content}</div>
+        ) : (
+          <div key={i} style={{alignSelf:m.role==="user"?"flex-end":"flex-start",maxWidth:"90%"}}>
+            <div style={{padding:"9px 13px",
+              borderRadius:m.role==="user"?"12px 12px 2px 12px":"12px 12px 12px 2px",
+              background:m.role==="user"?"rgba(60,219,192,.15)":m.role==="error"?"rgba(239,68,68,.15)":"rgba(255,255,255,.06)",
+              border:`1px solid ${m.role==="user"?"rgba(60,219,192,.25)":m.role==="error"?"rgba(239,68,68,.3)":"rgba(255,255,255,.08)"}`,
+              fontSize:12,lineHeight:1.65,color:m.role==="error"?"#fca5a5":"#e2e8f0",whiteSpace:"pre-wrap"}}>
+              {m.content}
+            </div>
+          </div>
+        ))}
+        {loading&&<div style={{alignSelf:"flex-start",padding:"8px 14px",background:"rgba(255,255,255,.06)",borderRadius:"12px 12px 12px 2px",fontSize:14,color:"#5a6a84",letterSpacing:4}}>●●●</div>}
+      </div>
+      <div style={{padding:"10px 12px",borderTop:"1px solid rgba(255,255,255,.08)",display:"flex",gap:8,flexShrink:0}}>
+        <input value={input} onChange={e=>setInput(e.target.value)}
+          onKeyDown={e=>e.key==="Enter"&&!e.shiftKey&&(e.preventDefault(),send())}
+          placeholder="Descreva o cenário..." disabled={loading}
+          style={{flex:1,background:"rgba(255,255,255,.05)",border:"1px solid rgba(255,255,255,.12)",borderRadius:8,
+            color:"#f1f5f9",fontSize:12,padding:"9px 12px",fontFamily:"'Montserrat',sans-serif",outline:"none"}}/>
+        <button onClick={send} disabled={loading||!input.trim()} style={{padding:"9px 14px",background:"rgba(60,219,192,.2)",
+          border:"1px solid rgba(60,219,192,.4)",color:"#3CDBC0",borderRadius:8,cursor:"pointer",fontSize:18,fontWeight:700,
+          opacity:loading||!input.trim()?0.35:1,transition:"opacity .15s"}}>↑</button>
+      </div>
+    </div>
+  );
+}
+
 // ── APP ────────────────────────────────────────────────────────────────────────
 function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=null, onCalcsChange=null}){
   const [d,setD]=useState(()=>({...DEF}));
   const [calcs,setCalcs]=useState(()=>({...CALC_DEF}));
   const [tab,setTab]=useState("perfil");
   const [modal,setModal]=useState(null);
+  const [chatOpen,setChatOpen]=useState(false);
   const [produtosDB,setProdutosDB]=useState([]);
   const [produtoDB,setProdutoDB]=useState(null);
   const [categoriasDB,setCategoriasDB]=useState([]);
@@ -3257,6 +3455,10 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
           style={{padding:"4px 12px",background:"rgba(5,150,105,.15)",border:"1px solid rgba(5,150,105,.4)",color:"#34d399",fontFamily:"'Montserrat',sans-serif",fontSize:11,fontWeight:700,letterSpacing:.5,cursor:"pointer",borderRadius:20,display:"flex",alignItems:"center",gap:5}}>
           👥 Gestão de Usuários
         </button>}
+        <button onClick={()=>setChatOpen(o=>!o)}
+          style={{padding:"4px 12px",background:chatOpen?"rgba(60,219,192,.25)":"rgba(60,219,192,.1)",border:`1px solid ${chatOpen?"rgba(60,219,192,.6)":"rgba(60,219,192,.3)"}`,color:"#3CDBC0",fontFamily:"'Montserrat',sans-serif",fontSize:11,fontWeight:700,letterSpacing:.5,cursor:"pointer",borderRadius:20,display:"flex",alignItems:"center",gap:5,transition:".15s"}}>
+          🤖 Assistente IA
+        </button>
       </div>
 
       <div className="layout">
@@ -3967,6 +4169,7 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
         </main>
       </div>
     </div>
+    {chatOpen&&<ChatPanel d={d} setD={setD} c={c} produtosDB={produtosDB} onClose={()=>setChatOpen(false)}/>}
     </>
   );
 }
