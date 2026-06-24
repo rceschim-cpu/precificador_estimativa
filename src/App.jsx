@@ -2727,22 +2727,22 @@ CONTEXTO DA CALCULADORA (injetado dinamicamente):
 {CONTEXT}`;
 
 const CALC_TOOLS = [
-  { name:"set_produto", description:"Seleciona o produto na calculadora pelo ID do catálogo",
-    input_schema:{ type:"object", properties:{ produto_id:{type:"string",description:"ID do produto em produtos_catalogo"} }, required:["produto_id"] } },
-  { name:"set_origem_modalidade", description:"Define fábrica de origem e modalidade de importação",
-    input_schema:{ type:"object", properties:{ origem:{type:"string",enum:["MAO","IOS","CWB"]}, modalidade:{type:"string",enum:["CKD","SKD","CBU"]} }, required:["origem","modalidade"] } },
-  { name:"set_canal", description:"Seleciona canal de venda",
-    input_schema:{ type:"object", properties:{ canal_id:{type:"string",description:"ID do canal (ex: 't3', 'corp', 'amzn')"} }, required:["canal_id"] } },
-  { name:"set_custo", description:"Define custo do produto",
-    input_schema:{ type:"object", properties:{ vpl_usd:{type:"number",description:"Custo em USD (VPL)"}, dolar:{type:"number",description:"Taxa do dólar (ptax)"}, producao:{type:"number",description:"Custo de produção em R$"} } } },
-  { name:"set_uf_destino", description:"Define UF de destino (para cálculo de ICMS e DIFAL)",
-    input_schema:{ type:"object", properties:{ uf:{type:"string",description:"Sigla do estado (ex: SP, RJ, MG)"} }, required:["uf"] } },
-  { name:"set_margem", description:"Define margem líquida alvo (ML%)",
-    input_schema:{ type:"object", properties:{ margem:{type:"number",description:"Percentual de margem líquida"} }, required:["margem"] } },
-  { name:"set_indices", description:"Sobrescreve índices comerciais específicos",
-    input_schema:{ type:"object", properties:{ rebate:{type:"number"}, mkt:{type:"number"}, frete:{type:"number"}, vpc:{type:"number"}, pdd:{type:"number"}, comis:{type:"number"} } } },
-  { name:"get_resultado", description:"Retorna o preço calculado atual (pF, ML%, MC%, markup). Chamar sempre ao final.",
-    input_schema:{ type:"object", properties:{} } },
+  { type:"function", function:{ name:"set_produto", description:"Seleciona o produto na calculadora pelo ID do catálogo",
+    parameters:{ type:"object", properties:{ produto_id:{type:"string",description:"ID do produto em produtos_catalogo"} }, required:["produto_id"] } } },
+  { type:"function", function:{ name:"set_origem_modalidade", description:"Define fábrica de origem e modalidade de importação",
+    parameters:{ type:"object", properties:{ origem:{type:"string",enum:["MAO","IOS","CWB"]}, modalidade:{type:"string",enum:["CKD","SKD","CBU"]} }, required:["origem","modalidade"] } } },
+  { type:"function", function:{ name:"set_canal", description:"Seleciona canal de venda",
+    parameters:{ type:"object", properties:{ canal_id:{type:"string",description:"ID do canal (ex: 't3', 'corp', 'amzn')"} }, required:["canal_id"] } } },
+  { type:"function", function:{ name:"set_custo", description:"Define custo do produto",
+    parameters:{ type:"object", properties:{ vpl_usd:{type:"number",description:"Custo em USD (VPL)"}, dolar:{type:"number",description:"Taxa do dólar (ptax)"}, producao:{type:"number",description:"Custo de produção em R$"} } } } },
+  { type:"function", function:{ name:"set_uf_destino", description:"Define UF de destino (para cálculo de ICMS e DIFAL)",
+    parameters:{ type:"object", properties:{ uf:{type:"string",description:"Sigla do estado (ex: SP, RJ, MG)"} }, required:["uf"] } } },
+  { type:"function", function:{ name:"set_margem", description:"Define margem líquida alvo (ML%)",
+    parameters:{ type:"object", properties:{ margem:{type:"number",description:"Percentual de margem líquida"} }, required:["margem"] } } },
+  { type:"function", function:{ name:"set_indices", description:"Sobrescreve índices comerciais específicos",
+    parameters:{ type:"object", properties:{ rebate:{type:"number"}, mkt:{type:"number"}, frete:{type:"number"}, vpc:{type:"number"}, pdd:{type:"number"}, comis:{type:"number"} } } } },
+  { type:"function", function:{ name:"get_resultado", description:"Retorna o preço calculado atual (pF, ML%, MC%, markup). Chamar sempre ao final.",
+    parameters:{ type:"object", properties:{} } } },
 ];
 
 function ChatPanel({ d, setD, c, produtosDB, onClose }) {
@@ -2821,34 +2821,37 @@ Resultado: pF R$ ${c.pF?.toFixed(2)||"—"} | ML ${c.margPct?.toFixed(2)||"—"}
     setMessages(newMsgs);
     setLoading(true);
     try {
-      let apiMsgs = newMsgs.map(m => ({ role:m.role, content:m.content }));
+      const systemMsg = { role:"system", content: CHAT_SYSTEM_PROMPT.replace("{CONTEXT}", buildCalcContext()) };
+      let apiMsgs = [systemMsg, ...newMsgs.map(m => ({ role:m.role, content:m.content||"" }))];
       while (true) {
-        const res = await fetch("https://api.anthropic.com/v1/messages", {
+        const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
           method:"POST",
-          headers:{ "x-api-key": import.meta.env.VITE_CLAUDE_KEY, "anthropic-version":"2023-06-01", "content-type":"application/json" },
-          body: JSON.stringify({ model:"claude-haiku-4-5-20251001", max_tokens:1024,
-            system: CHAT_SYSTEM_PROMPT.replace("{CONTEXT}", buildCalcContext()),
+          headers:{
+            "Authorization": `Bearer ${import.meta.env.VITE_CLAUDE_KEY}`,
+            "HTTP-Referer": "https://precificador-estimativa.vercel.app",
+            "content-type":"application/json"
+          },
+          body: JSON.stringify({ model:"anthropic/claude-haiku-4-5", max_tokens:1024,
             tools: CALC_TOOLS, messages: apiMsgs }),
         });
         if (!res.ok) throw new Error(`Erro API: ${res.status}`);
         const data = await res.json();
-        apiMsgs.push({ role:"assistant", content:data.content });
-        if (data.stop_reason === "end_turn") {
-          const txt = data.content.filter(b=>b.type==="text").map(b=>b.text).join("\n");
-          if (txt) setMessages(prev => [...prev, { role:"assistant", content:txt }]);
+        const msg = data.choices[0].message;
+        const finish = data.choices[0].finish_reason;
+        apiMsgs.push({ role:"assistant", content:msg.content||null, tool_calls:msg.tool_calls||undefined });
+        if (finish === "stop" || finish === "end_turn" || !msg.tool_calls?.length) {
+          if (msg.content) setMessages(prev => [...prev, { role:"assistant", content:msg.content }]);
           break;
         }
-        if (data.stop_reason === "tool_use") {
-          const toolResults = []; const names = [];
-          for (const blk of data.content) {
-            if (blk.type === "tool_use") {
-              const result = handleToolCall(blk.name, blk.input);
-              toolResults.push({ type:"tool_result", tool_use_id:blk.id, content:JSON.stringify(result) });
-              names.push(blk.name.replace(/_/g," "));
-            }
+        if (finish === "tool_calls") {
+          const names = [];
+          for (const tc of msg.tool_calls) {
+            const inp = JSON.parse(tc.function.arguments||"{}");
+            const result = handleToolCall(tc.function.name, inp);
+            apiMsgs.push({ role:"tool", tool_call_id:tc.id, content:JSON.stringify(result) });
+            names.push(tc.function.name.replace(/_/g," "));
           }
           setMessages(prev => [...prev, { role:"tool", content:names.join(" · ") }]);
-          apiMsgs.push({ role:"user", content:toolResults });
         }
       }
     } catch(e) {
