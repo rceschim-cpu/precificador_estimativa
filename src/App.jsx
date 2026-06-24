@@ -2750,6 +2750,7 @@ function ChatPanel({ d, setD, c, produtosDB, onClose }) {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const scrollRef = useRef(null);
+  const apiHistoryRef = useRef([]);
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -2817,13 +2818,13 @@ Resultado: pF R$ ${c.pF?.toFixed(2)||"—"} | ML ${c.margPct?.toFixed(2)||"—"}
     if (!input.trim() || loading) return;
     const userText = input.trim();
     setInput("");
-    const newMsgs = [...messages, { role:"user", content:userText }];
-    setMessages(newMsgs);
+    setMessages(prev => [...prev, { role:"user", content:userText }]);
     setLoading(true);
     try {
       const systemMsg = { role:"system", content: CHAT_SYSTEM_PROMPT.replace("{CONTEXT}", buildCalcContext()) };
-      let apiMsgs = [systemMsg, ...newMsgs.map(m => ({ role:m.role, content:m.content||"" }))];
+      apiHistoryRef.current.push({ role:"user", content:userText });
       while (true) {
+        const apiMsgs = [systemMsg, ...apiHistoryRef.current];
         const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
           method:"POST",
           headers:{
@@ -2838,7 +2839,7 @@ Resultado: pF R$ ${c.pF?.toFixed(2)||"—"} | ML ${c.margPct?.toFixed(2)||"—"}
         const data = await res.json();
         const msg = data.choices[0].message;
         const finish = data.choices[0].finish_reason;
-        apiMsgs.push({ role:"assistant", content:msg.content||null, tool_calls:msg.tool_calls||undefined });
+        apiHistoryRef.current.push({ role:"assistant", content:msg.content||null, ...(msg.tool_calls?.length ? { tool_calls:msg.tool_calls } : {}) });
         if (finish === "stop" || finish === "end_turn" || !msg.tool_calls?.length) {
           if (msg.content) setMessages(prev => [...prev, { role:"assistant", content:msg.content }]);
           break;
@@ -2848,7 +2849,8 @@ Resultado: pF R$ ${c.pF?.toFixed(2)||"—"} | ML ${c.margPct?.toFixed(2)||"—"}
           for (const tc of msg.tool_calls) {
             const inp = JSON.parse(tc.function.arguments||"{}");
             const result = handleToolCall(tc.function.name, inp);
-            apiMsgs.push({ role:"tool", tool_call_id:tc.id, content:JSON.stringify(result) });
+            const toolMsg = { role:"tool", tool_call_id:tc.id, content:JSON.stringify(result) };
+            apiHistoryRef.current.push(toolMsg);
             names.push(tc.function.name.replace(/_/g," "));
           }
           setMessages(prev => [...prev, { role:"tool", content:names.join(" · ") }]);
