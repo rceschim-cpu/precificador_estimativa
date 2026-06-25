@@ -140,6 +140,8 @@ input,select,textarea,button{font-family:inherit}
   background:linear-gradient(90deg,#3CDBC0,#2bc4ab,#3CDBC0);
 }
 @keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+@keyframes agentPulse{0%,100%{box-shadow:0 0 0 2px #3CDBC0,0 0 18px rgba(60,219,192,.35)}50%{box-shadow:0 0 0 3px #3CDBC0,0 0 32px rgba(60,219,192,.6)}}
+.agent-ativo{animation:agentPulse 1.8s ease-in-out infinite;border-radius:4px}
 
 .auth-head{padding:32px 32px 0;display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center}
 .auth-logo{display:flex;align-items:center;gap:10px}
@@ -2733,6 +2735,13 @@ REGRAS OBRIGATÓRIAS:
 - Formato de valores monetários: R$ com 2 casas decimais.
 - Seja direto. Confirme o que foi preenchido em uma linha.
 
+FLUXO PARA PRECIFICAR COM ÍNDICES REAIS:
+1. set_produto → set_origem_modalidade → set_canal → set_uf_destino → set_custo
+2. query_indices_historico (usando o SKU do produto) com canal_filtro se o usuário mencionou cliente/canal
+3. aplicar_indices_completo com os valores do canal mais relevante encontrado
+4. set_margem se o usuário definiu margem alvo
+5. get_resultado para apresentar pF, ML%, MC%
+
 CONTEXTO DA CALCULADORA (injetado dinamicamente):
 {CONTEXT}`;
 
@@ -2758,14 +2767,27 @@ const CALC_TOOLS = [
       sku:{type:"string",description:"Código SAP do produto (campo sku no catálogo). Se não souber, use o produto_id e eu busco o SKU."},
       canal_filtro:{type:"string",description:"Filtro opcional por nome do cliente/canal (ex: 'AMAZON', 'MAGAZINE', 'GAZIN', 'CASAS BAHIA')"},
     }, required:["sku"] } } },
+  { type:"function", function:{ name:"aplicar_indices_completo", description:"Aplica todos os índices comerciais históricos na calculadora de uma vez. Use após query_indices_historico para preencher os campos com os valores reais do canal escolhido.",
+    parameters:{ type:"object", properties:{
+      rebate_pct:{type:"number",description:"Rebate %"},
+      mkt_pct:{type:"number",description:"Marketing %"},
+      frete_pct:{type:"number",description:"Frete %"},
+      zv09_pct:{type:"number",description:"Custo financeiro canal ZV09 %"},
+      zv11_pct:{type:"number",description:"Custo fixo canal ZV11 %"},
+      pd_pct:{type:"number",description:"P&D canal ZV25 %"},
+      scrap_pct:{type:"number",description:"Scrap canal ZV29 %"},
+      comis_pct:{type:"number",description:"Comissão %"},
+      margem:{type:"number",description:"Margem líquida alvo %"},
+    } } } },
 ];
 
-function ChatPanel({ d, setD, c, produtosDB, onClose }) {
+function ChatPanel({ d, setD, c, produtosDB, onClose, onPrecificando }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const scrollRef = useRef(null);
   const apiHistoryRef = useRef([]);
+  const notifyFill = () => onPrecificando?.(true);
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -2786,15 +2808,18 @@ Resultado: pF R$ ${c.pF?.toFixed(2)||"—"} | ML ${c.margPct?.toFixed(2)||"—"}
 
   const handleToolCall = async (name, inp) => {
     if (name === "set_produto") {
+      notifyFill();
       setD(p => ({...p, prodId: inp.produto_id}));
       const prod = produtosDB.find(p => p.id === inp.produto_id);
       return { ok:true, msg:`Produto: ${prod?.nome || inp.produto_id}` };
     }
     if (name === "set_origem_modalidade") {
+      notifyFill();
       setD(p => ({...p, origem: inp.origem, modalidade: inp.modalidade}));
       return { ok:true, msg:`${inp.origem} / ${inp.modalidade}` };
     }
     if (name === "set_canal") {
+      notifyFill();
       const canal = CANAIS.find(c => c.id === inp.canal_id);
       if (!canal?.default) return { ok:false, msg:"Canal não encontrado" };
       const rates = getCanalRates(inp.canal_id, "");
@@ -2802,6 +2827,7 @@ Resultado: pF R$ ${c.pF?.toFixed(2)||"—"} | ML ${c.margPct?.toFixed(2)||"—"}
       return { ok:true, msg:`Canal: ${canal.label}` };
     }
     if (name === "set_custo") {
+      notifyFill();
       const upd = {};
       if (inp.vpl_usd  !== undefined) upd.fobUSD   = inp.vpl_usd;
       if (inp.dolar    !== undefined) upd.ptax      = inp.dolar;
@@ -2810,18 +2836,37 @@ Resultado: pF R$ ${c.pF?.toFixed(2)||"—"} | ML ${c.margPct?.toFixed(2)||"—"}
       return { ok:true, msg:"Custo atualizado" };
     }
     if (name === "set_uf_destino") {
+      notifyFill();
       setD(p => ({...p, ufDestino: inp.uf.toUpperCase()}));
       return { ok:true, msg:`UF: ${inp.uf.toUpperCase()}` };
     }
     if (name === "set_margem") {
+      notifyFill();
       setD(p => ({...p, margem: inp.margem}));
       return { ok:true, msg:`ML: ${inp.margem}%` };
     }
     if (name === "set_indices") {
+      notifyFill();
       const upd = {};
       ["rebate","mkt","frete","vpc","pdd","comis"].forEach(k => { if (inp[k] !== undefined) upd[k] = inp[k]; });
       setD(p => ({...p, ...upd}));
       return { ok:true, msg:"Índices atualizados" };
+    }
+    if (name === "aplicar_indices_completo") {
+      notifyFill();
+      const campos = {
+        rebate:"rebate_pct", mkt:"mkt_pct", frete:"frete_pct",
+        custoFin:"zv09_pct", custoFixoCan:"zv11_pct", pedCan:"pd_pct",
+        scrapCan:"scrap_pct", comis:"comis_pct", margem:"margem_pct",
+      };
+      const upd = {};
+      Object.entries(campos).forEach(([stateKey, inpKey]) => {
+        const v = inp[inpKey] ?? inp[stateKey];
+        if (v !== undefined) upd[stateKey] = +parseFloat(v).toFixed(2);
+      });
+      if (inp.margem !== undefined) upd.margem = +parseFloat(inp.margem).toFixed(2);
+      setD(p => ({...p, ...upd}));
+      return { ok:true, campos_aplicados: Object.keys(upd), msg:`${Object.keys(upd).length} campos aplicados` };
     }
     if (name === "get_resultado") {
       return { pF: c.pF, ml: c.margPct, mc: c.mc, markup: c.mkp };
@@ -2904,17 +2949,19 @@ Resultado: pF R$ ${c.pF?.toFixed(2)||"—"} | ML ${c.margPct?.toFixed(2)||"—"}
       }
     } catch(e) {
       setMessages(prev => [...prev, { role:"error", content:e.message }]);
-    } finally { setLoading(false); }
+    } finally { setLoading(false); onPrecificando?.(false); }
   };
 
   const S={fontFamily:"'Montserrat',sans-serif"};
   return (
-    <div style={{position:"fixed",top:0,right:0,bottom:0,width:380,background:"#0d0d15",borderLeft:"1px solid rgba(255,255,255,.1)",display:"flex",flexDirection:"column",zIndex:1000,...S}}>
+    <div style={{position:"fixed",top:0,right:0,bottom:0,width:400,background:"#0d0d15",borderLeft:"2px solid rgba(60,219,192,.25)",display:"flex",flexDirection:"column",zIndex:1000,...S}}>
       <div style={{padding:"14px 16px",borderBottom:"1px solid rgba(255,255,255,.08)",display:"flex",alignItems:"center",gap:10,flexShrink:0}}>
         <span style={{fontSize:18}}>🤖</span>
         <div style={{flex:1}}>
           <div style={{fontSize:13,fontWeight:700,color:"#f0f4ff"}}>Assistente Positec</div>
-          <div style={{fontSize:10,color:"#5a6a84"}}>Descreva o cenário — eu preencho os campos</div>
+          <div style={{fontSize:10,color:loading?"#3CDBC0":"#5a6a84",transition:".3s"}}>
+            {loading?"⚡ Preenchendo a calculadora...":"Descreva o cenário — eu preencho os campos"}
+          </div>
         </div>
         <button onClick={onClose} style={{background:"none",border:"none",color:"#5a6a84",cursor:"pointer",fontSize:18,lineHeight:1,padding:"2px 6px"}}>✕</button>
       </div>
@@ -2964,6 +3011,7 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
   const [tab,setTab]=useState("perfil");
   const [modal,setModal]=useState(null);
   const [chatOpen,setChatOpen]=useState(false);
+  const [chatPrecificando,setChatPrecificando]=useState(false);
   const [produtosDB,setProdutosDB]=useState([]);
   const [produtoDB,setProdutoDB]=useState(null);
   const [categoriasDB,setCategoriasDB]=useState([]);
@@ -3537,7 +3585,7 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
       );
     })()}
 
-    <div className="app">
+    <div className={`app${chatPrecificando?" agent-ativo":""}`} style={{transition:"margin-right .25s ease",marginRight:chatOpen?400:0}}>
     <style>{CSS}</style>
 
       {/* sub-header: badges de contexto + nome da aba + botões */}
@@ -4311,7 +4359,7 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
         </main>
       </div>
     </div>
-    {chatOpen&&<ChatPanel d={d} setD={setD} c={c} produtosDB={produtosDB} onClose={()=>setChatOpen(false)}/>}
+    {chatOpen&&<ChatPanel d={d} setD={setD} c={c} produtosDB={produtosDB} onClose={()=>{setChatOpen(false);setChatPrecificando(false);}} onPrecificando={v=>setChatPrecificando(v)}/>}
     </>
   );
 }
