@@ -51,6 +51,49 @@ const db = {
   deletePastaRegistro: (id)       => sbFetch(`pastas_registros?id=eq.${id}`, { method:"DELETE", prefer:"return=minimal" }),
 };
 
+// ── SHAREPOINT via Power Automate ─────────────────────────────────────────────
+const SP_SALVAR_URL   = import.meta.env.VITE_SP_SALVAR_URL   || "";
+const SP_CARREGAR_URL = import.meta.env.VITE_SP_CARREGAR_URL || "";
+const SP_DELETAR_URL  = import.meta.env.VITE_SP_DELETAR_URL  || "";
+const spAtivo = () => !!(SP_SALVAR_URL && SP_CARREGAR_URL);
+
+const spPost = async (url, body) => {
+  const r = await fetch(url, { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body) });
+  if (!r.ok) throw new Error(`Flow HTTP ${r.status}`);
+  const txt = await r.text();
+  return txt ? JSON.parse(txt) : {};
+};
+
+const spDb = {
+  getRegistros: async (userId) => {
+    const raw = await spPost(SP_CARREGAR_URL, { usuario: String(userId) });
+    const rows = Array.isArray(raw) ? raw : (raw?.value || []);
+    return rows.map(r => ({
+      id:           `sp:${r.ID}`,
+      nome:         r.Title || "Sem nome",
+      pastaId:      r.Pasta || null,
+      compartilhado: false,
+      userId:       r.Usuario || String(userId),
+      data:         r.Timestamp ? new Date(r.Timestamp).toLocaleString("pt-BR") : "—",
+      d:     (() => { try { return JSON.parse(r.DadosCompletos)?.d;     } catch { return null; } })(),
+      calcs: (() => { try { return JSON.parse(r.DadosCompletos)?.calcs; } catch { return null; } })(),
+    }));
+  },
+  insertRegistro: async (userId, nome, pastaPath, _comp, d, calcs) => {
+    return spPost(SP_SALVAR_URL, {
+      nome, pasta: pastaPath || "", usuario: String(userId),
+      produto: d?.prodId || "", origem: d?.origem || "", modalidade: d?.modalidade || "",
+      pF: calcs?.pF || 0, ml: calcs?.margPct || 0, mc: calcs?.mc || 0,
+      dados: JSON.stringify({ d, calcs }), ts: new Date().toISOString(),
+    });
+  },
+  deleteRegistro: async (spId) => {
+    if (!SP_DELETAR_URL) return;
+    const id = parseInt(String(spId).replace("sp:", ""), 10);
+    if (!isNaN(id)) return spPost(SP_DELETAR_URL, { id });
+  },
+};
+
 // ── STORAGE (sessão local apenas) ─────────────────────────────────────────────
 const KEYS = { session: "ptc_session", perfis: "ptc_perfis" };
 
@@ -1856,6 +1899,7 @@ function ModalRegistros({onClose, onLoad, currentD, currentCalcs, prodNome, user
   const [migMsg, setMigMsg]       = useState(null);
 
   const canManageShared = user?.perfil === "admin" || user?.perfil === "custos";
+  const isSP = spAtivo();
 
   const localCount = () => {
     try { return JSON.parse(localStorage.getItem("positec_calc_registros")||"[]").length; } catch { return 0; }
@@ -1864,30 +1908,37 @@ function ModalRegistros({onClose, onLoad, currentD, currentCalcs, prodNome, user
   const handleMigrar = async () => {
     setMigrando(true); setMigMsg(null); setErro(null);
     try {
-      const regsLocal  = JSON.parse(localStorage.getItem("positec_calc_registros")||"[]");
+      const regsLocal   = JSON.parse(localStorage.getItem("positec_calc_registros")||"[]");
       const pastasLocal = JSON.parse(localStorage.getItem("positec_calc_pastas")||"[]");
       if(regsLocal.length===0){ setMigMsg("Nenhum registro local encontrado."); return; }
 
-      // Cria pastas em ordem topológica (raiz primeiro) e mapeia id antigo → novo
+      if (isSP) {
+        let ok=0, fail=0;
+        for(const r of regsLocal){
+          try {
+            const pasta = r.pastaId ? (pastasLocal.find(p=>p.id===r.pastaId)?.nome || "") : "";
+            await spDb.insertRegistro(user.id, r.nome, pasta, false, r.d, r.calcs);
+            ok++;
+          } catch { fail++; }
+        }
+        setMigMsg(`✓ ${ok} registro${ok!==1?"s":""} migrado${ok!==1?"s":""} para o SharePoint${fail?` · ${fail} falhou`:""}. Pode limpar o armazenamento local.`);
+        await reload();
+        return;
+      }
+
       const idMap = {};
       const ordered = [];
       const add = (p) => { if(idMap[p.id]!==undefined||ordered.includes(p)) return; if(p.pai) { const pai=pastasLocal.find(x=>x.id===p.pai); if(pai) add(pai); } ordered.push(p); };
       pastasLocal.forEach(add);
-
       for(const p of ordered){
         const novoId = (await db.insertPastaRegistro(user.id, p.nome, p.pai ? (idMap[p.pai]??null) : null, false))?.[0]?.id;
         if(novoId) idMap[p.id] = novoId;
       }
-
-      // Cria registros
       let ok=0, fail=0;
       for(const r of regsLocal){
-        try {
-          await db.insertRegistro(user.id, r.nome, r.pastaId ? (idMap[r.pastaId]??null) : null, false, r.d, r.calcs);
-          ok++;
-        } catch { fail++; }
+        try { await db.insertRegistro(user.id, r.nome, r.pastaId ? (idMap[r.pastaId]??null) : null, false, r.d, r.calcs); ok++; }
+        catch { fail++; }
       }
-
       setMigMsg(`✓ ${ok} registro${ok!==1?"s":""} migrado${ok!==1?"s":""}${fail?` · ${fail} falhou`:""}. Pode limpar o armazenamento local se quiser.`);
       await reload();
     } catch(e) { setErro("Erro na migração: "+e.message); }
@@ -1897,8 +1948,25 @@ function ModalRegistros({onClose, onLoad, currentD, currentCalcs, prodNome, user
   const reload = async () => {
     setLoading(true); setErro(null);
     try {
-      const [regs, pas] = await Promise.all([db.getRegistros(user.id), db.getPastasRegistros(user.id)]);
-      setRegistros(regs||[]); setPastas(pas||[]);
+      if (isSP) {
+        const regs = await spDb.getRegistros(user.id);
+        const pastaStrings = [...new Set(regs.map(r=>r.pastaId).filter(Boolean))];
+        const virtualPastas = []; const seen = new Set();
+        for (const path of pastaStrings) {
+          const parts = path.split("/");
+          for (let i=0; i<parts.length; i++) {
+            const full = parts.slice(0,i+1).join("/");
+            if (!seen.has(full)) {
+              seen.add(full);
+              virtualPastas.push({ id:full, nome:parts[i], pai: i>0?parts.slice(0,i).join("/"):null, compartilhado:false, userId:user.id });
+            }
+          }
+        }
+        setRegistros(regs); setPastas(virtualPastas);
+      } else {
+        const [regs, pas] = await Promise.all([db.getRegistros(user.id), db.getPastasRegistros(user.id)]);
+        setRegistros(regs||[]); setPastas(pas||[]);
+      }
     } catch(e) { setErro("Erro ao carregar: "+e.message); }
     finally { setLoading(false); }
   };
@@ -1918,7 +1986,9 @@ function ModalRegistros({onClose, onLoad, currentD, currentCalcs, prodNome, user
     const label = nome.trim() || prodNome || "Sem nome";
     setErro(null); setSaving(true);
     try {
-      if(sobrescrever){
+      if (isSP) {
+        await spDb.insertRegistro(user.id, label, pastaAtual, compartilhado, currentD, currentCalcs);
+      } else if (sobrescrever) {
         const reg = registros.find(r=>r.id===sobrescrever);
         if(reg?.compartilhado && !canManageShared){ setErro("Sem permissão para sobrescrever registros compartilhados."); return; }
         await db.updateRegistro(sobrescrever, { nome:label, dados:{d:currentD,calcs:currentCalcs} });
@@ -1934,19 +2004,28 @@ function ModalRegistros({onClose, onLoad, currentD, currentCalcs, prodNome, user
   const handleDelete = async (id) => {
     const reg = registros.find(r=>r.id===id);
     if(reg?.compartilhado && !canManageShared){ setErro("Sem permissão para excluir registros compartilhados."); setConfirmDel(null); return; }
-    try { await db.deleteRegistro(id); await reload(); } catch(e) { setErro("Erro: "+e.message); }
+    try {
+      if (isSP) await spDb.deleteRegistro(id);
+      else await db.deleteRegistro(id);
+      await reload();
+    } catch(e) { setErro("Erro: "+e.message); }
     setConfirmDel(null);
   };
 
   const handleDeletePasta = async (id) => {
     try {
-      const regsNesta = registros.filter(r=>r.pastaId===id);
-      const subps = pastas.filter(p=>p.pai===id);
-      await Promise.all([
-        ...regsNesta.map(r=>db.updateRegistro(r.id,{pasta_id:null})),
-        ...subps.map(p=>db.updatePastaRegistro(p.id,{pai_id:null})),
-      ]);
-      await db.deletePastaRegistro(id);
+      if (isSP) {
+        const toDelete = registros.filter(r => r.pastaId===id || r.pastaId?.startsWith(id+"/"));
+        await Promise.all(toDelete.map(r => spDb.deleteRegistro(r.id)));
+      } else {
+        const regsNesta = registros.filter(r=>r.pastaId===id);
+        const subps = pastas.filter(p=>p.pai===id);
+        await Promise.all([
+          ...regsNesta.map(r=>db.updateRegistro(r.id,{pasta_id:null})),
+          ...subps.map(p=>db.updatePastaRegistro(p.id,{pai_id:null})),
+        ]);
+        await db.deletePastaRegistro(id);
+      }
       if(pastaAtual===id) setPastaAtual(null);
       await reload();
     } catch(e) { setErro("Erro: "+e.message); }
@@ -1956,18 +2035,26 @@ function ModalRegistros({onClose, onLoad, currentD, currentCalcs, prodNome, user
   const handleCriarPasta = async () => {
     if(!nomePasta.trim()) return;
     try {
-      await db.insertPastaRegistro(user.id, nomePasta.trim(), pastaPaiCriacao??pastaAtual??null, false);
-      setNomePasta(""); setView("lista"); setPastaPaiCriacao(null); await reload();
+      if (isSP) {
+        const path = [pastaAtual, nomePasta.trim()].filter(Boolean).join("/");
+        setPastas(prev => [...prev, { id:path, nome:nomePasta.trim(), pai:pastaAtual||null, compartilhado:false, userId:user.id }]);
+      } else {
+        await db.insertPastaRegistro(user.id, nomePasta.trim(), pastaPaiCriacao??pastaAtual??null, false);
+        await reload();
+      }
+      setNomePasta(""); setView("lista"); setPastaPaiCriacao(null);
     } catch(e) { setErro("Erro: "+e.message); }
   };
 
   const handleMover = async (pastaDestino) => {
+    if (isSP) { setErro("Mover registros entre pastas ainda não disponível no modo SharePoint."); return; }
     try { await db.updateRegistro(registroMover,{pasta_id:pastaDestino}); setRegistroMover(null); setView("lista"); await reload(); }
     catch(e) { setErro("Erro: "+e.message); }
   };
 
   const handleRenomear = async (id) => {
     if(!editVal.trim()) return;
+    if (isSP) { setErro("Renomear ainda não disponível no modo SharePoint."); setEditNome(null); return; }
     try { await db.updateRegistro(id,{nome:editVal.trim()}); setEditNome(null); await reload(); }
     catch(e) { setErro("Erro: "+e.message); }
   };
@@ -2021,6 +2108,9 @@ function ModalRegistros({onClose, onLoad, currentD, currentCalcs, prodNome, user
       <div className="mb" style={{maxWidth:580}} onClick={e=>e.stopPropagation()}>
         <div className="mh">
           <span className="mt">📋 Registros</span>
+          {isSP
+            ? <span style={{fontSize:9,fontWeight:700,padding:"2px 8px",background:"rgba(0,120,212,.2)",border:"1px solid rgba(0,120,212,.4)",color:"#60a5fa",borderRadius:10,letterSpacing:.5}}>SharePoint</span>
+            : <span style={{fontSize:9,fontWeight:700,padding:"2px 8px",background:"rgba(60,219,192,.1)",border:"1px solid rgba(60,219,192,.25)",color:"#3CDBC0",borderRadius:10,letterSpacing:.5}}>Supabase</span>}
           <button className="mc_btn" onClick={onClose}>×</button>
         </div>
         <div className="mbody">
@@ -2062,8 +2152,8 @@ function ModalRegistros({onClose, onLoad, currentD, currentCalcs, prodNome, user
                 🌐 Compartilhar com todos
               </label>
             </div>
-            {/* Sobrescrever dropdown */}
-            <div style={{display:"flex",alignItems:"center",gap:8}}>
+            {/* Sobrescrever dropdown — apenas Supabase */}
+            {!isSP&&<div style={{display:"flex",alignItems:"center",gap:8}}>
               <span style={{fontSize:10,color:"#5a6a84",flexShrink:0}}>Ou sobrescrever:</span>
               <select value={sobrescrever||""}
                 onChange={e=>setSobrescrever(e.target.value ? Number(e.target.value) : null)}
@@ -2075,7 +2165,7 @@ function ModalRegistros({onClose, onLoad, currentD, currentCalcs, prodNome, user
               </select>
               {sobrescrever&&<button onClick={()=>setSobrescrever(null)}
                 style={{padding:"3px 8px",background:"none",border:"1px solid rgba(255,255,255,.1)",color:"#A7A8AA",fontSize:10,cursor:"pointer",borderRadius:3}}>✕</button>}
-            </div>
+            </div>}
           </div>
 
           {/* ── Navegação de pastas com breadcrumb ── */}
