@@ -2753,6 +2753,11 @@ const CALC_TOOLS = [
     parameters:{ type:"object", properties:{ rebate:{type:"number"}, mkt:{type:"number"}, frete:{type:"number"}, vpc:{type:"number"}, pdd:{type:"number"}, comis:{type:"number"} } } } },
   { type:"function", function:{ name:"get_resultado", description:"Retorna o preço calculado atual (pF, ML%, MC%, markup). Chamar sempre ao final.",
     parameters:{ type:"object", properties:{} } } },
+  { type:"function", function:{ name:"query_indices_historico", description:"Consulta índices reais históricos (rebate, mkt, frete, ZV09, ZV11, BKP, P&D) por produto baseado nos fechamentos da Controladoria. Use antes de precificar para saber os índices praticados com cada canal/cliente.",
+    parameters:{ type:"object", properties:{
+      sku:{type:"string",description:"Código SAP do produto (campo sku no catálogo). Se não souber, use o produto_id e eu busco o SKU."},
+      canal_filtro:{type:"string",description:"Filtro opcional por nome do cliente/canal (ex: 'AMAZON', 'MAGAZINE', 'GAZIN', 'CASAS BAHIA')"},
+    }, required:["sku"] } } },
 ];
 
 function ChatPanel({ d, setD, c, produtosDB, onClose }) {
@@ -2779,7 +2784,7 @@ Margem alvo (ML): ${d.margem}%
 Resultado: pF R$ ${c.pF?.toFixed(2)||"—"} | ML ${c.margPct?.toFixed(2)||"—"}% | MC ${c.mc?.toFixed(2)||"—"}%`;
   };
 
-  const handleToolCall = (name, inp) => {
+  const handleToolCall = async (name, inp) => {
     if (name === "set_produto") {
       setD(p => ({...p, prodId: inp.produto_id}));
       const prod = produtosDB.find(p => p.id === inp.produto_id);
@@ -2821,6 +2826,37 @@ Resultado: pF R$ ${c.pF?.toFixed(2)||"—"} | ML ${c.margPct?.toFixed(2)||"—"}
     if (name === "get_resultado") {
       return { pF: c.pF, ml: c.margPct, mc: c.mc, markup: c.mkp };
     }
+    if (name === "query_indices_historico") {
+      try {
+        const prod = produtosDB.find(p => p.sku === inp.sku || p.id === inp.sku);
+        const sku = inp.sku || prod?.sku;
+        if (!sku) return { found:false, msg:"SKU não encontrado" };
+        const filtro = inp.canal_filtro
+          ? `&cliente_nome=ilike.*${encodeURIComponent(inp.canal_filtro)}*` : "";
+        const data = await sbFetch(
+          `precificacao_indices?sku=eq.${sku}${filtro}&select=canal,cliente,cliente_nome,planta,data_ref,rebate_pct,mkt_pct,frete_pct,zv09_pct,zv11_pct,bkp_pct,pd_pct,scrap_pct,margger_pct,mc_pct,margem_pct,fonte&order=data_ref.desc&limit=100`
+        );
+        if (!data?.length) return { found:false, msg:`Nenhum índice encontrado para SKU ${sku}${inp.canal_filtro?" com filtro '"+inp.canal_filtro+"'":""}` };
+        const grupos = {};
+        for (const r of data) {
+          const k = `${r.canal}|${r.planta}`;
+          if (!grupos[k]) grupos[k] = [];
+          grupos[k].push(r);
+        }
+        const med = arr => { const v=arr.filter(x=>x>0).sort((a,b)=>a-b); return v.length?+(v[Math.floor(v.length/2)]).toFixed(2):0; };
+        const resumo = Object.values(grupos).map(rs=>({
+          canal_sap:rs[0].canal, planta:rs[0].planta, qtd:rs.length,
+          data_mais_recente:rs[0].data_ref,
+          clientes:[...new Set(rs.map(r=>r.cliente_nome).filter(Boolean))].slice(0,3).join(", "),
+          rebate:med(rs.map(r=>r.rebate_pct)), mkt:med(rs.map(r=>r.mkt_pct)),
+          frete:med(rs.map(r=>r.frete_pct)), zv09_custoFin:med(rs.map(r=>r.zv09_pct)),
+          zv11_cfixoCan:med(rs.map(r=>r.zv11_pct)), bkp:med(rs.map(r=>r.bkp_pct)),
+          pd:med(rs.map(r=>r.pd_pct)), mc_mediana:med(rs.map(r=>r.mc_pct)),
+        }));
+        resumo.sort((a,b)=>b.qtd-a.qtd);
+        return { found:true, sku, total_registros:data.length, por_canal:resumo };
+      } catch(e) { return { found:false, error:String(e) }; }
+    }
     return { ok:false, msg:"Tool desconhecida" };
   };
 
@@ -2858,7 +2894,7 @@ Resultado: pF R$ ${c.pF?.toFixed(2)||"—"} | ML ${c.margPct?.toFixed(2)||"—"}
           const names = [];
           for (const tc of msg.tool_calls) {
             const inp = JSON.parse(tc.function.arguments||"{}");
-            const result = handleToolCall(tc.function.name, inp);
+            const result = await handleToolCall(tc.function.name, inp);
             const toolMsg = { role:"tool", tool_call_id:tc.id, content:JSON.stringify(result) };
             apiHistoryRef.current.push(toolMsg);
             names.push(tc.function.name.replace(/_/g," "));
@@ -2935,6 +2971,21 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
   const [editCadModal,setEditCadModal]=useState(false);
   const [editCadForm,setEditCadForm]=useState(null);
   const [editCadSalvando,setEditCadSalvando]=useState(false);
+  const [historIndices,setHistorIndices]=useState([]);
+  const [historLoading,setHistorLoading]=useState(false);
+  const [showHistorModal,setShowHistorModal]=useState(false);
+
+  const fetchHistoricoIndices = async (sku) => {
+    if (!sku) return;
+    setHistorLoading(true);
+    try {
+      const data = await sbFetch(
+        `precificacao_indices?sku=eq.${encodeURIComponent(sku)}&select=canal,cliente,cliente_nome,planta,data_ref,rebate_pct,mkt_pct,frete_pct,zv09_pct,zv11_pct,bkp_pct,pd_pct,scrap_pct,margger_pct,mc_pct,margem_pct,fonte&order=data_ref.desc&limit=200`
+      );
+      setHistorIndices(Array.isArray(data) ? data : []);
+    } catch(e) { setHistorIndices([]); }
+    setHistorLoading(false);
+  };
 
   // Escuta evento do botão Gestão no topbar
   useEffect(()=>{
@@ -3411,6 +3462,76 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
                 {editCadSalvando?"Salvando...":"Salvar"}
               </button>
             </div>
+          </div>
+        </div>
+      );
+    })()}
+
+    {showHistorModal&&(()=>{
+      const sku=produtoDB?.sku||"";
+      const canalAtual=CANAIS.find(c=>c.id===d.canalId);
+      const aplicar=r=>{
+        setD(p=>({...p,
+          rebate:+(r.rebate_pct||0).toFixed(2),
+          mkt:+(r.mkt_pct||0).toFixed(2),
+          custoFin:+(r.zv09_pct||0).toFixed(2),
+          custoFixoCan:+(r.zv11_pct||0).toFixed(2),
+          frete:+(r.frete_pct||0).toFixed(2),
+          pedCan:+(r.pd_pct||0).toFixed(2),
+          scrapCan:+(r.scrap_pct||0).toFixed(2),
+        }));
+        setShowHistorModal(false);
+      };
+      const cols=[
+        {k:"cliente_nome",l:"Cliente",w:160},
+        {k:"planta",l:"Planta",w:48},
+        {k:"data_ref",l:"Data",w:80},
+        {k:"rebate_pct",l:"Rebate%",w:60},
+        {k:"mkt_pct",l:"Mkt%",w:55},
+        {k:"frete_pct",l:"Frete%",w:55},
+        {k:"zv09_pct",l:"ZV09%",w:55},
+        {k:"zv11_pct",l:"ZV11%",w:55},
+        {k:"pd_pct",l:"P&D%",w:50},
+        {k:"scrap_pct",l:"Scrap%",w:55},
+        {k:"mc_pct",l:"MC%",w:55},
+      ];
+      const rows=historIndices;
+      return(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.75)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center"}} onClick={e=>{if(e.target===e.currentTarget)setShowHistorModal(false);}}>
+          <div style={{background:"#1a2332",border:"1px solid rgba(255,255,255,.15)",borderRadius:10,width:"min(92vw,980px)",maxHeight:"80vh",display:"flex",flexDirection:"column",overflow:"hidden"}}>
+            <div style={{padding:"14px 20px",borderBottom:"1px solid rgba(255,255,255,.1)",display:"flex",alignItems:"center",gap:10}}>
+              <span style={{fontWeight:700,fontSize:14,color:"#e2e8f0"}}>Histórico Real — SKU {sku}</span>
+              {canalAtual&&<span style={{fontSize:11,color:"#63b3ed",background:"rgba(99,179,237,.1)",padding:"2px 8px",borderRadius:12,border:"1px solid rgba(99,179,237,.3)"}}>{canalAtual.label}</span>}
+              <span style={{fontSize:10,color:"#5a6a84",marginLeft:"auto"}}>{rows.length} registros</span>
+              <button onClick={()=>setShowHistorModal(false)} style={{background:"none",border:"none",color:"#94a3b8",cursor:"pointer",fontSize:18,padding:"0 4px"}}>✕</button>
+            </div>
+            {historLoading?<div style={{padding:40,textAlign:"center",color:"#63b3ed"}}>Carregando...</div>:
+            rows.length===0?<div style={{padding:40,textAlign:"center",color:"#5a6a84"}}>Nenhum registro encontrado para este SKU.</div>:(
+            <div style={{overflowY:"auto",flex:1}}>
+              <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
+                <thead style={{position:"sticky",top:0,background:"#1a2332",zIndex:1}}>
+                  <tr>
+                    {cols.map(c=><th key={c.k} style={{padding:"8px 10px",textAlign:"left",color:"#94a3b8",fontWeight:600,borderBottom:"1px solid rgba(255,255,255,.08)",minWidth:c.w,maxWidth:c.w,overflow:"hidden",whiteSpace:"nowrap"}}>{c.l}</th>)}
+                    <th style={{padding:"8px 10px",color:"#94a3b8",fontWeight:600,borderBottom:"1px solid rgba(255,255,255,.08)"}}>Aplicar</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((r,i)=>(
+                    <tr key={i} style={{borderBottom:"1px solid rgba(255,255,255,.04)",background:i%2?"rgba(255,255,255,.02)":"none"}}>
+                      {cols.map(c=><td key={c.k} style={{padding:"6px 10px",color:"#cbd5e1",maxWidth:c.w,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                        {typeof r[c.k]==="number"?r[c.k].toFixed(2):(r[c.k]||"—")}
+                      </td>)}
+                      <td style={{padding:"6px 10px"}}>
+                        <button onClick={()=>aplicar(r)} style={{padding:"3px 10px",fontSize:10,fontWeight:700,cursor:"pointer",borderRadius:4,border:"1px solid rgba(99,179,237,.4)",background:"rgba(99,179,237,.1)",color:"#63b3ed",outline:"none"}}>
+                          Aplicar
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            )}
           </div>
         </div>
       );
@@ -3986,9 +4107,10 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
                     value={d.canalId||""}
                     onChange={e=>{
                       const canal=CANAIS.find(c=>c.id===e.target.value);
-                      if(!canal||!canal.default){setD(p=>({...p,canalId:e.target.value}));return;}
+                      if(!canal||!canal.default){setD(p=>({...p,canalId:e.target.value}));if(produtoDB?.sku)fetchHistoricoIndices(produtoDB.sku);return;}
                       const rates=getCanalRates(e.target.value, prodAtrib.cat||"");
                       setD(p=>({...p,canalId:canal.id,comis:rates.comis,mkt:rates.mkt,rebate:rates.rebate,pdd:rates.pdd,vpc:rates.vpc,custoFin:rates.custoFin||0,custoFixoCan:rates.custoFixoCan||0,pedCan:rates.pedCan||0,scrapCan:rates.scrapCan||0}));
+                      if(produtoDB?.sku)fetchHistoricoIndices(produtoDB.sku);
                     }}
                     style={{background:"#1a1a1a",border:"1px solid rgba(255,255,255,.12)",borderRadius:4,
                       color:"#e2e8f0",fontSize:11,padding:"5px 8px",cursor:"pointer",outline:"none"}}>
@@ -3997,6 +4119,11 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
                   {d.canalId&&<span style={{fontSize:9,color:"#5a6a84",fontFamily:"'Montserrat',sans-serif"}}>
                     {(()=>{const cat=CATS.find(c=>c.id===prodAtrib.cat);return cat?`Taxas: ${cat.label} — edite abaixo para ajustar`:"Campos preenchidos — edite abaixo para ajustar";})()}
                   </span>}
+                  {produtoDB?.sku&&<button
+                    onClick={()=>{if(!historIndices.length)fetchHistoricoIndices(produtoDB.sku);setShowHistorModal(true);}}
+                    style={{marginTop:4,padding:"4px 10px",fontSize:10,fontWeight:700,cursor:"pointer",borderRadius:4,border:"1px solid rgba(99,179,237,.4)",background:"rgba(99,179,237,.1)",color:"#63b3ed",outline:"none"}}>
+                    {historLoading?"Carregando...":"📊 Histórico Real"}
+                  </button>}
                 </div>
                 <Field label="CF Venda" sfx="%" value={d.cfVenda}
                   onChange={calcs.cfVenda.applied?undefined:S("cfVenda")}
