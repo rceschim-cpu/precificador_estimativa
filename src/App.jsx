@@ -1927,20 +1927,33 @@ function ModalRegistros({onClose, onLoad, currentD, currentCalcs, prodNome, user
       }
 
       const idMap = {};
-      const ordered = [];
-      const add = (p) => { if(idMap[p.id]!==undefined||ordered.includes(p)) return; if(p.pai) { const pai=pastasLocal.find(x=>x.id===p.pai); if(pai) add(pai); } ordered.push(p); };
-      pastasLocal.forEach(add);
-      for(const p of ordered){
-        const novoId = (await db.insertPastaRegistro(user.id, p.nome, p.pai ? (idMap[p.pai]??null) : null, false))?.[0]?.id;
-        if(novoId) idMap[p.id] = novoId;
+      if (isSP) {
+        let ok=0, fail=0;
+        for(const r of regsLocal){
+          try {
+            const pasta = r.pastaId ? (pastasLocal.find(p=>p.id===r.pastaId)?.nome||"") : "";
+            await spDb.insertRegistro(user.id, r.nome, pasta, false, r.d, r.calcs);
+            ok++;
+          } catch { fail++; }
+        }
+        setMigMsg(`✓ ${ok} registro${ok!==1?"s":""} migrado${ok!==1?"s":""}${fail?` · ${fail} falhou`:""} para o SharePoint.`);
+        await reload();
+      } else {
+        const ordered = [];
+        const add = (p) => { if(idMap[p.id]!==undefined||ordered.includes(p)) return; if(p.pai) { const pai=pastasLocal.find(x=>x.id===p.pai); if(pai) add(pai); } ordered.push(p); };
+        pastasLocal.forEach(add);
+        for(const p of ordered){
+          const novoId = (await db.insertPastaRegistro(user.id, p.nome, p.pai ? (idMap[p.pai]??null) : null, false))?.[0]?.id;
+          if(novoId) idMap[p.id] = novoId;
+        }
+        let ok=0, fail=0;
+        for(const r of regsLocal){
+          try { await db.insertRegistro(user.id, r.nome, r.pastaId ? (idMap[r.pastaId]??null) : null, false, r.d, r.calcs); ok++; }
+          catch { fail++; }
+        }
+        setMigMsg(`✓ ${ok} registro${ok!==1?"s":""} migrado${ok!==1?"s":""}${fail?` · ${fail} falhou`:""}. Pode limpar o armazenamento local se quiser.`);
+        await reload();
       }
-      let ok=0, fail=0;
-      for(const r of regsLocal){
-        try { await db.insertRegistro(user.id, r.nome, r.pastaId ? (idMap[r.pastaId]??null) : null, false, r.d, r.calcs); ok++; }
-        catch { fail++; }
-      }
-      setMigMsg(`✓ ${ok} registro${ok!==1?"s":""} migrado${ok!==1?"s":""}${fail?` · ${fail} falhou`:""}. Pode limpar o armazenamento local se quiser.`);
-      await reload();
     } catch(e) { setErro("Erro na migração: "+e.message); }
     finally { setMigrando(false); }
   };
@@ -2108,6 +2121,7 @@ function ModalRegistros({onClose, onLoad, currentD, currentCalcs, prodNome, user
       <div className="mb" style={{maxWidth:580}} onClick={e=>e.stopPropagation()}>
         <div className="mh">
           <span className="mt">📋 Registros</span>
+          {isSP&&<span style={{fontSize:9,fontWeight:700,padding:"2px 8px",background:"rgba(0,120,212,.15)",border:"1px solid rgba(0,120,212,.35)",color:"#60a5fa",borderRadius:10,letterSpacing:.5}}>SharePoint</span>}
           {isSP
             ? <span style={{fontSize:9,fontWeight:700,padding:"2px 8px",background:"rgba(0,120,212,.2)",border:"1px solid rgba(0,120,212,.4)",color:"#60a5fa",borderRadius:10,letterSpacing:.5}}>SharePoint</span>
             : <span style={{fontSize:9,fontWeight:700,padding:"2px 8px",background:"rgba(60,219,192,.1)",border:"1px solid rgba(60,219,192,.25)",color:"#3CDBC0",borderRadius:10,letterSpacing:.5}}>Supabase</span>}
