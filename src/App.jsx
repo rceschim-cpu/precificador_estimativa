@@ -2833,25 +2833,35 @@ REGRAS OBRIGATÓRIAS:
 - Use SEMPRE as ferramentas disponíveis para preencher os campos — nunca responda só com texto quando puder agir.
 - Após preencher os campos, chame get_resultado para mostrar o preço calculado.
 - Percentuais: "2%" ou "2" → passe 2 (nunca 0.02).
-- Se o usuário mencionar produto ambíguo (ex: "notebook" sem modelo), pergunte BU/modelo antes de chamar set_produto.
+- Se o usuário mencionar produto ambíguo (ex: "notebook" sem modelo), use buscar_produto para encontrá-lo antes de set_produto.
 - Não recalcule manualmente tributos — a calculadora faz isso; use get_resultado.
-- Se faltar alguma informação obrigatória (custo ou produto), pergunte antes de agir.
+- Se faltar custo (FOB USD) ou ptax, pergunte antes de calcular — esses dados não estão no banco.
 - Formato de valores monetários: R$ com 2 casas decimais.
 - Seja direto. Confirme o que foi preenchido em uma linha.
 
-FLUXO PARA PRECIFICAR COM ÍNDICES REAIS:
-1. set_produto → set_origem_modalidade → set_canal → set_uf_destino → set_custo
-2. query_indices_historico (usando o SKU do produto) com canal_filtro se o usuário mencionou cliente/canal
-3. aplicar_indices_completo com os valores do canal mais relevante encontrado
-4. set_margem se o usuário definiu margem alvo
-5. get_resultado para apresentar pF, ML%, MC%
+FLUXO OBRIGATÓRIO PARA PRECIFICAR (siga sempre nesta ordem):
+1. buscar_produto se o produto_id não for conhecido → set_produto
+2. set_origem_modalidade → set_canal → set_uf_destino
+3. set_custo (peça FOB USD e ptax ao usuário se não informados)
+4. ⚠️ OBRIGATÓRIO: query_indices_historico com o SKU retornado por set_produto
+   (sem esse passo você usará índices padrão incorretos — sempre consulte o histórico)
+5. aplicar_indices_completo com os valores do canal mais relevante encontrado no histórico
+6. set_margem se o usuário definiu margem alvo
+7. get_resultado → apresente pF, ML%, MC% e de qual canal vieram os índices
+
+BASE DE DADOS DISPONÍVEL:
+- precificacao_indices: 203.170 registros de índices reais por SKU×canal (Jan/2025–Mar/2026)
+- produtos_catalogo: 610 produtos com NCM, IPI, ICMS, crédito presumido por planta
+O que NÃO está no banco: custo FOB USD e taxa de câmbio (ptax) — sempre pergunte ao usuário.
 
 CONTEXTO DA CALCULADORA (injetado dinamicamente):
 {CONTEXT}`;
 
 const CALC_TOOLS = [
-  { type:"function", function:{ name:"set_produto", description:"Seleciona o produto na calculadora pelo ID do catálogo",
-    parameters:{ type:"object", properties:{ produto_id:{type:"string",description:"ID do produto em produtos_catalogo"} }, required:["produto_id"] } } },
+  { type:"function", function:{ name:"buscar_produto", description:"Busca produtos no catálogo por nome ou modelo. Use quando o usuário mencionar um produto e você não souber o produto_id exato.",
+    parameters:{ type:"object", properties:{ termo:{type:"string",description:"Nome, modelo ou parte do nome do produto (ex: 'Q232A', 'Twist 3', 'Smartphone C350')"} }, required:["termo"] } } },
+  { type:"function", function:{ name:"set_produto", description:"Seleciona o produto na calculadora pelo ID do catálogo. Retorna o SKU SAP do produto — use esse SKU na query_indices_historico.",
+    parameters:{ type:"object", properties:{ produto_id:{type:"string",description:"ID do produto em produtos_catalogo (use buscar_produto se não souber)"} }, required:["produto_id"] } } },
   { type:"function", function:{ name:"set_origem_modalidade", description:"Define fábrica de origem e modalidade de importação",
     parameters:{ type:"object", properties:{ origem:{type:"string",enum:["MAO","IOS","CWB"]}, modalidade:{type:"string",enum:["CKD","SKD","CBU"]} }, required:["origem","modalidade"] } } },
   { type:"function", function:{ name:"set_canal", description:"Seleciona canal de venda",
@@ -2866,9 +2876,9 @@ const CALC_TOOLS = [
     parameters:{ type:"object", properties:{ rebate:{type:"number"}, mkt:{type:"number"}, frete:{type:"number"}, vpc:{type:"number"}, pdd:{type:"number"}, comis:{type:"number"} } } } },
   { type:"function", function:{ name:"get_resultado", description:"Retorna o preço calculado atual (pF, ML%, MC%, markup). Chamar sempre ao final.",
     parameters:{ type:"object", properties:{} } } },
-  { type:"function", function:{ name:"query_indices_historico", description:"Consulta índices reais históricos (rebate, mkt, frete, ZV09, ZV11, BKP, P&D) por produto baseado nos fechamentos da Controladoria. Use antes de precificar para saber os índices praticados com cada canal/cliente.",
+  { type:"function", function:{ name:"query_indices_historico", description:"SEMPRE chamar antes de precificar qualquer produto. Consulta índices reais históricos (rebate, mkt, frete, ZV09, ZV11, BKP, P&D) por produto nos fechamentos mensais da Controladoria (203k registros). Passe o SKU retornado por set_produto — sem esse passo os índices serão padrão (incorretos).",
     parameters:{ type:"object", properties:{
-      sku:{type:"string",description:"Código SAP do produto (campo sku no catálogo). Se não souber, use o produto_id e eu busco o SKU."},
+      sku:{type:"string",description:"SKU SAP do produto — use exatamente o valor 'sku' retornado por set_produto. Alternativamente passe o produto_id que o sistema resolve."},
       canal_filtro:{type:"string",description:"Filtro opcional por nome do cliente/canal (ex: 'AMAZON', 'MAGAZINE', 'GAZIN', 'CASAS BAHIA')"},
     }, required:["sku"] } } },
   { type:"function", function:{ name:"aplicar_indices_completo", description:"Aplica todos os índices comerciais históricos na calculadora de uma vez. Use após query_indices_historico para preencher os campos com os valores reais do canal escolhido.",
@@ -2900,7 +2910,8 @@ function ChatPanel({ d, setD, c, produtosDB, onClose, onPrecificando }) {
   const buildCalcContext = () => {
     const prod = produtosDB.find(p => p.id === d.prodId);
     const canal = CANAIS.find(c => c.id === d.canalId);
-    return `Produto: ${prod?.nome || d.prodId || "não selecionado"}
+    const sku = prod?.sku || null;
+    return `Produto: ${prod?.nome || d.prodId || "não selecionado"}${sku ? ` | SKU SAP: ${sku}` : " | SKU: não disponível"}
 Origem: ${d.origem} | Modalidade: ${d.modalidade}
 UF destino: ${d.ufDestino}
 Câmbio: R$ ${d.ptax}/USD | Custo FOB: USD ${d.fobUSD}
@@ -2911,11 +2922,20 @@ Resultado: pF R$ ${c.pF?.toFixed(2)||"—"} | ML ${c.margPct?.toFixed(2)||"—"}
   };
 
   const handleToolCall = async (name, inp) => {
+    if (name === "buscar_produto") {
+      const termo = (inp.termo || "").toLowerCase();
+      const matches = produtosDB
+        .filter(p => p.nome?.toLowerCase().includes(termo) || p.sku?.toLowerCase().includes(termo) || p.modelo?.toLowerCase().includes(termo))
+        .slice(0, 10)
+        .map(p => ({ id: p.id, nome: p.nome, sku: p.sku || null, bu: p.bu || null }));
+      return { found: matches.length > 0, total: matches.length, produtos: matches,
+        msg: matches.length ? `${matches.length} produto(s) encontrado(s)` : `Nenhum produto com "${inp.termo}"` };
+    }
     if (name === "set_produto") {
       notifyFill();
       setD(p => ({...p, prodId: inp.produto_id}));
       const prod = produtosDB.find(p => p.id === inp.produto_id);
-      return { ok:true, msg:`Produto: ${prod?.nome || inp.produto_id}` };
+      return { ok:true, msg:`Produto: ${prod?.nome || inp.produto_id}`, sku: prod?.sku || null, produto_id: inp.produto_id };
     }
     if (name === "set_origem_modalidade") {
       notifyFill();
