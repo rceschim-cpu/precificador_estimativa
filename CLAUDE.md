@@ -134,33 +134,39 @@ Produtos com FTI: Terminal de Pagamento, Smartphone, Câmera (2,2%)
 ```
 margGerPct SEMPRE entra no soma (sempre impacta preço e ML)
 
-REGRA CONFIRMADA (2026-06-23): custo fixo NUNCA entra em MC, independente da origem
+REGRA CONFIRMADA (2026-07-14): custo fixo SEMPRE entra em MC (revoga regra de 2026-06-23)
 
-MC toggle OFF: MC = margV / pF                      ← cfixo e MG fora da MC
-MC toggle ON:  MC = (margV + margGerV) / pF         ← só MG entra; cfixo nunca entra
+MC toggle OFF: MC = (margV + cfxV) / pF             ← cfixo entra, MG fora da MC
+MC toggle ON:  MC = (margV + cfxV + margGerV) / pF  ← cfixo e MG entram
 
-mcSugerida = margemSugerida + (margGerAtivo ? margGer : 0)
-mcAlvo     = margemAlvo     + (margGerAtivo ? margGer : 0)
+mcSugerida = margemSugerida + cfixoEf + (margGerAtivo ? margGer : 0)
+mcAlvo     = margemAlvo     + cfixoEf + (margGerAtivo ? margGer : 0)
 
 cfixo: entra no soma (indPct) → compõe o preço → afeta ML
-       NÃO entra no cálculo de MC
+       TAMBÉM entra no cálculo de MC (cfxV somado a margV)
        Exibido como linha informativa no BreakdownPanel abaixo de ML
 ```
 
 ### Índices de Canal (novos campos — Fase 2 da migração)
 ```
 Campos novos vindos de Lista_Canais / Supabase tabela canais:
-  custo_fin  (Custo Financeiro — ZV09)
+  custo_fin  (Custo Financeiro — ZV09, índice fixo por canal — distinto do CF Venda abaixo)
   ped        (P&D — ZV25)
-  custo_fixo (Custo Fixo — ZV11)   ← ATENÇÃO: regra de MC abaixo
+  custo_fixo (Custo Fixo — ZV11)   ← ATENÇÃO: regra de MC acima
   scrap      (Quebra+Scrap — ZV29)
 
-REGRA CONFIRMADA por Rafael (2026-06-23):
+REGRA CONFIRMADA por Rafael (2026-07-14):
   TODOS entram no indPct → compõem o denominador → afetam o preço → compõem ML
-  custo_fixo NÃO entra na composição de MC
+  custo_fixo TAMBÉM entra na composição de MC (ver regra de Margem Gerencial acima)
   custo_fixo CANAL substitui cfixo do PRODUTO — nunca somam (exclusão mútua confirmada)
     cfixoEf = custoFixoCan > 0 ? custoFixoCan : cfixo
     cfxV = pF × cfixoEf / 100
+
+CF Venda (Custo Financeiro de Venda) — distinto do custo_fin (ZV09) acima:
+  Calculado a partir do prazo de pagamento do cliente: (1+taxa/30)^(prazo+10) - 1
+  Taxa padrão 1,14% a.m. Aplicado via d.cfVenda, entra em indPct como cfVendaEf
+  Agente: tool calcular_cf_venda(prazo_dias, taxa_pct) — obrigatório perguntar o prazo
+  ao usuário (nunca assumir) antes de fechar uma precificação
 
 indPct (atualizado após Fase 2):
   d.pd + cfixoEf + d.scrap + d.royal + cfVendaEf + d.frete
@@ -173,9 +179,16 @@ indPct (atualizado após Fase 2):
 
 ### Normalização do Catálogo (normalizeProdutoDB)
 ```
-Tributos: tabela PRODUTOS[] hardcoded por NCM é fonte PRIMÁRIA
-Fallback: valores do catálogo (campos ipi_ios, cred_cwb, etc.)
-Se NCM do produto bater com PRODUTOS[] → usa hardcoded (ignora catálogo)
+REGRA CONFIRMADA (2026-07-14): Cadastro de Produtos é fonte PRIMÁRIA para tributos
+(IPI/ICMS/Crédito/MVA/ST) sempre que o campo estiver preenchido (>0).
+Tabela PRODUTOS[] hardcoded por NCM (~40 perfis genéricos) só cobre o que o
+Cadastro deixar vazio/zerado — revoga a regra anterior onde PRODUTOS[] sempre
+vencia. Motivo: PRODUTOS[] representa um NCM inteiro (ex: "Smart Plug WiFi"),
+mas produtos diferentes podem compartilhar NCM com tributação real distinta
+(ex: BOTAO DE SOBREPOR/EMBUTIR, NCM 8536.50.90, IPI_CWB real 9,75% vs perfil
+genérico 3,25%).
+Campos de produção/garantia/BKP/embalagem/P&D/scrap/royalties/frete/mkt/rebate/
+margem gerencial vêm SEMPRE do Cadastro — não existem na tabela PRODUTOS[].
 ```
 
 ### Constantes — NUNCA alterar sem confirmação
@@ -213,4 +226,169 @@ comisXPct       = comis × (2/3)  ← encargos automáticos sobre comissão
 ## FEATURE: Chat LLM (a implementar)
 
 ### Objetivo
-Sidebar de chat onde o usuário desc
+Sidebar de chat onde o usuário descreve o cenário em linguagem natural e o LLM preenche os campos da calculadora via tool calls.
+
+Exemplo: "precifica o Notebook Celeron 14 pra T3 SP, custo USD 320, dólar 5,85, margem 12%"
+→ LLM chama set_produto, set_canal, set_custo, set_uf, set_margem automaticamente.
+
+### Variável de ambiente
+```
+VITE_CLAUDE_KEY=sk-ant-...   (configurar no Vercel + .env.local)
+```
+
+### Modelo
+```
+claude-haiku-4-5-20251001   ← rápido e barato; suficiente para tool calls simples
+```
+
+### API endpoint
+```
+POST https://api.anthropic.com/v1/messages
+Headers:
+  x-api-key: import.meta.env.VITE_CLAUDE_KEY
+  anthropic-version: 2023-06-01
+  content-type: application/json
+```
+
+### SYSTEM PROMPT do agente (usar literalmente)
+```
+Você é o assistente de precificação da Positivo Tecnologia.
+Sua função é preencher os campos da calculadora tributária com base no que o usuário descreve.
+
+REGRAS OBRIGATÓRIAS:
+- Use SEMPRE as ferramentas disponíveis para preencher os campos — nunca responda só com texto quando puder agir.
+- Após preencher os campos, chame get_resultado para mostrar o preço calculado.
+- Percentuais: "2%" ou "2" → passe 2 (nunca 0.02).
+- Se o usuário mencionar produto ambíguo (ex: "notebook" sem modelo), pergunte BU/modelo antes de chamar set_produto.
+- Não recalcule manualmente tributos — a calculadora faz isso; use get_resultado.
+- Se faltar alguma informação obrigatória (custo ou produto), pergunte antes de agir.
+- Formato de valores monetários: R$ com 2 casas decimais.
+- Seja direto. Confirme o que foi preenchido em uma linha.
+
+CONTEXTO DA CALCULADORA (injetado dinamicamente):
+{CONTEXT}
+```
+
+O placeholder `{CONTEXT}` é substituído em runtime pela função `buildCalcContext(d, prod, canais)` que serializa o estado atual da calculadora.
+
+### Tools (CALC_TOOLS)
+```js
+const CALC_TOOLS = [
+  {
+    name: "set_produto",
+    description: "Seleciona o produto na calculadora pelo ID do catálogo",
+    input_schema: {
+      type: "object",
+      properties: {
+        produto_id: { type: "string", description: "ID do produto em produtos_catalogo" }
+      },
+      required: ["produto_id"]
+    }
+  },
+  {
+    name: "set_origem_modalidade",
+    description: "Define fábrica de origem e modalidade de importação",
+    input_schema: {
+      type: "object",
+      properties: {
+        origem:     { type: "string", enum: ["MAO","IOS","CWB"] },
+        modalidade: { type: "string", enum: ["CKD","SKD","CBU"] }
+      },
+      required: ["origem","modalidade"]
+    }
+  },
+  {
+    name: "set_canal",
+    description: "Seleciona canal de venda",
+    input_schema: {
+      type: "object",
+      properties: {
+        canal_id: { type: "string", description: "ID do canal (ex: 't3', 'corp', 'amzn')" }
+      },
+      required: ["canal_id"]
+    }
+  },
+  {
+    name: "set_custo",
+    description: "Define custo do produto",
+    input_schema: {
+      type: "object",
+      properties: {
+        vpl_usd:  { type: "number", description: "Custo em USD (VPL)" },
+        dolar:    { type: "number", description: "Taxa do dólar (ptax)" },
+        producao: { type: "number", description: "Custo de produção/transformação em R$" }
+      }
+    }
+  },
+  {
+    name: "set_uf_destino",
+    description: "Define UF de destino (para cálculo de ICMS e DIFAL)",
+    input_schema: {
+      type: "object",
+      properties: {
+        uf: { type: "string", description: "Sigla do estado (ex: SP, RJ, MG)" }
+      },
+      required: ["uf"]
+    }
+  },
+  {
+    name: "set_margem",
+    description: "Define margem líquida alvo (ML%)",
+    input_schema: {
+      type: "object",
+      properties: {
+        margem: { type: "number", description: "Percentual de margem líquida" }
+      },
+      required: ["margem"]
+    }
+  },
+  {
+    name: "set_indices",
+    description: "Sobrescreve índices comerciais específicos da aba ativa",
+    input_schema: {
+      type: "object",
+      properties: {
+        rebate:   { type: "number" },
+        mkt:      { type: "number" },
+        frete:    { type: "number" },
+        vpc:      { type: "number" },
+        pdd:      { type: "number" },
+        comis:    { type: "number" }
+      }
+    }
+  },
+  {
+    name: "get_resultado",
+    description: "Retorna o preço calculado atual (pF, ML%, MC%, markup). Chamar sempre ao final para mostrar o resultado ao usuário.",
+    input_schema: { type: "object", properties: {} }
+  }
+]
+```
+
+### Implementação do ChatPanel
+- Componente `ChatPanel({ d, setD, c, produtosDB, canais, onClose })`
+- Estado local: `messages` (array de {role, content}), `loading` (bool)
+- `buildCalcContext(d, prod, canais)` → string com produto atual, canal, custo, UF, índices
+- `handleToolCall(name, input)` → executa a tool e retorna resultado:
+  - `set_produto` → busca em produtosDB pelo ID, chama `normalizeProdutoDB`, seta prod
+  - `set_origem_modalidade` → `setD(p=>({...p, origem, modalidade}))`
+  - `set_canal` → carrega taxas do canal e seta todos os campos de índice
+  - `set_custo` → `setD(p=>({...p, fobUSD: vpl_usd, ptax: dolar, ...}))`
+  - `set_uf_destino` → `setD(p=>({...p, ufDestino: uf}))`
+  - `set_margem` → `setD(p=>({...p, margem}))`
+  - `set_indices` → `setD(p=>({...p, ...input}))`
+  - `get_resultado` → retorna `{ pF: c.pF, ml: c.margPct, mc: c.mc, markup: c.mkp }`
+- Loop agentic: após tool_use, adiciona tool_result e chama API novamente até stop_reason === "end_turn"
+- UI: sidebar direita, 380px, histórico scrollável, input na base
+
+### Campos de `d` (estado da calculadora) relevantes para os setters
+```
+d.fobUSD      → custo USD (VPL)
+d.ptax        → dólar de custo
+d.producao    → custo transformação R$
+d.origem      → "MAO" | "IOS" | "CWB"
+d.modalidade  → "CKD" | "SKD" | "CBU"
+d.ufDestino   → sigla UF
+d.margem      → ML% alvo
+d.comis, d.mkt, d.rebate, d.pdd, d.vpc, d.frete  → índices comerciais
+```

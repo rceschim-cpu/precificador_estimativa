@@ -1326,31 +1326,33 @@ const PRODUTOS = [
 ];
 
 // Converte produto do catálogo (snake_case) → shape da calculadora (camelCase)
+// Cadastro manda sempre que o campo estiver preenchido (>0); tabela PRODUTOS[] só cobre o que o Cadastro deixar vazio.
+const pref = (catVal, hcVal) => (catVal > 0 ? catVal : (hcVal ?? 0));
+
 const normalizeProdutoDB = r => {
-  // Tributos: usar tabela PRODUTOS hardcoded por NCM (perfil tributário por regime/planta)
-  // Fallback para os valores do catálogo se o NCM não existir na tabela
+  // Tributos: perfil genérico por NCM (tabela PRODUTOS) só como fallback do Cadastro
   const base = PRODUTOS.find(p => p.ncm === r.ncm) ?? {};
   return {
     id: r.id, ncm: r.ncm||"", nome: r.nome||"",
-    // Tributos — PRODUTOS por NCM é fonte primária; catálogo só como fallback
-    mva:    base.mva     ?? r.mva     ?? 0,
-    aliqST: base.aliqST  ?? r.aliq_st ?? 0,
-    ipiMAO: base.ipiMAO  ?? r.ipi_mao ?? 0,
-    ipiIOS: base.ipiIOS  ?? r.ipi_ios ?? 0,
-    ipiCWB: base.ipiCWB  ?? r.ipi_cwb ?? 0,
-    credMAO: base.credMAO ?? r.cred_mao ?? 0,
-    credIOS: base.credIOS ?? r.cred_ios ?? 0,
-    credCWB: base.credCWB ?? r.cred_cwb ?? 0,
-    icmsMAO: base.icmsMAO ?? r.icms_mao ?? 0,
-    icmsIOS: base.icmsIOS ?? r.icms_ios ?? 0,
-    icmsCWB: base.icmsCWB ?? r.icms_cwb ?? 0,
+    // Tributos — Cadastro é fonte primária quando preenchido; PRODUTOS[] cobre o que faltar
+    mva:    pref(r.mva,     base.mva),
+    aliqST: pref(r.aliq_st, base.aliqST),
+    ipiMAO: pref(r.ipi_mao, base.ipiMAO),
+    ipiIOS: pref(r.ipi_ios, base.ipiIOS),
+    ipiCWB: pref(r.ipi_cwb, base.ipiCWB),
+    credMAO: pref(r.cred_mao, base.credMAO),
+    credIOS: pref(r.cred_ios, base.credIOS),
+    credCWB: pref(r.cred_cwb, base.credCWB),
+    icmsMAO: pref(r.icms_mao, base.icmsMAO),
+    icmsIOS: pref(r.icms_ios, base.icmsIOS),
+    icmsCWB: pref(r.icms_cwb, base.icmsCWB),
     // Índices — sempre do catálogo (valores inseridos por produto)
     fti: r.fti ?? 0,
-    cfixoPad: base.cfixoPad ?? r.cfixo_pad ?? 0,
-    royalPad: base.royalPad ?? r.royal_pad ?? 0,
-    scrapPad: base.scrapPad ?? r.scrap_pad ?? 0,
-    fretePad: base.fretePad ?? r.frete_pad ?? 0,
-    bkpPad:   base.bkpPad   ?? r.bkp_pad   ?? 0,
+    cfixoPad: pref(r.cfixo_pad, base.cfixoPad),
+    royalPad: pref(r.royal_pad, base.royalPad),
+    scrapPad: pref(r.scrap_pad, base.scrapPad),
+    fretePad: pref(r.frete_pad, base.fretePad),
+    bkpPad:   pref(r.bkp_pad,   base.bkpPad),
   };
 };
 
@@ -2416,7 +2418,7 @@ function BreakdownPanel({c,d,prod,ppbTot,calcs}){
         <Row l={`MC — Margem Contribuição${d.margGerAtivo&&d.margGer!==0?" (c/ MG)":""} (${pct(c.mc)})`} v={mcV} acc="green" showPct/>
         <Row l={`ML — Margem Líquida (${pct(c.margPct)})`} v={c.margV} acc="blue" indent sub showPct/>
         {d.margGer!==0&&<Row l={`  ↳ Margem Gerencial/Agnóstica (${pct(d.margGer)})`} v={c.margGerV} acc={d.margGer<0?"green":"red"} indent sub showPct/>}
-        {c.cfixoEf>0&&<Row l={`Custo Fixo${(d.custoFixoCan||0)>0?" (canal ZV11)":" (produto)"} (${pct(c.cfixoEf)}) — no preço, fora da MC`} v={c.cfxV} showPct/>}
+        {c.cfixoEf>0&&<Row l={`Custo Fixo${(d.custoFixoCan||0)>0?" (canal ZV11)":" (produto)"} (${pct(c.cfixoEf)}) — no preço, compõe a MC`} v={c.cfxV} showPct/>}
       </Grp>
 
       {/* PREÇO FINAL — fixo */}
@@ -3579,9 +3581,8 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
     const cargaTot=pcV+ipiV+icmsEfV+difalV+stV+fcpV;
     const cargaPct=pF>0?(cargaTot/pF)*100:0;
     const margPct=pF>0?(margV/pF)*100:0;
-    // MC: toggle OFF → MG não entra na MC (abaixo da linha)
-    //     toggle ON  → MG entra na MC junto com ML e CF
-    const mc=pF>0?((margV+(d.margGerAtivo?margGerV:0))/pF)*100:0;
+    // MC = ML + Custo Fixo (ZV11/produto), sempre. MG (margem gerencial) só entra se o toggle estiver ON.
+    const mc=pF>0?((margV+cfxV+(d.margGerAtivo?margGerV:0))/pF)*100:0;
     const mkp=cmvTotal>0?pF/cmvTotal:0;
     let margemAlvo=null;
     if(d.precoAlvo>0){
@@ -3635,9 +3636,9 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
       scrapPad:prodAtrib.scrapPad||0,fretePad:prodAtrib.fretePad||0,bkpPad:prodAtrib.bkpPad||0,pdV:pdVf,cfxV:cfxVf,scV:scVf,ryV:ryVf,cfnV:cfnVf,cfVendaEf,cartaoPct,frV:frVf,cmV:cmVf,mktV:mktVf,rebateV:rebateVf,pddV:pddVf,vbExtraV:vbExtraVf,vpcV:vpcVf,custoFinV:custoFinVf,custoFixoCanV:custoFixoCanVf,stV,stBase,
       pF:pFfinal,pUSD:pUSDf,
       cargaTot:cargaTotf,cargaPct:cargaPctf,margPct:margPctf,mc:mcf,mkp:mkpf,ufO,intra,deveDifal,margemAlvo,margemSugerida,comisXPct,margGerPct,margGerV:margGerVf,
-      // MC equivalente nos modos precoAlvo e margem (ML + MG; custo fixo NUNCA entra em MC)
-      mcAlvo:    margemAlvo    !== null ? margemAlvo    + (d.margGerAtivo ? d.margGer : 0) : null,
-      mcSugerida:margemSugerida!== null ? margemSugerida+ (d.margGerAtivo ? d.margGer : 0) : null};
+      // MC equivalente nos modos precoAlvo e margem = ML + Custo Fixo (+ MG se toggle ON)
+      mcAlvo:    margemAlvo    !== null ? margemAlvo    +cfixoEf+ (d.margGerAtivo ? d.margGer : 0) : null,
+      mcSugerida:margemSugerida!== null ? margemSugerida+cfixoEf+ (d.margGerAtivo ? d.margGer : 0) : null};
   },[d,prod,prodAtrib,isZFM,isCBU,pcEntry,ppbTot,produtoDB]);
 
   // Notifica o MultiTab sempre que os cálculos mudarem (para o painel comparativo)
