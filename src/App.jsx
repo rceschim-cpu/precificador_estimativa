@@ -223,7 +223,7 @@ input,select,textarea,button{font-family:inherit}
 .auth-msg.warn{background:rgba(217,119,6,.1);border-color:#d97706;color:#fbbf24}
 
 /* ── DASHBOARD ── */
-.dash{display:flex;flex-direction:column;min-height:100vh}
+.dash{display:flex;flex-direction:column;height:100vh;overflow:hidden}
 .topbar{
   background:var(--surface);border-bottom:1px solid var(--border);
   padding:0 24px;height:56px;display:flex;align-items:center;gap:16px;
@@ -2910,7 +2910,7 @@ const CALC_TOOLS = [
     }, required:["prazo_dias"] } } },
 ];
 
-function ChatPanel({ d, setD, c, produtosDB, onClose, onPrecificando, embedded=false }) {
+function ChatPanel({ d, setD, c, produtosDB, onClose, onPrecificando, embedded=false, setProd }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -2951,9 +2951,10 @@ Resultado: pF R$ ${c.pF?.toFixed(2)||"—"} | ML ${c.margPct?.toFixed(2)||"—"}
     }
     if (name === "set_produto") {
       notifyFill();
-      setD(p => ({...p, prodId: inp.produto_id}));
       const prod = produtosDB.find(p => p.id === inp.produto_id);
-      return { ok:true, msg:`Produto: ${prod?.nome || inp.produto_id}`, sku: prod?.sku || null, produto_id: inp.produto_id };
+      if (setProd) setProd(inp.produto_id); // carrega produção, garantia, backup%, embalagem, P&D, scrap, royalties, frete, marg.ger do cadastro
+      else setD(p => ({...p, prodId: inp.produto_id}));
+      return { ok:true, msg:`Produto: ${prod?.nome || inp.produto_id} (custos e taxas de cadastro carregados)`, sku: prod?.sku || null, produto_id: inp.produto_id };
     }
     if (name === "set_origem_modalidade") {
       notifyFill();
@@ -3917,7 +3918,7 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
           </div>
 
           {/* Chat em evidência */}
-          <ChatPanel embedded d={d} setD={setD} c={c} produtosDB={produtosDB}
+          <ChatPanel embedded d={d} setD={setD} c={c} produtosDB={produtosDB} setProd={setProd}
             onClose={()=>{}} onPrecificando={v=>setChatPrecificando(v)}/>
         </div>
       </div>
@@ -4721,7 +4722,7 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
         </main>
       </div>
     </div>
-    {chatOpen&&<ChatPanel d={d} setD={setD} c={c} produtosDB={produtosDB} onClose={()=>{setChatOpen(false);setChatPrecificando(false);}} onPrecificando={v=>setChatPrecificando(v)}/>}
+    {chatOpen&&<ChatPanel d={d} setD={setD} c={c} produtosDB={produtosDB} setProd={setProd} onClose={()=>{setChatOpen(false);setChatPrecificando(false);}} onPrecificando={v=>setChatPrecificando(v)}/>}
     </>)}
     </>
   );
