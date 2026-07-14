@@ -2846,10 +2846,8 @@ FLUXO OBRIGATÓRIO PARA PRECIFICAR (siga sempre nesta ordem; use perguntar_usuar
    Informe ao usuário de qual mês veio (ex: "VPL de Mar/2026: USD 68,32 × 5,54").
 4. perguntar_usuario para canal/cliente se não informado → set_canal
 5. ⚠️ OBRIGATÓRIO E AUTOMÁTICO: query_indices_historico com o SKU → aplicar_indices_completo
-   com os valores do canal/cliente mais relevante encontrado — sem perguntar, só aplicar.
-   Passe TODOS os campos do registro escolhido (rebate_pct, mkt_pct, frete_pct, zv09_pct,
-   zv11_pct, pd_pct, scrap_pct) — NUNCA omita zv11_pct (Custo Fixo), mesmo que pareça
-   secundário: ele agora compõe a MC e omiti-lo faz MC sair igual à ML (sempre errado).
+   passando apenas o canal_sap do registro mais relevante em por_canal (o sistema copia
+   os números sozinho — inclusive o Custo Fixo, que compõe a MC). Não redigite valores.
 6. perguntar_usuario para prazo de pagamento se não informado → calcular_cf_venda (OBRIGATÓRIO,
    nunca pule este passo — sem ele MC = ML incorretamente)
 7. set_margem se o usuário definiu margem alvo
@@ -2892,18 +2890,12 @@ const CALC_TOOLS = [
       sku:{type:"string",description:"SKU SAP do produto — use o valor 'sku' retornado por set_produto. Alternativamente passe o produto_id."},
       planta:{type:"string",description:"Filtro opcional por planta (ex: 'Manaus', 'Ilhéus', 'Curitiba')"},
     }, required:["sku"] } } },
-  { type:"function", function:{ name:"aplicar_indices_completo", description:"Aplica TODOS os índices comerciais históricos na calculadora de uma vez, a partir de UM registro de por_canal retornado por query_indices_historico. ⚠️ Passe TODOS os campos do registro escolhido, mesmo os que parecerem pequenos — em especial zv11_pct (Custo Fixo), que agora É SOMADO na Margem de Contribuição (MC). Omitir zv11_pct faz o MC sair igual à ML, o que é sempre errado quando o canal tem custo fixo.",
+  { type:"function", function:{ name:"aplicar_indices_completo", description:"Aplica automaticamente TODOS os índices reais (rebate, mkt, frete, custo financeiro, CUSTO FIXO, P&D, scrap) do canal/cliente escolhido em por_canal — o próprio sistema copia os números direto do resultado de query_indices_historico, você NÃO precisa (e não deve) redigitar os valores. Isso garante que o Custo Fixo (que compõe a MC) nunca seja esquecido. Basta informar qual registro usar.",
     parameters:{ type:"object", properties:{
-      rebate_pct:{type:"number",description:"Rebate %"},
-      mkt_pct:{type:"number",description:"Marketing %"},
-      frete_pct:{type:"number",description:"Frete %"},
-      zv09_pct:{type:"number",description:"Custo financeiro canal ZV09 % — sempre incluir, mesmo se 0"},
-      zv11_pct:{type:"number",description:"⚠️ Custo Fixo canal ZV11 % — OBRIGATÓRIO, entra na MC. Nunca omitir este campo."},
-      pd_pct:{type:"number",description:"P&D canal ZV25 %"},
-      scrap_pct:{type:"number",description:"Scrap canal ZV29 %"},
-      comis_pct:{type:"number",description:"Comissão %"},
-      margem:{type:"number",description:"Margem líquida alvo %"},
-    }, required:["rebate_pct","mkt_pct","frete_pct","zv09_pct","zv11_pct","pd_pct","scrap_pct"] } } },
+      canal_sap:{type:"string",description:"Código canal_sap do registro escolhido em por_canal (retornado por query_indices_historico). Se omitido, usa o registro mais representativo (maior qtd de registros)."},
+      planta:{type:"string",description:"Planta do registro, opcional, só para desambiguar se houver mais de um canal_sap igual em plantas diferentes"},
+      margem:{type:"number",description:"Margem líquida alvo % — só se o usuário definiu uma meta explícita"},
+    } } } },
   { type:"function", function:{ name:"perguntar_usuario", description:"Use SEMPRE que precisar de uma informação que não está na base de dados nem foi dita pelo usuário (ex: UF de destino, canal/cliente, prazo de pagamento). NUNCA assuma um valor (ex: nunca assuma São Paulo como UF de destino) — pergunte de forma interativa com opções. O usuário verá botões com as opções e um campo para digitar outro valor. ⚠️ NUNCA escreva a pergunta como texto normal na resposta — SEMPRE chame esta ferramenta, uma pergunta por vez (uma de cada vez, não numere várias perguntas num único texto). Se precisar de várias informações, chame esta ferramenta várias vezes (uma por informação) — cada uma será exibida em sequência.",
     parameters:{ type:"object", properties:{
       pergunta:{type:"string",description:"Pergunta objetiva e curta a exibir ao usuário"},
@@ -2974,6 +2966,7 @@ function ChatPanel({ d, setD, c, produtosDB, onClose, onPrecificando, embedded=f
   const [outroTexto, setOutroTexto] = useState("");
   const scrollRef = useRef(null);
   const apiHistoryRef = useRef([]);
+  const ultimoResumoRef = useRef([]); // último resumo de query_indices_historico, para aplicar_indices_completo copiar direto (sem depender do modelo re-digitar números)
   const pendingQueueRef = useRef([]); // fila de perguntar_usuario ainda não exibidas do batch atual
   const notifyFill = () => onPrecificando?.(true);
 
@@ -3060,19 +3053,25 @@ Resultado: pF R$ ${c.pF?.toFixed(2)||"—"} | ML ${c.margPct?.toFixed(2)||"—"}
     }
     if (name === "aplicar_indices_completo") {
       notifyFill();
-      const campos = {
-        rebate:"rebate_pct", mkt:"mkt_pct", frete:"frete_pct",
-        custoFin:"zv09_pct", custoFixoCan:"zv11_pct", pedCan:"pd_pct",
-        scrapCan:"scrap_pct", comis:"comis_pct", margem:"margem_pct",
+      // Aplica direto do resumo já consultado (query_indices_historico) — o código copia
+      // TODOS os campos do registro, sem depender do modelo redigitar os números (evita
+      // omissão do custo fixo/zv11, que compõe a MC).
+      const registros = ultimoResumoRef.current || [];
+      let rec = null;
+      if (inp.canal_sap !== undefined) {
+        rec = registros.find(r => String(r.canal_sap) === String(inp.canal_sap) && (!inp.planta || r.planta === inp.planta));
+      }
+      if (!rec) rec = registros[0]; // já ordenado por qtd desc — mais representativo
+      if (!rec) return { ok:false, msg:"Nenhum índice histórico disponível — chame query_indices_historico antes de aplicar_indices_completo" };
+      const upd = {
+        rebate: rec.rebate, mkt: rec.mkt, frete: rec.frete,
+        custoFin: rec.zv09_custoFin, custoFixoCan: rec.zv11_cfixoCan,
+        pedCan: rec.pd, scrapCan: rec.scrap ?? 0,
       };
-      const upd = {};
-      Object.entries(campos).forEach(([stateKey, inpKey]) => {
-        const v = inp[inpKey] ?? inp[stateKey];
-        if (v !== undefined) upd[stateKey] = +parseFloat(v).toFixed(2);
-      });
       if (inp.margem !== undefined) upd.margem = +parseFloat(inp.margem).toFixed(2);
       setD(p => ({...p, ...upd}));
-      return { ok:true, campos_aplicados: Object.keys(upd), msg:`${Object.keys(upd).length} campos aplicados` };
+      return { ok:true, aplicado_de:`canal ${rec.canal_sap}/${rec.planta} (${rec.clientes})`, campos: upd,
+        msg:`Índices aplicados: rebate ${rec.rebate}%, mkt ${rec.mkt}%, frete ${rec.frete}%, custo financeiro ${rec.zv09_custoFin}%, custo fixo ${rec.zv11_cfixoCan}%, P&D ${rec.pd}%, scrap ${rec.scrap ?? 0}%` };
     }
     if (name === "calcular_cf_venda") {
       notifyFill();
@@ -3129,9 +3128,10 @@ Resultado: pF R$ ${c.pF?.toFixed(2)||"—"} | ML ${c.margPct?.toFixed(2)||"—"}
           rebate:med(rs.map(r=>r.rebate_pct)), mkt:med(rs.map(r=>r.mkt_pct)),
           frete:med(rs.map(r=>r.frete_pct)), zv09_custoFin:med(rs.map(r=>r.zv09_pct)),
           zv11_cfixoCan:med(rs.map(r=>r.zv11_pct)), bkp:med(rs.map(r=>r.bkp_pct)),
-          pd:med(rs.map(r=>r.pd_pct)), mc_mediana:med(rs.map(r=>r.mc_pct)),
+          pd:med(rs.map(r=>r.pd_pct)), scrap:med(rs.map(r=>r.scrap_pct)), mc_mediana:med(rs.map(r=>r.mc_pct)),
         }));
         resumo.sort((a,b)=>b.qtd-a.qtd);
+        ultimoResumoRef.current = resumo;
         return { found:true, sku, total_registros:data.length, por_canal:resumo };
       } catch(e) { return { found:false, error:String(e) }; }
     }
