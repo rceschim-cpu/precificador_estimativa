@@ -2834,6 +2834,8 @@ REGRAS OBRIGATÓRIAS:
 - NUNCA peça FOB (USD) ao usuário. O VPL (custo_usd_unit do fechamento mais recente) JÁ inclui o FOB — buscar e aplicar automaticamente via query_custos_historico + set_custo. FOB nunca precisa ser perguntado nem informado separadamente.
 - ⚠️ NUNCA ASSUMA valores que só o usuário sabe — em especial UF de destino, canal/cliente e prazo de pagamento. Se o usuário não informou, use perguntar_usuario (interativo, com opções) em vez de adivinhar ou perguntar em texto livre solto. Nunca assuma São Paulo (ou qualquer UF) como destino por padrão.
 - ⚠️ SEMPRE chame calcular_cf_venda com o prazo de pagamento do cliente antes de get_resultado (pergunte o prazo via perguntar_usuario se não foi dito — opções: 'À vista','30 dias','60 dias','90 dias'). Sem isso, a MC fica igual à ML, o que é sempre incorreto quando há prazo de pagamento.
+- ⚠️ MC ≠ ML: MC = ML + Custo Fixo. Se o usuário pedir para ajustar/atingir uma MC específica, use set_mc_alvo (nunca calcule a ML equivalente de cabeça — é fácil errar essa subtração).
+- ⚠️ NUNCA invente ou "arredonde" um resultado. Depois de QUALQUER alteração (preço, margem, índices), chame get_resultado e relate exatamente o que ele retornou — nunca diga que algo foi ajustado para um valor específico sem confirmar via get_resultado. Se o resultado real não bater com o que você esperava, NÃO invente desculpas (ex: "aguardando sincronização") — ajuste os parâmetros de novo e confira até bater, ou informe o valor real ao usuário.
 - Formato de valores monetários: R$ com 2 casas decimais.
 - Seja direto. Confirme o que foi preenchido em uma linha.
 
@@ -2874,8 +2876,10 @@ const CALC_TOOLS = [
     parameters:{ type:"object", properties:{ vpl_usd:{type:"number",description:"VPL em USD (custo_usd_unit do fechamento mais recente)"}, dolar:{type:"number",description:"Taxa do dólar do fechamento (taxa_dolar)"}, vpl_brl:{type:"number",description:"VPL já em R$, caso já convertido — usa direto sem multiplicar pelo dólar"}, producao:{type:"number",description:"Custo de produção em R$ (componente separado do VPL)"} } } } },
   { type:"function", function:{ name:"set_uf_destino", description:"Define UF de destino (para cálculo de ICMS e DIFAL)",
     parameters:{ type:"object", properties:{ uf:{type:"string",description:"Sigla do estado (ex: SP, RJ, MG)"} }, required:["uf"] } } },
-  { type:"function", function:{ name:"set_margem", description:"Define margem líquida alvo (ML%)",
+  { type:"function", function:{ name:"set_margem", description:"Define margem líquida alvo (ML%). Use quando o usuário pedir uma ML específica. Se o usuário pedir uma MC (Margem de Contribuição) específica, use set_mc_alvo em vez desta — MC ≠ ML, não faça a conta de cabeça.",
     parameters:{ type:"object", properties:{ margem:{type:"number",description:"Percentual de margem líquida"} }, required:["margem"] } } },
+  { type:"function", function:{ name:"set_mc_alvo", description:"Define a Margem de Contribuição (MC) alvo — use quando o usuário pedir para atingir/ajustar uma MC específica (ex: 'aumenta o preço pra 10% de MC'). NUNCA calcule a ML equivalente de cabeça (MC = ML + Custo Fixo, uma subtração fácil de errar) — esta ferramenta faz o cálculo exato. Depois de chamar, SEMPRE confira com get_resultado antes de informar o resultado ao usuário.",
+    parameters:{ type:"object", properties:{ mc_pct:{type:"number",description:"Percentual de MC desejado"} }, required:["mc_pct"] } } },
   { type:"function", function:{ name:"set_indices", description:"Sobrescreve índices comerciais específicos",
     parameters:{ type:"object", properties:{ rebate:{type:"number"}, mkt:{type:"number"}, frete:{type:"number"}, vpc:{type:"number"}, pdd:{type:"number"}, comis:{type:"number"} } } } },
   { type:"function", function:{ name:"get_resultado", description:"Retorna o preço calculado atual (pF, ML%, MC%, markup). Chamar sempre ao final.",
@@ -2994,6 +2998,7 @@ UF destino: ${d.ufDestino}
 Câmbio: R$ ${d.ptax}/USD | Custo FOB: USD ${d.fobUSD}
 Canal: ${canal?.label || "nenhum"}
 Margem alvo (ML): ${d.margem}%
+Custo Fixo (soma na MC, não editável diretamente): ${c.cfixoEf?.toFixed(2)||0}%
 Índices: comis ${d.comis}% mkt ${d.mkt}% rebate ${d.rebate}% pdd ${d.pdd||2.5}% vpc ${d.vpc||0}%
 Resultado: pF R$ ${c.pF?.toFixed(2)||"—"} | ML ${c.margPct?.toFixed(2)||"—"}% | MC ${c.mc?.toFixed(2)||"—"}%`;
   };
@@ -3053,6 +3058,16 @@ Resultado: pF R$ ${c.pF?.toFixed(2)||"—"} | ML ${c.margPct?.toFixed(2)||"—"}
       notifyFill();
       setD(p => ({...p, margem: inp.margem}));
       return { ok:true, msg:`ML: ${inp.margem}%` };
+    }
+    if (name === "set_mc_alvo") {
+      notifyFill();
+      // MC = ML + Custo Fixo. Calcula o ML necessário para a MC pedida sem depender
+      // do modelo fazer a subtração — evita a MC sair diferente do pedido.
+      const cfixoEf = c.cfixoEf || 0;
+      const margemNecessaria = +(inp.mc_pct - cfixoEf).toFixed(2);
+      setD(p => ({...p, margem: margemNecessaria}));
+      return { ok:true, mc_alvo: inp.mc_pct, custo_fixo_pct: cfixoEf, ml_calculado: margemNecessaria,
+        msg:`Para MC=${inp.mc_pct}% com Custo Fixo de ${cfixoEf}%, ML foi ajustada para ${margemNecessaria}%. Chame get_resultado para confirmar o novo preço e MC reais.` };
     }
     if (name === "set_indices") {
       notifyFill();
