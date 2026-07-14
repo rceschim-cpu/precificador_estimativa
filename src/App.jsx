@@ -2898,7 +2898,7 @@ const CALC_TOOLS = [
       comis_pct:{type:"number",description:"Comissão %"},
       margem:{type:"number",description:"Margem líquida alvo %"},
     } } } },
-  { type:"function", function:{ name:"perguntar_usuario", description:"Use SEMPRE que precisar de uma informação que não está na base de dados nem foi dita pelo usuário (ex: UF de destino, canal/cliente, prazo de pagamento). NUNCA assuma um valor (ex: nunca assuma São Paulo como UF de destino) — pergunte de forma interativa com opções. O usuário verá botões com as opções e um campo para digitar outro valor.",
+  { type:"function", function:{ name:"perguntar_usuario", description:"Use SEMPRE que precisar de uma informação que não está na base de dados nem foi dita pelo usuário (ex: UF de destino, canal/cliente, prazo de pagamento). NUNCA assuma um valor (ex: nunca assuma São Paulo como UF de destino) — pergunte de forma interativa com opções. O usuário verá botões com as opções e um campo para digitar outro valor. ⚠️ NUNCA escreva a pergunta como texto normal na resposta — SEMPRE chame esta ferramenta, uma pergunta por vez (uma de cada vez, não numere várias perguntas num único texto). Se precisar de várias informações, chame esta ferramenta várias vezes (uma por informação) — cada uma será exibida em sequência.",
     parameters:{ type:"object", properties:{
       pergunta:{type:"string",description:"Pergunta objetiva e curta a exibir ao usuário"},
       opcoes:{type:"array",items:{type:"string"},description:"2 a 4 opções sugeridas, mutuamente exclusivas (o usuário também pode digitar uma resposta livre)"},
@@ -2918,6 +2918,7 @@ function ChatPanel({ d, setD, c, produtosDB, onClose, onPrecificando, embedded=f
   const [outroTexto, setOutroTexto] = useState("");
   const scrollRef = useRef(null);
   const apiHistoryRef = useRef([]);
+  const pendingQueueRef = useRef([]); // fila de perguntar_usuario ainda não exibidas do batch atual
   const notifyFill = () => onPrecificando?.(true);
 
   useEffect(() => {
@@ -3107,12 +3108,12 @@ Resultado: pF R$ ${c.pF?.toFixed(2)||"—"} | ML ${c.margPct?.toFixed(2)||"—"}
       }
       if (finish === "tool_calls") {
         const names = [];
-        let waiting = null;
+        const perguntas = [];
         for (const tc of msg.tool_calls) {
           if (tc.function.name === "perguntar_usuario") {
             const inp = JSON.parse(tc.function.arguments||"{}");
-            waiting = { toolCallId: tc.id, pergunta: inp.pergunta, opcoes: Array.isArray(inp.opcoes)?inp.opcoes.slice(0,4):[] };
-            continue; // não resolve ainda — fica pendente até o usuário responder
+            perguntas.push({ toolCallId: tc.id, pergunta: inp.pergunta, opcoes: Array.isArray(inp.opcoes)?inp.opcoes.slice(0,4):[] });
+            continue; // não resolve ainda — cada uma fica pendente até ser exibida e respondida
           }
           const inp = JSON.parse(tc.function.arguments||"{}");
           const result = await handleToolCall(tc.function.name, inp);
@@ -3120,7 +3121,12 @@ Resultado: pF R$ ${c.pF?.toFixed(2)||"—"} | ML ${c.margPct?.toFixed(2)||"—"}
           names.push(tc.function.name.replace(/_/g," "));
         }
         if (names.length) setMessages(prev => [...prev, { role:"tool", content:names.join(" · ") }]);
-        if (waiting) { setPendingQuestion(waiting); return; } // pausa o loop
+        if (perguntas.length) {
+          // exibe a primeira agora; as demais ficam na fila e aparecem uma a uma
+          pendingQueueRef.current = perguntas.slice(1);
+          setPendingQuestion(perguntas[0]);
+          return; // pausa o loop até todas as perguntas do batch serem respondidas
+        }
       }
     }
   };
@@ -3143,11 +3149,18 @@ Resultado: pF R$ ${c.pF?.toFixed(2)||"—"} | ML ${c.margPct?.toFixed(2)||"—"}
     if (!pendingQuestion || !valor.trim()) return;
     const toolCallId = pendingQuestion.toolCallId;
     setMessages(prev => [...prev, { role:"user", content:valor }]);
-    setPendingQuestion(null);
     setOutroTexto("");
+    apiHistoryRef.current.push({ role:"tool", tool_call_id:toolCallId, content:JSON.stringify({ resposta:valor }) });
+    if (pendingQueueRef.current.length) {
+      // ainda há perguntas do mesmo batch — exibe a próxima sem chamar a API de novo
+      const proxima = pendingQueueRef.current[0];
+      pendingQueueRef.current = pendingQueueRef.current.slice(1);
+      setPendingQuestion(proxima);
+      return;
+    }
+    setPendingQuestion(null);
     setLoading(true);
     try {
-      apiHistoryRef.current.push({ role:"tool", tool_call_id:toolCallId, content:JSON.stringify({ resposta:valor }) });
       await runLoop();
     } catch(e) {
       setMessages(prev => [...prev, { role:"error", content:e.message }]);
