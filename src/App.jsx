@@ -2835,24 +2835,26 @@ REGRAS OBRIGATÓRIAS:
 - Percentuais: "2%" ou "2" → passe 2 (nunca 0.02).
 - Se o usuário mencionar produto ambíguo (ex: "notebook" sem modelo), use buscar_produto para encontrá-lo antes de set_produto.
 - Não recalcule manualmente tributos — a calculadora faz isso; use get_resultado.
-- Se faltar custo (FOB USD) ou ptax, pergunte antes de calcular — esses dados não estão no banco.
+- Se o usuário não informar custo (FOB USD) ou ptax, use query_custos_historico e aplique o registro mais recente via set_custo — SEMPRE avise o usuário que usou custo histórico e de qual mês (fonte).
 - Formato de valores monetários: R$ com 2 casas decimais.
 - Seja direto. Confirme o que foi preenchido em uma linha.
 
 FLUXO OBRIGATÓRIO PARA PRECIFICAR (siga sempre nesta ordem):
 1. buscar_produto se o produto_id não for conhecido → set_produto
 2. set_origem_modalidade → set_canal → set_uf_destino
-3. set_custo (peça FOB USD e ptax ao usuário se não informados)
+3. Custo: se o usuário informou FOB USD/ptax, use set_custo direto.
+   Senão: query_custos_historico com o SKU → set_custo com custo_usd_unit e taxa_dolar
+   do registro mais_recente → informe ao usuário a fonte (ex: "custo de Mar/2026").
 4. ⚠️ OBRIGATÓRIO: query_indices_historico com o SKU retornado por set_produto
    (sem esse passo você usará índices padrão incorretos — sempre consulte o histórico)
 5. aplicar_indices_completo com os valores do canal mais relevante encontrado no histórico
 6. set_margem se o usuário definiu margem alvo
-7. get_resultado → apresente pF, ML%, MC% e de qual canal vieram os índices
+7. get_resultado → apresente pF, ML%, MC%, de qual canal vieram os índices e de qual mês veio o custo
 
 BASE DE DADOS DISPONÍVEL:
 - precificacao_indices: 203.170 registros de índices reais por SKU×canal (Jan/2025–Mar/2026)
+- precificacao_custos: 11.495 registros de custos reais por SKU×planta×mês (custo USD, dólar, CMV, garantia, backup, impostos, preço médio, MC/ML realizados)
 - produtos_catalogo: 610 produtos com NCM, IPI, ICMS, crédito presumido por planta
-O que NÃO está no banco: custo FOB USD e taxa de câmbio (ptax) — sempre pergunte ao usuário.
 
 CONTEXTO DA CALCULADORA (injetado dinamicamente):
 {CONTEXT}`;
@@ -2880,6 +2882,11 @@ const CALC_TOOLS = [
     parameters:{ type:"object", properties:{
       sku:{type:"string",description:"SKU SAP do produto — use exatamente o valor 'sku' retornado por set_produto. Alternativamente passe o produto_id que o sistema resolve."},
       canal_filtro:{type:"string",description:"Filtro opcional por nome do cliente/canal (ex: 'AMAZON', 'MAGAZINE', 'GAZIN', 'CASAS BAHIA')"},
+    }, required:["sku"] } } },
+  { type:"function", function:{ name:"query_custos_historico", description:"Consulta custos reais históricos do produto nos fechamentos da Controladoria: custo USD, taxa dólar, custo BRL, custo transformação, GGF, CMV unitário, garantia %, backup %, impostos (ICMS, IPI, PIS, COFINS, ST, DIFAL, crédito presumido, FTI), preço médio praticado e volume. Use quando o usuário não informar o custo FOB — o registro mais recente serve como referência (sempre informe a fonte/mês ao usuário).",
+    parameters:{ type:"object", properties:{
+      sku:{type:"string",description:"SKU SAP do produto — use o valor 'sku' retornado por set_produto. Alternativamente passe o produto_id."},
+      planta:{type:"string",description:"Filtro opcional por planta (ex: 'Manaus', 'Ilhéus', 'Curitiba')"},
     }, required:["sku"] } } },
   { type:"function", function:{ name:"aplicar_indices_completo", description:"Aplica todos os índices comerciais históricos na calculadora de uma vez. Use após query_indices_historico para preencher os campos com os valores reais do canal escolhido.",
     parameters:{ type:"object", properties:{
@@ -2994,6 +3001,20 @@ Resultado: pF R$ ${c.pF?.toFixed(2)||"—"} | ML ${c.margPct?.toFixed(2)||"—"}
     }
     if (name === "get_resultado") {
       return { pF: c.pF, ml: c.margPct, mc: c.mc, markup: c.mkp };
+    }
+    if (name === "query_custos_historico") {
+      try {
+        const prod = produtosDB.find(p => p.sku === inp.sku || p.id === inp.sku);
+        const sku = prod?.sku || inp.sku;
+        if (!sku) return { found:false, msg:"SKU não encontrado" };
+        const fPlanta = inp.planta ? `&planta=ilike.*${encodeURIComponent(inp.planta)}*` : "";
+        const data = await sbFetch(
+          `precificacao_custos?sku=eq.${sku}${fPlanta}&select=planta,data_ref,volume,preco_medio,custo_usd_unit,taxa_dolar,custo_brl_unit,custo_transf_unit,ggf_unit,cmv_unit,garantia_pct,backup_pct,st_pct,difal_pct,icms_pct,ipi_pct,pis_pct,cofins_pct,cred_presum_pct,fti_pct,mc_pct,ml_pct,fonte&order=data_ref.desc&limit=12`
+        );
+        if (!data?.length) return { found:false, msg:`Nenhum custo histórico para SKU ${sku}` };
+        return { found:true, sku, mais_recente:data[0], historico_12m:data,
+          obs:"Valores unitários dos fechamentos mensais. Use mais_recente como referência e SEMPRE informe a fonte ao usuário." };
+      } catch(e) { return { found:false, error:String(e) }; }
     }
     if (name === "query_indices_historico") {
       try {
