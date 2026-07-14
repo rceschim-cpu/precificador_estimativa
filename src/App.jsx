@@ -2908,6 +2908,15 @@ const CALC_TOOLS = [
     }, required:["prazo_dias"] } } },
 ];
 
+// API da Anthropic direto (Messages API) usa outro formato de tool que o OpenAI-style
+// acima: input_schema em vez de function.parameters, sem o wrapper type:"function".
+const ANTHROPIC_MODEL = "claude-haiku-4-5-20251001";
+const ANTHROPIC_TOOLS = CALC_TOOLS.map(t => ({
+  name: t.function.name,
+  description: t.function.description,
+  input_schema: t.function.parameters,
+}));
+
 // Formatador leve de markdown para as respostas do agente: negrito, títulos e tabelas
 // viram elementos simples — o chat não tem parser de markdown completo, isso evita
 // mostrar "**"/"##"/"|---|---|" cru na tela.
@@ -2967,6 +2976,7 @@ function ChatPanel({ d, setD, c, produtosDB, onClose, onPrecificando, embedded=f
   const scrollRef = useRef(null);
   const apiHistoryRef = useRef([]);
   const ultimoResumoRef = useRef([]); // último resumo de query_indices_historico, para aplicar_indices_completo copiar direto (sem depender do modelo re-digitar números)
+  const pendingToolResultsRef = useRef([]); // tool_results já resolvidos do turno atual, aguardando as perguntas pendentes serem respondidas
   const pendingQueueRef = useRef([]); // fila de perguntar_usuario ainda não exibidas do batch atual
   const notifyFill = () => onPrecificando?.(true);
 
@@ -3138,53 +3148,58 @@ Resultado: pF R$ ${c.pF?.toFixed(2)||"—"} | ML ${c.margPct?.toFixed(2)||"—"}
     return { ok:false, msg:"Tool desconhecida" };
   };
 
-  // Loop principal do agente. Pausa (sem fechar o loading) quando o modelo chama
-  // perguntar_usuario — nesse caso o tool_call_id fica pendente até o usuário responder.
+  // Loop principal do agente (Anthropic Messages API direto). Pausa (sem fechar o loading)
+  // quando o modelo chama perguntar_usuario — o tool_use_id fica pendente até o usuário responder.
   const runLoop = async () => {
-    const systemMsg = { role:"system", content: CHAT_SYSTEM_PROMPT.replace("{CONTEXT}", buildCalcContext()) };
+    const systemPrompt = CHAT_SYSTEM_PROMPT.replace("{CONTEXT}", buildCalcContext());
     while (true) {
-      const apiMsgs = [systemMsg, ...apiHistoryRef.current];
-      const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
         method:"POST",
         headers:{
-          "Authorization": `Bearer ${import.meta.env.VITE_CLAUDE_KEY}`,
-          "HTTP-Referer": "https://precificador-estimativa.vercel.app",
+          "x-api-key": import.meta.env.VITE_CLAUDE_KEY,
+          "anthropic-version": "2023-06-01",
+          "anthropic-dangerous-direct-browser-access": "true",
           "content-type":"application/json"
         },
-        body: JSON.stringify({ model:"anthropic/claude-haiku-4-5", max_tokens:1024,
-          tools: CALC_TOOLS, messages: apiMsgs }),
+        body: JSON.stringify({ model: ANTHROPIC_MODEL, max_tokens:1024,
+          system: systemPrompt, tools: ANTHROPIC_TOOLS, messages: apiHistoryRef.current }),
       });
-      if (!res.ok) throw new Error(`Erro API: ${res.status}`);
+      if (!res.ok) {
+        const errBody = await res.text().catch(()=> "");
+        throw new Error(`Erro API: ${res.status}${errBody?` — ${errBody.slice(0,200)}`:""}`);
+      }
       const data = await res.json();
-      const msg = data.choices[0].message;
-      const finish = data.choices[0].finish_reason;
-      apiHistoryRef.current.push({ role:"assistant", content:msg.content||null, ...(msg.tool_calls?.length ? { tool_calls:msg.tool_calls } : {}) });
-      if (finish === "stop" || finish === "end_turn" || !msg.tool_calls?.length) {
-        if (msg.content) setMessages(prev => [...prev, { role:"assistant", content:msg.content }]);
+      const content = data.content || [];
+      apiHistoryRef.current.push({ role:"assistant", content });
+      const toolBlocks = content.filter(b => b.type === "tool_use");
+      if (data.stop_reason !== "tool_use" || !toolBlocks.length) {
+        const text = content.filter(b => b.type === "text").map(b => b.text).join("\n");
+        if (text) setMessages(prev => [...prev, { role:"assistant", content:text }]);
         break;
       }
-      if (finish === "tool_calls") {
-        const names = [];
-        const perguntas = [];
-        for (const tc of msg.tool_calls) {
-          if (tc.function.name === "perguntar_usuario") {
-            const inp = JSON.parse(tc.function.arguments||"{}");
-            perguntas.push({ toolCallId: tc.id, pergunta: inp.pergunta, opcoes: Array.isArray(inp.opcoes)?inp.opcoes.slice(0,4):[] });
-            continue; // não resolve ainda — cada uma fica pendente até ser exibida e respondida
-          }
-          const inp = JSON.parse(tc.function.arguments||"{}");
-          const result = await handleToolCall(tc.function.name, inp);
-          apiHistoryRef.current.push({ role:"tool", tool_call_id:tc.id, content:JSON.stringify(result) });
-          names.push(tc.function.name.replace(/_/g," "));
+      const names = [];
+      const perguntas = [];
+      const toolResults = [];
+      for (const tb of toolBlocks) {
+        if (tb.name === "perguntar_usuario") {
+          perguntas.push({ toolCallId: tb.id, pergunta: tb.input.pergunta, opcoes: Array.isArray(tb.input.opcoes)?tb.input.opcoes.slice(0,4):[] });
+          continue; // não resolve ainda — cada uma fica pendente até ser exibida e respondida
         }
-        if (names.length) setMessages(prev => [...prev, { role:"tool", content:names.join(" · ") }]);
-        if (perguntas.length) {
-          // exibe a primeira agora; as demais ficam na fila e aparecem uma a uma
-          pendingQueueRef.current = perguntas.slice(1);
-          setPendingQuestion(perguntas[0]);
-          return; // pausa o loop até todas as perguntas do batch serem respondidas
-        }
+        const result = await handleToolCall(tb.name, tb.input || {});
+        toolResults.push({ type:"tool_result", tool_use_id: tb.id, content: JSON.stringify(result) });
+        names.push(tb.name.replace(/_/g," "));
       }
+      if (names.length) setMessages(prev => [...prev, { role:"tool", content:names.join(" · ") }]);
+      if (perguntas.length) {
+        // guarda os tool_results já prontos deste turno; só vão pro histórico quando
+        // TODAS as perguntas pendentes do mesmo turno tiverem sido respondidas
+        // (a Anthropic exige um tool_result para cada tool_use do turno, num único bloco)
+        pendingToolResultsRef.current = toolResults;
+        pendingQueueRef.current = perguntas.slice(1);
+        setPendingQuestion(perguntas[0]);
+        return; // pausa o loop
+      }
+      apiHistoryRef.current.push({ role:"user", content: toolResults });
     }
   };
 
@@ -3204,12 +3219,13 @@ Resultado: pF R$ ${c.pF?.toFixed(2)||"—"} | ML ${c.margPct?.toFixed(2)||"—"}
 
   const responderPergunta = async (valor) => {
     if (!pendingQuestion || !valor.trim()) return;
-    const toolCallId = pendingQuestion.toolCallId;
+    const toolUseId = pendingQuestion.toolCallId;
     setMessages(prev => [...prev, { role:"user", content:valor }]);
     setOutroTexto("");
-    apiHistoryRef.current.push({ role:"tool", tool_call_id:toolCallId, content:JSON.stringify({ resposta:valor }) });
+    pendingToolResultsRef.current = [...pendingToolResultsRef.current,
+      { type:"tool_result", tool_use_id: toolUseId, content: JSON.stringify({ resposta:valor }) }];
     if (pendingQueueRef.current.length) {
-      // ainda há perguntas do mesmo batch — exibe a próxima sem chamar a API de novo
+      // ainda há perguntas do mesmo turno — exibe a próxima sem chamar a API de novo
       const proxima = pendingQueueRef.current[0];
       pendingQueueRef.current = pendingQueueRef.current.slice(1);
       setPendingQuestion(proxima);
@@ -3218,6 +3234,8 @@ Resultado: pF R$ ${c.pF?.toFixed(2)||"—"} | ML ${c.margPct?.toFixed(2)||"—"}
     setPendingQuestion(null);
     setLoading(true);
     try {
+      apiHistoryRef.current.push({ role:"user", content: pendingToolResultsRef.current });
+      pendingToolResultsRef.current = [];
       await runLoop();
     } catch(e) {
       setMessages(prev => [...prev, { role:"error", content:e.message }]);
