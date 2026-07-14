@@ -24,9 +24,9 @@ const sbFetch = async (path, opts = {}) => {
 };
 
 const db = {
-  getUsers:       ()         => sbFetch("usuarios?select=*&order=criado_em.asc"),
-  getUserByEmail: (email)    => sbFetch(`usuarios?email=eq.${encodeURIComponent(email)}&select=*`),
-  insertUser:     (u)        => sbFetch("usuarios", { method: "POST", body: JSON.stringify(u) }),
+  getUsers:       ()         => sbFetch("usuarios_publico?select=*&order=criado_em.asc"),
+  verificarLogin: (email, senha) => sbFetch("rpc/verificar_login", { method:"POST", body: JSON.stringify({ p_email: email, p_senha: senha }) }),
+  criarUsuario:   (nome, email, senha, perfil) => sbFetch("rpc/criar_usuario", { method:"POST", body: JSON.stringify({ p_nome: nome, p_email: email, p_senha: senha, p_perfil: perfil }) }),
   updateUser:     (id, data) => sbFetch(`usuarios?id=eq.${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   deleteUser:     (id)       => sbFetch(`usuarios?id=eq.${id}`, { method: "DELETE", prefer: "return=minimal" }),
   getProdutos:    ()         => sbFetch("produtos_catalogo?select=*&order=nome.asc"),
@@ -559,10 +559,9 @@ function AuthScreen({ onLogin }) {
   const handleLogin = async () => {
     setMsg(null); setLoading(true);
     try {
-      const rows = await db.getUserByEmail(form.email.toLowerCase().trim());
+      const rows = await db.verificarLogin(form.email.toLowerCase().trim(), form.senha);
       const user = rows?.[0];
-      if (!user) return setMsg({ type: "err", text: "E-mail não encontrado." });
-      if (user.senha !== form.senha) return setMsg({ type: "err", text: "Senha incorreta." });
+      if (!user) return setMsg({ type: "err", text: "E-mail ou senha incorretos." });
       if (user.status === "pendente") return setMsg({ type: "warn", text: "Sua conta ainda não foi aprovada pelo administrador." });
       if (user.status === "rejeitado") return setMsg({ type: "err", text: "Acesso negado. Entre em contato com o administrador." });
       if (user.status === "inativo") return setMsg({ type: "err", text: "Conta inativa. Entre em contato com o administrador." });
@@ -581,20 +580,13 @@ function AuthScreen({ onLogin }) {
     if (form.senha !== form.confirma) return setMsg({ type: "err", text: "As senhas não conferem." });
     setLoading(true);
     try {
-      const existing = await db.getUserByEmail(form.email.toLowerCase().trim());
-      if (existing?.length > 0) return setMsg({ type: "err", text: "Este e-mail já está cadastrado." });
-      await db.insertUser({
-        nome: form.nome.trim(),
-        email: form.email.toLowerCase().trim(),
-        senha: form.senha,
-        perfil: form.perfil,
-        status: "pendente",
-      });
+      await db.criarUsuario(form.nome.trim(), form.email.toLowerCase().trim(), form.senha, form.perfil);
       setMsg({ type: "ok", text: "Cadastro realizado! Aguarde aprovação do administrador." });
       setForm(p => ({ ...p, senha: "", confirma: "", nome: "" }));
       setTimeout(() => setAba("login"), 2500);
     } catch(e) {
-      setMsg({ type: "err", text: "Erro ao cadastrar. Tente novamente." });
+      const dup = /duplicate|unique/i.test(e.message || "");
+      setMsg({ type: "err", text: dup ? "Este e-mail já está cadastrado." : "Erro ao cadastrar. Tente novamente." });
     } finally { setLoading(false); }
   };
 
@@ -2835,21 +2827,23 @@ REGRAS OBRIGATÓRIAS:
 - Percentuais: "2%" ou "2" → passe 2 (nunca 0.02).
 - Se o usuário mencionar produto ambíguo (ex: "notebook" sem modelo), use buscar_produto para encontrá-lo antes de set_produto.
 - Não recalcule manualmente tributos — a calculadora faz isso; use get_resultado.
-- Se o usuário não informar custo (FOB USD) ou ptax, use query_custos_historico e aplique o registro mais recente via set_custo — SEMPRE avise o usuário que usou custo histórico e de qual mês (fonte).
+- REGRA CENTRAL: use SEMPRE por padrão os valores da base de dados (custos e índices), sem perguntar ao usuário. Só pergunte algo que só o usuário sabe (ex: qual canal/cliente, margem alvo específica) ou se ele mesmo disser um valor diferente do praticado.
+- NUNCA peça FOB (USD) ao usuário. O VPL (custo_usd_unit do fechamento mais recente) JÁ inclui o FOB — buscar e aplicar automaticamente via query_custos_historico + set_custo. FOB nunca precisa ser perguntado nem informado separadamente.
 - Formato de valores monetários: R$ com 2 casas decimais.
 - Seja direto. Confirme o que foi preenchido em uma linha.
 
-FLUXO OBRIGATÓRIO PARA PRECIFICAR (siga sempre nesta ordem):
-1. buscar_produto se o produto_id não for conhecido → set_produto
-2. set_origem_modalidade → set_canal → set_uf_destino
-3. Custo: se o usuário informou FOB USD/ptax, use set_custo direto.
-   Senão: query_custos_historico com o SKU → set_custo com custo_usd_unit e taxa_dolar
-   do registro mais_recente → informe ao usuário a fonte (ex: "custo de Mar/2026").
-4. ⚠️ OBRIGATÓRIO: query_indices_historico com o SKU retornado por set_produto
-   (sem esse passo você usará índices padrão incorretos — sempre consulte o histórico)
-5. aplicar_indices_completo com os valores do canal mais relevante encontrado no histórico
+FLUXO OBRIGATÓRIO PARA PRECIFICAR (siga sempre nesta ordem, sem pausar para perguntar custo/índices — só aplique):
+1. buscar_produto se o produto_id não for conhecido → set_produto (guarda o SKU retornado)
+2. set_origem_modalidade → set_uf_destino
+3. ⚠️ OBRIGATÓRIO E AUTOMÁTICO: query_custos_historico com o SKU → aplique IMEDIATAMENTE via
+   set_custo(vpl_usd: custo_usd_unit, dolar: taxa_dolar) do registro mais_recente.
+   Isso já é o VPL completo — não peça FOB, não pergunte custo ao usuário.
+   Informe ao usuário de qual mês veio (ex: "VPL de Mar/2026: USD 68,32 × 5,54").
+4. set_canal (pergunte ao usuário qual canal/cliente, se não tiver dito)
+5. ⚠️ OBRIGATÓRIO E AUTOMÁTICO: query_indices_historico com o SKU → aplicar_indices_completo
+   com os valores do canal/cliente mais relevante encontrado — sem perguntar, só aplicar.
 6. set_margem se o usuário definiu margem alvo
-7. get_resultado → apresente pF, ML%, MC%, de qual canal vieram os índices e de qual mês veio o custo
+7. get_resultado → apresente pF, ML%, MC%, de qual canal vieram os índices e de qual mês veio o VPL
 
 BASE DE DADOS DISPONÍVEL:
 - precificacao_indices: 203.170 registros de índices reais por SKU×canal (Jan/2025–Mar/2026)
@@ -2868,8 +2862,8 @@ const CALC_TOOLS = [
     parameters:{ type:"object", properties:{ origem:{type:"string",enum:["MAO","IOS","CWB"]}, modalidade:{type:"string",enum:["CKD","SKD","CBU"]} }, required:["origem","modalidade"] } } },
   { type:"function", function:{ name:"set_canal", description:"Seleciona canal de venda",
     parameters:{ type:"object", properties:{ canal_id:{type:"string",description:"ID do canal (ex: 't3', 'corp', 'amzn')"} }, required:["canal_id"] } } },
-  { type:"function", function:{ name:"set_custo", description:"Define custo do produto",
-    parameters:{ type:"object", properties:{ vpl_usd:{type:"number",description:"Custo em USD (VPL)"}, dolar:{type:"number",description:"Taxa do dólar (ptax)"}, producao:{type:"number",description:"Custo de produção em R$"} } } } },
+  { type:"function", function:{ name:"set_custo", description:"Define o VPL (custo padrão do produto, já com FOB/duties incluídos) em modo manual. NUNCA pergunte FOB ao usuário — o VPL do fechamento mais recente (via query_custos_historico) já inclui o FOB, basta aplicar vpl_usd+dolar (ou vpl_brl direto) aqui.",
+    parameters:{ type:"object", properties:{ vpl_usd:{type:"number",description:"VPL em USD (custo_usd_unit do fechamento mais recente)"}, dolar:{type:"number",description:"Taxa do dólar do fechamento (taxa_dolar)"}, vpl_brl:{type:"number",description:"VPL já em R$, caso já convertido — usa direto sem multiplicar pelo dólar"}, producao:{type:"number",description:"Custo de produção em R$ (componente separado do VPL)"} } } } },
   { type:"function", function:{ name:"set_uf_destino", description:"Define UF de destino (para cálculo de ICMS e DIFAL)",
     parameters:{ type:"object", properties:{ uf:{type:"string",description:"Sigla do estado (ex: SP, RJ, MG)"} }, required:["uf"] } } },
   { type:"function", function:{ name:"set_margem", description:"Define margem líquida alvo (ML%)",
@@ -2883,7 +2877,7 @@ const CALC_TOOLS = [
       sku:{type:"string",description:"SKU SAP do produto — use exatamente o valor 'sku' retornado por set_produto. Alternativamente passe o produto_id que o sistema resolve."},
       canal_filtro:{type:"string",description:"Filtro opcional por nome do cliente/canal (ex: 'AMAZON', 'MAGAZINE', 'GAZIN', 'CASAS BAHIA')"},
     }, required:["sku"] } } },
-  { type:"function", function:{ name:"query_custos_historico", description:"Consulta custos reais históricos do produto nos fechamentos da Controladoria: custo USD, taxa dólar, custo BRL, custo transformação, GGF, CMV unitário, garantia %, backup %, impostos (ICMS, IPI, PIS, COFINS, ST, DIFAL, crédito presumido, FTI), preço médio praticado e volume. Use quando o usuário não informar o custo FOB — o registro mais recente serve como referência (sempre informe a fonte/mês ao usuário).",
+  { type:"function", function:{ name:"query_custos_historico", description:"⚠️ SEMPRE chamar automaticamente ao precificar, ANTES de perguntar qualquer coisa sobre custo — nunca peça FOB ao usuário. Consulta o VPL (custo USD do mês corrente, campo custo_usd_unit) e a taxa de dólar do fechamento mais recente da Controladoria, além de custo transformação, GGF, CMV, garantia %, backup %, impostos e preço médio praticado. O VPL já inclui o FOB (não solicite FOB separadamente). Aplique o resultado via set_custo(vpl_usd, dolar) automaticamente e informe ao usuário a fonte/mês usado.",
     parameters:{ type:"object", properties:{
       sku:{type:"string",description:"SKU SAP do produto — use o valor 'sku' retornado por set_produto. Alternativamente passe o produto_id."},
       planta:{type:"string",description:"Filtro opcional por planta (ex: 'Manaus', 'Ilhéus', 'Curitiba')"},
@@ -2960,11 +2954,18 @@ Resultado: pF R$ ${c.pF?.toFixed(2)||"—"} | ML ${c.margPct?.toFixed(2)||"—"}
     if (name === "set_custo") {
       notifyFill();
       const upd = {};
-      if (inp.vpl_usd  !== undefined) upd.fobUSD   = inp.vpl_usd;
-      if (inp.dolar    !== undefined) upd.ptax      = inp.dolar;
-      if (inp.producao !== undefined) upd.producao  = inp.producao;
+      const dolarUsado = inp.dolar !== undefined ? inp.dolar : d.ptax;
+      if (inp.dolar !== undefined) upd.ptax = inp.dolar;
+      if (inp.vpl_brl !== undefined) {
+        upd.vplModo = "manual";
+        upd.vplManual = +parseFloat(inp.vpl_brl).toFixed(2);
+      } else if (inp.vpl_usd !== undefined) {
+        upd.vplModo = "manual";
+        upd.vplManual = +(inp.vpl_usd * (dolarUsado || 0)).toFixed(2);
+      }
+      if (inp.producao !== undefined) upd.producao = inp.producao;
       setD(p => ({...p, ...upd}));
-      return { ok:true, msg:"Custo atualizado" };
+      return { ok:true, msg:"VPL atualizado (modo manual, FOB não é necessário)", vpl_brl: upd.vplManual };
     }
     if (name === "set_uf_destino") {
       notifyFill();
@@ -3104,7 +3105,7 @@ Resultado: pF R$ ${c.pF?.toFixed(2)||"—"} | ML ${c.margPct?.toFixed(2)||"—"}
 
   const S={fontFamily:"'Montserrat',sans-serif"};
   const wrapStyle = embedded
-    ? {flex:1,minWidth:0,background:"#0d0d15",display:"flex",flexDirection:"column",...S}
+    ? {flex:1,minWidth:0,minHeight:0,height:"100%",background:"#0d0d15",display:"flex",flexDirection:"column",...S}
     : {position:"fixed",top:0,right:0,bottom:0,width:400,background:"#0d0d15",borderLeft:"2px solid rgba(60,219,192,.25)",display:"flex",flexDirection:"column",zIndex:1000,...S};
   return (
     <div style={wrapStyle}>
@@ -3118,13 +3119,13 @@ Resultado: pF R$ ${c.pF?.toFixed(2)||"—"} | ML ${c.margPct?.toFixed(2)||"—"}
         </div>
         {!embedded&&<button onClick={onClose} style={{background:"none",border:"none",color:"#5a6a84",cursor:"pointer",fontSize:18,lineHeight:1,padding:"2px 6px"}}>✕</button>}
       </div>
-      <div ref={scrollRef} style={{flex:1,overflowY:"auto",padding:"12px 14px",display:"flex",flexDirection:"column",gap:10}}>
+      <div ref={scrollRef} style={{flex:1,minHeight:0,overflowY:"auto",padding:"12px 14px",display:"flex",flexDirection:"column",gap:10}}>
         {messages.length===0&&(
           <div style={{color:"#5a6a84",fontSize:11,textAlign:"center",marginTop:24}}>
             <div style={{fontSize:28,marginBottom:8}}>💬</div>
             <div style={{marginBottom:6}}>Exemplo de uso:</div>
             <div style={{padding:"10px 14px",background:"rgba(255,255,255,.04)",borderRadius:8,color:"#7a90b0",lineHeight:1.6,textAlign:"left"}}>
-              "Precifica notebook Celeron 14 pra T3 SP, custo USD 320, dólar 5,85, margem 12%"
+              "Precifica notebook Celeron 14 pra T3 SP, margem 12%" — custo e índices vêm da base automaticamente
             </div>
           </div>
         )}
@@ -3756,7 +3757,7 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
     })()}
 
     {viewMode==="agent"&&(
-      <div className={`app${chatPrecificando?" agent-ativo":""}`} style={{display:"flex",flexDirection:"column",height:"100%",overflow:"hidden"}}>
+      <div className={`app${chatPrecificando?" agent-ativo":""}`} style={{display:"flex",flexDirection:"column",height:"100%",minHeight:0,overflow:"hidden"}}>
         <style>{CSS}</style>
         {/* Header — modo agente */}
         <div style={{display:"flex",alignItems:"center",gap:10,padding:"10px 16px",background:"#1e2a3d",borderBottom:"1px solid rgba(255,255,255,.07)",flexShrink:0,flexWrap:"wrap"}}>
@@ -3785,7 +3786,7 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
           </button>
         </div>
 
-        <div style={{flex:1,display:"flex",overflow:"hidden"}}>
+        <div style={{flex:1,minHeight:0,display:"flex",overflow:"hidden"}}>
           {/* Resumo da precificação sendo formada */}
           <div style={{width:380,minWidth:320,borderRight:"1px solid rgba(255,255,255,.08)",overflowY:"auto",padding:16,display:"flex",flexDirection:"column",gap:14}}>
             <div className="price-hero">
