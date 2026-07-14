@@ -2902,7 +2902,7 @@ const CALC_TOOLS = [
     } } } },
 ];
 
-function ChatPanel({ d, setD, c, produtosDB, onClose, onPrecificando }) {
+function ChatPanel({ d, setD, c, produtosDB, onClose, onPrecificando, embedded=false }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -3103,8 +3103,11 @@ Resultado: pF R$ ${c.pF?.toFixed(2)||"—"} | ML ${c.margPct?.toFixed(2)||"—"}
   };
 
   const S={fontFamily:"'Montserrat',sans-serif"};
+  const wrapStyle = embedded
+    ? {flex:1,minWidth:0,background:"#0d0d15",display:"flex",flexDirection:"column",...S}
+    : {position:"fixed",top:0,right:0,bottom:0,width:400,background:"#0d0d15",borderLeft:"2px solid rgba(60,219,192,.25)",display:"flex",flexDirection:"column",zIndex:1000,...S};
   return (
-    <div style={{position:"fixed",top:0,right:0,bottom:0,width:400,background:"#0d0d15",borderLeft:"2px solid rgba(60,219,192,.25)",display:"flex",flexDirection:"column",zIndex:1000,...S}}>
+    <div style={wrapStyle}>
       <div style={{padding:"14px 16px",borderBottom:"1px solid rgba(255,255,255,.08)",display:"flex",alignItems:"center",gap:10,flexShrink:0}}>
         <span style={{fontSize:18}}>🤖</span>
         <div style={{flex:1}}>
@@ -3113,7 +3116,7 @@ Resultado: pF R$ ${c.pF?.toFixed(2)||"—"} | ML ${c.margPct?.toFixed(2)||"—"}
             {loading?"⚡ Preenchendo a calculadora...":"Descreva o cenário — eu preencho os campos"}
           </div>
         </div>
-        <button onClick={onClose} style={{background:"none",border:"none",color:"#5a6a84",cursor:"pointer",fontSize:18,lineHeight:1,padding:"2px 6px"}}>✕</button>
+        {!embedded&&<button onClick={onClose} style={{background:"none",border:"none",color:"#5a6a84",cursor:"pointer",fontSize:18,lineHeight:1,padding:"2px 6px"}}>✕</button>}
       </div>
       <div ref={scrollRef} style={{flex:1,overflowY:"auto",padding:"12px 14px",display:"flex",flexDirection:"column",gap:10}}>
         {messages.length===0&&(
@@ -3162,6 +3165,7 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
   const [modal,setModal]=useState(null);
   const [chatOpen,setChatOpen]=useState(false);
   const [chatPrecificando,setChatPrecificando]=useState(false);
+  const [viewMode,setViewMode]=useState("agent"); // "agent" (padrão) | "manual" (calculadora detalhada)
   const [produtosDB,setProdutosDB]=useState([]);
   const [produtoDB,setProdutoDB]=useState(null);
   const [categoriasDB,setCategoriasDB]=useState([]);
@@ -3751,6 +3755,78 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
       );
     })()}
 
+    {viewMode==="agent"&&(
+      <div className={`app${chatPrecificando?" agent-ativo":""}`} style={{display:"flex",flexDirection:"column",height:"100%",overflow:"hidden"}}>
+        <style>{CSS}</style>
+        {/* Header — modo agente */}
+        <div style={{display:"flex",alignItems:"center",gap:10,padding:"10px 16px",background:"#1e2a3d",borderBottom:"1px solid rgba(255,255,255,.07)",flexShrink:0,flexWrap:"wrap"}}>
+          <span style={{fontSize:13,fontWeight:700,color:"#3CDBC0",display:"flex",alignItems:"center",gap:6}}>🤖 Assistente de Precificação</span>
+          {nomeAba&&(
+            <span style={{fontSize:11,fontWeight:600,color:"#3CDBC0",padding:"2px 8px",background:"rgba(60,219,192,.15)",borderRadius:20,border:"1px solid rgba(60,219,192,.3)"}}>
+              {nomeAba}
+            </span>
+          )}
+          <div style={{flex:1}}/>
+          <button onClick={()=>{setD({...DEF});setCalcs({...CALC_DEF});setTab("perfil");if(onRenomear)onRenomear("Nova Precificação");}}
+            style={{padding:"4px 10px",background:"rgba(220,38,38,.15)",border:"1px solid rgba(220,38,38,.35)",color:"#f87171",fontFamily:"'Montserrat',sans-serif",fontSize:11,fontWeight:700,letterSpacing:.5,cursor:"pointer",borderRadius:20}}>
+            Novo
+          </button>
+          <button onClick={()=>setModal("registros")}
+            style={{padding:"4px 10px",background:"rgba(60,219,192,.2)",border:"1px solid rgba(60,219,192,.45)",color:"#3CDBC0",fontFamily:"'Montserrat',sans-serif",fontSize:11,fontWeight:700,letterSpacing:.5,cursor:"pointer",borderRadius:20}}>
+            Salvar/Carregar
+          </button>
+          {isAdmin&&<button onClick={()=>setModal("gestao")}
+            style={{padding:"4px 12px",background:"rgba(5,150,105,.15)",border:"1px solid rgba(5,150,105,.4)",color:"#34d399",fontFamily:"'Montserrat',sans-serif",fontSize:11,fontWeight:700,letterSpacing:.5,cursor:"pointer",borderRadius:20}}>
+            👥 Gestão de Usuários
+          </button>}
+          <button onClick={()=>setViewMode("manual")}
+            style={{padding:"5px 14px",background:"rgba(96,165,250,.15)",border:"1px solid rgba(96,165,250,.4)",color:"#60a5fa",fontFamily:"'Montserrat',sans-serif",fontSize:11,fontWeight:700,letterSpacing:.5,cursor:"pointer",borderRadius:20}}>
+            🧮 Calculadora Detalhada
+          </button>
+        </div>
+
+        <div style={{flex:1,display:"flex",overflow:"hidden"}}>
+          {/* Resumo da precificação sendo formada */}
+          <div style={{width:380,minWidth:320,borderRight:"1px solid rgba(255,255,255,.08)",overflowY:"auto",padding:16,display:"flex",flexDirection:"column",gap:14}}>
+            <div className="price-hero">
+              <div>
+                <div style={{fontFamily:"'Montserrat',sans-serif",fontSize:9,fontWeight:700,letterSpacing:2,color:"#A7A8AA",marginBottom:4}}>
+                  {d.modoCalc==="margem"?"MC RESULTANTE":"PREÇO DE VENDA FINAL"}
+                </div>
+                {d.modoCalc==="margem"
+                  ? <div style={{fontFamily:"'Montserrat',sans-serif",fontSize:36,fontWeight:800,letterSpacing:-1.5,lineHeight:1,display:"flex",alignItems:"flex-end",gap:4,
+                      color:c.mcSugerida!==null?(c.mcSugerida>=0?"#4ade80":"#f87171"):"#f1f5f9"}}>
+                      {c.mcSugerida!==null?n3(c.mcSugerida):"—"}
+                      <span style={{fontSize:16,fontWeight:400,marginBottom:4}}>%</span>
+                    </div>
+                  : <div style={{fontFamily:"'Montserrat',sans-serif",fontSize:36,fontWeight:800,color:"#f1f5f9",letterSpacing:-1.5,lineHeight:1,display:"flex",alignItems:"flex-start",gap:4}}>
+                      <span style={{fontSize:16,fontWeight:400,color:"#3CDBC0",marginTop:5}}>R$</span>{c.pF?n3(c.pF):"—"}
+                    </div>
+                }
+                <div style={{fontFamily:"'Montserrat',sans-serif",fontSize:9,color:"#5a6a84",marginTop:4,lineHeight:1.6}}>
+                  {prod?.nome?`${prod.nome} · ${d.origem||"—"}/${d.modalidade||"—"}`:"Aguardando o agente selecionar o produto..."}
+                </div>
+              </div>
+              <div style={{display:"flex",gap:5,flexWrap:"wrap",marginTop:8}}>
+                {[["CARGA","kpi-red",pct(c.cargaPct)],["ML","kpi-blue",pct(c.margPct)],["MC","kpi-green",pct(c.mc)],["MKP","",n3(c.mkp)+"x"]].map(([l,cls,v])=>(
+                  <div key={l} className={`kpi ${cls}`} style={{minWidth:60}}>
+                    <span style={{display:"block",fontFamily:"'Montserrat',sans-serif",fontSize:7,fontWeight:700,letterSpacing:1,color:"#475569",marginBottom:2}}>{l}</span>
+                    <span style={{fontFamily:"'Montserrat',sans-serif",fontSize:13,fontWeight:700}}>{v}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <BreakdownPanel c={c} d={d} prod={prod} ppbTot={ppbTot} calcs={calcs}/>
+          </div>
+
+          {/* Chat em evidência */}
+          <ChatPanel embedded d={d} setD={setD} c={c} produtosDB={produtosDB}
+            onClose={()=>{}} onPrecificando={v=>setChatPrecificando(v)}/>
+        </div>
+      </div>
+    )}
+
+    {viewMode==="manual"&&(<>
     <div className={`app${chatPrecificando?" agent-ativo":""}`} style={{transition:"margin-right .25s ease",marginRight:chatOpen?400:0}}>
     <style>{CSS}</style>
 
@@ -3808,6 +3884,11 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
         <button onClick={()=>setChatOpen(o=>!o)}
           style={{padding:"4px 12px",background:chatOpen?"rgba(60,219,192,.25)":"rgba(60,219,192,.1)",border:`1px solid ${chatOpen?"rgba(60,219,192,.6)":"rgba(60,219,192,.3)"}`,color:"#3CDBC0",fontFamily:"'Montserrat',sans-serif",fontSize:11,fontWeight:700,letterSpacing:.5,cursor:"pointer",borderRadius:20,display:"flex",alignItems:"center",gap:5,transition:".15s"}}>
           🤖 Assistente IA
+        </button>
+        <button onClick={()=>{setChatOpen(false);setViewMode("agent");}}
+          title="Voltar para a tela do assistente"
+          style={{padding:"4px 12px",background:"rgba(96,165,250,.1)",border:"1px solid rgba(96,165,250,.3)",color:"#60a5fa",fontFamily:"'Montserrat',sans-serif",fontSize:11,fontWeight:700,letterSpacing:.5,cursor:"pointer",borderRadius:20}}>
+          ← Modo Assistente
         </button>
       </div>
 
@@ -4544,6 +4625,7 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
       </div>
     </div>
     {chatOpen&&<ChatPanel d={d} setD={setD} c={c} produtosDB={produtosDB} onClose={()=>{setChatOpen(false);setChatPrecificando(false);}} onPrecificando={v=>setChatPrecificando(v)}/>}
+    </>)}
     </>
   );
 }
