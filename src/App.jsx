@@ -3002,9 +3002,14 @@ Resultado: pF R$ ${c.pF?.toFixed(2)||"—"} | ML ${c.margPct?.toFixed(2)||"—"}
         if (!sku) return { found:false, msg:"SKU não encontrado" };
         const filtro = inp.canal_filtro
           ? `&cliente_nome=ilike.*${encodeURIComponent(inp.canal_filtro)}*` : "";
-        const data = await sbFetch(
-          `precificacao_indices?sku=eq.${sku}${filtro}&select=canal,cliente,cliente_nome,planta,data_ref,rebate_pct,mkt_pct,frete_pct,zv09_pct,zv11_pct,bkp_pct,pd_pct,scrap_pct,margger_pct,mc_pct,margem_pct,fonte&order=data_ref.desc&limit=100`
-        );
+        const camposQ = "canal,cliente,cliente_nome,planta,data_ref,rebate_pct,mkt_pct,frete_pct,zv09_pct,zv11_pct,bkp_pct,pd_pct,scrap_pct,margger_pct,mc_pct,margem_pct,fonte";
+        let data;
+        try {
+          // View consolidada: último índice por cliente×canal
+          data = await sbFetch(`precificacao_indices_atual?sku=eq.${sku}${filtro}&select=${camposQ}&order=data_ref.desc&limit=100`);
+        } catch {
+          data = await sbFetch(`precificacao_indices?sku=eq.${sku}${filtro}&select=${camposQ}&order=data_ref.desc&limit=100`);
+        }
         if (!data?.length) return { found:false, msg:`Nenhum índice encontrado para SKU ${sku}${inp.canal_filtro?" com filtro '"+inp.canal_filtro+"'":""}` };
         const grupos = {};
         for (const r of data) {
@@ -3150,14 +3155,30 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
   const fetchHistoricoIndices = async (sku) => {
     if (!sku) return;
     setHistorLoading(true);
+    const campos = "canal,cliente,cliente_nome,planta,data_ref,rebate_pct,mkt_pct,frete_pct,zv09_pct,zv11_pct,bkp_pct,pd_pct,scrap_pct,margger_pct,mc_pct,margem_pct,fonte";
     try {
+      // View consolidada: último índice de cada cliente×canal para o SKU
       const data = await sbFetch(
-        `precificacao_indices?sku=eq.${encodeURIComponent(sku)}&select=canal,cliente,cliente_nome,planta,data_ref,rebate_pct,mkt_pct,frete_pct,zv09_pct,zv11_pct,bkp_pct,pd_pct,scrap_pct,margger_pct,mc_pct,margem_pct,fonte&order=data_ref.desc&limit=200`
+        `precificacao_indices_atual?sku=eq.${encodeURIComponent(sku)}&select=${campos}&order=data_ref.desc&limit=200`
       );
       setHistorIndices(Array.isArray(data) ? data : []);
-    } catch(e) { setHistorIndices([]); }
+    } catch(e) {
+      // Fallback: view ainda não criada — usa a tabela completa
+      try {
+        const data = await sbFetch(
+          `precificacao_indices?sku=eq.${encodeURIComponent(sku)}&select=${campos}&order=data_ref.desc&limit=200`
+        );
+        setHistorIndices(Array.isArray(data) ? data : []);
+      } catch(e2) { setHistorIndices([]); }
+    }
     setHistorLoading(false);
   };
+
+  // Auto-busca índices reais quando o produto muda
+  useEffect(()=>{
+    if (produtoDB?.sku) fetchHistoricoIndices(produtoDB.sku);
+    else setHistorIndices([]);
+  },[produtoDB?.sku]);
 
   // Escuta evento do botão Gestão no topbar
   useEffect(()=>{
@@ -4294,8 +4315,26 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
                   {produtoDB?.sku&&<button
                     onClick={()=>{if(!historIndices.length)fetchHistoricoIndices(produtoDB.sku);setShowHistorModal(true);}}
                     style={{marginTop:4,padding:"4px 10px",fontSize:10,fontWeight:700,cursor:"pointer",borderRadius:4,border:"1px solid rgba(99,179,237,.4)",background:"rgba(99,179,237,.1)",color:"#63b3ed",outline:"none"}}>
-                    {historLoading?"Carregando...":"📊 Histórico Real"}
+                    {historLoading?"Carregando...":`📊 Histórico Real${historIndices.length?` (${historIndices.length})`:""}`}
                   </button>}
+                  {/* Sugestão automática: registro mais recente da base consolidada */}
+                  {produtoDB?.sku&&historIndices.length>0&&(()=>{const r=historIndices[0];return(
+                    <div style={{marginTop:4,padding:"6px 8px",background:"rgba(60,219,192,.07)",border:"1px solid rgba(60,219,192,.25)",borderRadius:6,display:"flex",flexDirection:"column",gap:3}}>
+                      <span style={{fontSize:9,fontWeight:700,color:"#3CDBC0",letterSpacing:.4,textTransform:"uppercase"}}>Índices reais — base consolidada</span>
+                      <span style={{fontSize:10,color:"#a8b5cc",lineHeight:1.4}}>
+                        {r.cliente_nome||"Cliente"} · {r.fonte||r.data_ref}<br/>
+                        Rebate {(r.rebate_pct||0).toFixed(1)}% · Mkt {(r.mkt_pct||0).toFixed(1)}% · Frete {(r.frete_pct||0).toFixed(1)}% · ZV09 {(r.zv09_pct||0).toFixed(1)}% · ZV11 {(r.zv11_pct||0).toFixed(1)}%
+                      </span>
+                      <button onClick={()=>setD(p=>({...p,
+                          rebate:+(r.rebate_pct||0).toFixed(2),mkt:+(r.mkt_pct||0).toFixed(2),
+                          custoFin:+(r.zv09_pct||0).toFixed(2),custoFixoCan:+(r.zv11_pct||0).toFixed(2),
+                          frete:+(r.frete_pct||0).toFixed(2),pedCan:+(r.pd_pct||0).toFixed(2),
+                          scrapCan:+(r.scrap_pct||0).toFixed(2)}))}
+                        style={{alignSelf:"flex-start",padding:"3px 12px",fontSize:10,fontWeight:700,cursor:"pointer",borderRadius:4,border:"1px solid rgba(60,219,192,.5)",background:"rgba(60,219,192,.15)",color:"#3CDBC0",outline:"none"}}>
+                        ⚡ Aplicar índices reais
+                      </button>
+                    </div>
+                  );})()}
                 </div>
                 <Field label="CF Venda" sfx="%" value={d.cfVenda}
                   onChange={calcs.cfVenda.applied?undefined:S("cfVenda")}
