@@ -2829,6 +2829,7 @@ REGRAS OBRIGATÓRIAS:
 - Percentuais: "2%" ou "2" → passe 2 (nunca 0.02).
 - Se o usuário mencionar produto ambíguo (ex: "notebook" sem modelo), use buscar_produto para encontrá-lo antes de set_produto.
 - Não recalcule manualmente tributos — a calculadora faz isso; use get_resultado.
+- Formatação da resposta final: seja curto. Use no máximo 1 título em negrito e uma lista simples "Campo: valor" (uma por linha, com **negrito** no rótulo). NUNCA use tabelas markdown (|---|---|) nem headers com #/##/### — o chat não renderiza tabelas, só negrito e linhas.
 - REGRA CENTRAL: use SEMPRE por padrão os valores da base de dados (custos e índices), sem perguntar ao usuário. Só pergunte algo que só o usuário sabe.
 - NUNCA peça FOB (USD) ao usuário. O VPL (custo_usd_unit do fechamento mais recente) JÁ inclui o FOB — buscar e aplicar automaticamente via query_custos_historico + set_custo. FOB nunca precisa ser perguntado nem informado separadamente.
 - ⚠️ NUNCA ASSUMA valores que só o usuário sabe — em especial UF de destino, canal/cliente e prazo de pagamento. Se o usuário não informou, use perguntar_usuario (interativo, com opções) em vez de adivinhar ou perguntar em texto livre solto. Nunca assuma São Paulo (ou qualquer UF) como destino por padrão.
@@ -2846,6 +2847,9 @@ FLUXO OBRIGATÓRIO PARA PRECIFICAR (siga sempre nesta ordem; use perguntar_usuar
 4. perguntar_usuario para canal/cliente se não informado → set_canal
 5. ⚠️ OBRIGATÓRIO E AUTOMÁTICO: query_indices_historico com o SKU → aplicar_indices_completo
    com os valores do canal/cliente mais relevante encontrado — sem perguntar, só aplicar.
+   Passe TODOS os campos do registro escolhido (rebate_pct, mkt_pct, frete_pct, zv09_pct,
+   zv11_pct, pd_pct, scrap_pct) — NUNCA omita zv11_pct (Custo Fixo), mesmo que pareça
+   secundário: ele agora compõe a MC e omiti-lo faz MC sair igual à ML (sempre errado).
 6. perguntar_usuario para prazo de pagamento se não informado → calcular_cf_venda (OBRIGATÓRIO,
    nunca pule este passo — sem ele MC = ML incorretamente)
 7. set_margem se o usuário definiu margem alvo
@@ -2888,18 +2892,18 @@ const CALC_TOOLS = [
       sku:{type:"string",description:"SKU SAP do produto — use o valor 'sku' retornado por set_produto. Alternativamente passe o produto_id."},
       planta:{type:"string",description:"Filtro opcional por planta (ex: 'Manaus', 'Ilhéus', 'Curitiba')"},
     }, required:["sku"] } } },
-  { type:"function", function:{ name:"aplicar_indices_completo", description:"Aplica todos os índices comerciais históricos na calculadora de uma vez. Use após query_indices_historico para preencher os campos com os valores reais do canal escolhido.",
+  { type:"function", function:{ name:"aplicar_indices_completo", description:"Aplica TODOS os índices comerciais históricos na calculadora de uma vez, a partir de UM registro de por_canal retornado por query_indices_historico. ⚠️ Passe TODOS os campos do registro escolhido, mesmo os que parecerem pequenos — em especial zv11_pct (Custo Fixo), que agora É SOMADO na Margem de Contribuição (MC). Omitir zv11_pct faz o MC sair igual à ML, o que é sempre errado quando o canal tem custo fixo.",
     parameters:{ type:"object", properties:{
       rebate_pct:{type:"number",description:"Rebate %"},
       mkt_pct:{type:"number",description:"Marketing %"},
       frete_pct:{type:"number",description:"Frete %"},
-      zv09_pct:{type:"number",description:"Custo financeiro canal ZV09 %"},
-      zv11_pct:{type:"number",description:"Custo fixo canal ZV11 %"},
+      zv09_pct:{type:"number",description:"Custo financeiro canal ZV09 % — sempre incluir, mesmo se 0"},
+      zv11_pct:{type:"number",description:"⚠️ Custo Fixo canal ZV11 % — OBRIGATÓRIO, entra na MC. Nunca omitir este campo."},
       pd_pct:{type:"number",description:"P&D canal ZV25 %"},
       scrap_pct:{type:"number",description:"Scrap canal ZV29 %"},
       comis_pct:{type:"number",description:"Comissão %"},
       margem:{type:"number",description:"Margem líquida alvo %"},
-    } } } },
+    }, required:["rebate_pct","mkt_pct","frete_pct","zv09_pct","zv11_pct","pd_pct","scrap_pct"] } } },
   { type:"function", function:{ name:"perguntar_usuario", description:"Use SEMPRE que precisar de uma informação que não está na base de dados nem foi dita pelo usuário (ex: UF de destino, canal/cliente, prazo de pagamento). NUNCA assuma um valor (ex: nunca assuma São Paulo como UF de destino) — pergunte de forma interativa com opções. O usuário verá botões com as opções e um campo para digitar outro valor. ⚠️ NUNCA escreva a pergunta como texto normal na resposta — SEMPRE chame esta ferramenta, uma pergunta por vez (uma de cada vez, não numere várias perguntas num único texto). Se precisar de várias informações, chame esta ferramenta várias vezes (uma por informação) — cada uma será exibida em sequência.",
     parameters:{ type:"object", properties:{
       pergunta:{type:"string",description:"Pergunta objetiva e curta a exibir ao usuário"},
@@ -2911,6 +2915,56 @@ const CALC_TOOLS = [
       taxa_pct:{type:"number",description:"Taxa financeira mensal % (padrão 1,14% a.m. se não informado)"},
     }, required:["prazo_dias"] } } },
 ];
+
+// Formatador leve de markdown para as respostas do agente: negrito, títulos e tabelas
+// viram elementos simples — o chat não tem parser de markdown completo, isso evita
+// mostrar "**"/"##"/"|---|---|" cru na tela.
+const renderChatMd = (text) => {
+  if (!text) return null;
+  const renderInline = (s, key) => {
+    const parts = String(s).split(/\*\*(.+?)\*\*/g);
+    return parts.map((p, i) => i % 2 === 1 ? <strong key={`${key}-${i}`}>{p}</strong> : <span key={`${key}-${i}`}>{p}</span>);
+  };
+  const lines = text.split("\n");
+  const out = [];
+  let tableRows = [];
+  const flushTable = () => {
+    if (!tableRows.length) return;
+    const idx = out.length;
+    out.push(
+      <div key={idx} style={{display:"flex",flexDirection:"column",margin:"4px 0",border:"1px solid rgba(255,255,255,.1)",borderRadius:6,overflow:"hidden"}}>
+        {tableRows.map((cols, ri) => (
+          <div key={ri} style={{display:"flex",background:ri===0?"rgba(60,219,192,.08)":"transparent",borderTop:ri>0?"1px solid rgba(255,255,255,.05)":"none"}}>
+            {cols.map((cell, ci) => (
+              <div key={ci} style={{flex:1,padding:"4px 8px",fontSize:11,fontWeight:ri===0?700:400,color:ri===0?"#3CDBC0":"#e2e8f0"}}>
+                {renderInline(cell, `${idx}-${ri}-${ci}`)}
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+    );
+    tableRows = [];
+  };
+  lines.forEach((line, i) => {
+    const trimmed = line.trim();
+    if (/^\|.*\|$/.test(trimmed)) {
+      if (/^\|[\s\-:|]+\|$/.test(trimmed)) return; // linha separadora |---|---|
+      tableRows.push(trimmed.slice(1, -1).split("|").map(c => c.trim()));
+      return;
+    }
+    flushTable();
+    if (/^#{1,6}\s*/.test(trimmed) && trimmed.replace(/^#{1,6}\s*/, "")) {
+      out.push(<div key={i} style={{fontSize:13,fontWeight:700,color:"#f0f4ff",margin:"3px 0"}}>{renderInline(trimmed.replace(/^#{1,6}\s*/, ""), i)}</div>);
+    } else if (trimmed === "") {
+      out.push(<div key={i} style={{height:4}}/>);
+    } else {
+      out.push(<div key={i}>{renderInline(line, i)}</div>);
+    }
+  });
+  flushTable();
+  return out;
+};
 
 function ChatPanel({ d, setD, c, produtosDB, onClose, onPrecificando, embedded=false, setProd }) {
   const [messages, setMessages] = useState([]);
@@ -3205,7 +3259,7 @@ Resultado: pF R$ ${c.pF?.toFixed(2)||"—"} | ML ${c.margPct?.toFixed(2)||"—"}
               background:m.role==="user"?"rgba(60,219,192,.15)":m.role==="error"?"rgba(239,68,68,.15)":"rgba(255,255,255,.06)",
               border:`1px solid ${m.role==="user"?"rgba(60,219,192,.25)":m.role==="error"?"rgba(239,68,68,.3)":"rgba(255,255,255,.08)"}`,
               fontSize:12,lineHeight:1.65,color:m.role==="error"?"#fca5a5":"#e2e8f0",whiteSpace:"pre-wrap"}}>
-              {m.content}
+              {m.role==="assistant"?renderChatMd(m.content):m.content}
             </div>
           </div>
         ))}
