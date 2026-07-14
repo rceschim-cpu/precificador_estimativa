@@ -2827,23 +2827,27 @@ REGRAS OBRIGATÓRIAS:
 - Percentuais: "2%" ou "2" → passe 2 (nunca 0.02).
 - Se o usuário mencionar produto ambíguo (ex: "notebook" sem modelo), use buscar_produto para encontrá-lo antes de set_produto.
 - Não recalcule manualmente tributos — a calculadora faz isso; use get_resultado.
-- REGRA CENTRAL: use SEMPRE por padrão os valores da base de dados (custos e índices), sem perguntar ao usuário. Só pergunte algo que só o usuário sabe (ex: qual canal/cliente, margem alvo específica) ou se ele mesmo disser um valor diferente do praticado.
+- REGRA CENTRAL: use SEMPRE por padrão os valores da base de dados (custos e índices), sem perguntar ao usuário. Só pergunte algo que só o usuário sabe.
 - NUNCA peça FOB (USD) ao usuário. O VPL (custo_usd_unit do fechamento mais recente) JÁ inclui o FOB — buscar e aplicar automaticamente via query_custos_historico + set_custo. FOB nunca precisa ser perguntado nem informado separadamente.
+- ⚠️ NUNCA ASSUMA valores que só o usuário sabe — em especial UF de destino, canal/cliente e prazo de pagamento. Se o usuário não informou, use perguntar_usuario (interativo, com opções) em vez de adivinhar ou perguntar em texto livre solto. Nunca assuma São Paulo (ou qualquer UF) como destino por padrão.
+- ⚠️ SEMPRE chame calcular_cf_venda com o prazo de pagamento do cliente antes de get_resultado (pergunte o prazo via perguntar_usuario se não foi dito — opções: 'À vista','30 dias','60 dias','90 dias'). Sem isso, a MC fica igual à ML, o que é sempre incorreto quando há prazo de pagamento.
 - Formato de valores monetários: R$ com 2 casas decimais.
 - Seja direto. Confirme o que foi preenchido em uma linha.
 
-FLUXO OBRIGATÓRIO PARA PRECIFICAR (siga sempre nesta ordem, sem pausar para perguntar custo/índices — só aplique):
+FLUXO OBRIGATÓRIO PARA PRECIFICAR (siga sempre nesta ordem; use perguntar_usuario nos passos que dependem só do usuário, sem pausar nos passos que a base resolve sozinha):
 1. buscar_produto se o produto_id não for conhecido → set_produto (guarda o SKU retornado)
-2. set_origem_modalidade → set_uf_destino
+2. set_origem_modalidade → perguntar_usuario para UF de destino se não informada (opções: UFs mais comuns, ex: 'SP','RJ','MG','PR') → set_uf_destino
 3. ⚠️ OBRIGATÓRIO E AUTOMÁTICO: query_custos_historico com o SKU → aplique IMEDIATAMENTE via
    set_custo(vpl_usd: custo_usd_unit, dolar: taxa_dolar) do registro mais_recente.
    Isso já é o VPL completo — não peça FOB, não pergunte custo ao usuário.
    Informe ao usuário de qual mês veio (ex: "VPL de Mar/2026: USD 68,32 × 5,54").
-4. set_canal (pergunte ao usuário qual canal/cliente, se não tiver dito)
+4. perguntar_usuario para canal/cliente se não informado → set_canal
 5. ⚠️ OBRIGATÓRIO E AUTOMÁTICO: query_indices_historico com o SKU → aplicar_indices_completo
    com os valores do canal/cliente mais relevante encontrado — sem perguntar, só aplicar.
-6. set_margem se o usuário definiu margem alvo
-7. get_resultado → apresente pF, ML%, MC%, de qual canal vieram os índices e de qual mês veio o VPL
+6. perguntar_usuario para prazo de pagamento se não informado → calcular_cf_venda (OBRIGATÓRIO,
+   nunca pule este passo — sem ele MC = ML incorretamente)
+7. set_margem se o usuário definiu margem alvo
+8. get_resultado → apresente pF, ML%, MC%, de qual canal vieram os índices e de qual mês veio o VPL
 
 BASE DE DADOS DISPONÍVEL:
 - precificacao_indices: 203.170 registros de índices reais por SKU×canal (Jan/2025–Mar/2026)
@@ -2894,12 +2898,24 @@ const CALC_TOOLS = [
       comis_pct:{type:"number",description:"Comissão %"},
       margem:{type:"number",description:"Margem líquida alvo %"},
     } } } },
+  { type:"function", function:{ name:"perguntar_usuario", description:"Use SEMPRE que precisar de uma informação que não está na base de dados nem foi dita pelo usuário (ex: UF de destino, canal/cliente, prazo de pagamento). NUNCA assuma um valor (ex: nunca assuma São Paulo como UF de destino) — pergunte de forma interativa com opções. O usuário verá botões com as opções e um campo para digitar outro valor.",
+    parameters:{ type:"object", properties:{
+      pergunta:{type:"string",description:"Pergunta objetiva e curta a exibir ao usuário"},
+      opcoes:{type:"array",items:{type:"string"},description:"2 a 4 opções sugeridas, mutuamente exclusivas (o usuário também pode digitar uma resposta livre)"},
+    }, required:["pergunta","opcoes"] } } },
+  { type:"function", function:{ name:"calcular_cf_venda", description:"Calcula e aplica o Custo Financeiro de Venda (CF Venda) a partir do prazo de pagamento concedido ao cliente. ⚠️ OBRIGATÓRIO aplicar sempre que houver prazo de pagamento > 0 — sem isso a Margem de Contribuição (MC) fica IGUAL à Margem Líquida (ML), o que está errado. Se o prazo não foi informado, use perguntar_usuario primeiro (opções comuns: 'À vista', '30 dias', '60 dias', '90 dias').",
+    parameters:{ type:"object", properties:{
+      prazo_dias:{type:"number",description:"Prazo de pagamento em dias (0 se à vista)"},
+      taxa_pct:{type:"number",description:"Taxa financeira mensal % (padrão 1,14% a.m. se não informado)"},
+    }, required:["prazo_dias"] } } },
 ];
 
 function ChatPanel({ d, setD, c, produtosDB, onClose, onPrecificando, embedded=false }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [pendingQuestion, setPendingQuestion] = useState(null); // {toolCallId, pergunta, opcoes}
+  const [outroTexto, setOutroTexto] = useState("");
   const scrollRef = useRef(null);
   const apiHistoryRef = useRef([]);
   const notifyFill = () => onPrecificando?.(true);
@@ -3000,6 +3016,14 @@ Resultado: pF R$ ${c.pF?.toFixed(2)||"—"} | ML ${c.margPct?.toFixed(2)||"—"}
       setD(p => ({...p, ...upd}));
       return { ok:true, campos_aplicados: Object.keys(upd), msg:`${Object.keys(upd).length} campos aplicados` };
     }
+    if (name === "calcular_cf_venda") {
+      notifyFill();
+      const prazo = inp.prazo_dias || 0;
+      const taxa = inp.taxa_pct !== undefined ? inp.taxa_pct : 1.14;
+      const cfPct = (Math.pow(1 + taxa/100/30, prazo+10) - 1) * 100;
+      setD(p => ({...p, cfVenda: +cfPct.toFixed(3)}));
+      return { ok:true, cf_venda_pct: +cfPct.toFixed(3), msg:`CF Venda aplicado: ${cfPct.toFixed(2)}% (prazo ${prazo}d, taxa ${taxa}% a.m.) — MC agora reflete esse custo` };
+    }
     if (name === "get_resultado") {
       return { pF: c.pF, ml: c.margPct, mc: c.mc, markup: c.mkp };
     }
@@ -3056,48 +3080,75 @@ Resultado: pF R$ ${c.pF?.toFixed(2)||"—"} | ML ${c.margPct?.toFixed(2)||"—"}
     return { ok:false, msg:"Tool desconhecida" };
   };
 
+  // Loop principal do agente. Pausa (sem fechar o loading) quando o modelo chama
+  // perguntar_usuario — nesse caso o tool_call_id fica pendente até o usuário responder.
+  const runLoop = async () => {
+    const systemMsg = { role:"system", content: CHAT_SYSTEM_PROMPT.replace("{CONTEXT}", buildCalcContext()) };
+    while (true) {
+      const apiMsgs = [systemMsg, ...apiHistoryRef.current];
+      const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method:"POST",
+        headers:{
+          "Authorization": `Bearer ${import.meta.env.VITE_CLAUDE_KEY}`,
+          "HTTP-Referer": "https://precificador-estimativa.vercel.app",
+          "content-type":"application/json"
+        },
+        body: JSON.stringify({ model:"anthropic/claude-haiku-4-5", max_tokens:1024,
+          tools: CALC_TOOLS, messages: apiMsgs }),
+      });
+      if (!res.ok) throw new Error(`Erro API: ${res.status}`);
+      const data = await res.json();
+      const msg = data.choices[0].message;
+      const finish = data.choices[0].finish_reason;
+      apiHistoryRef.current.push({ role:"assistant", content:msg.content||null, ...(msg.tool_calls?.length ? { tool_calls:msg.tool_calls } : {}) });
+      if (finish === "stop" || finish === "end_turn" || !msg.tool_calls?.length) {
+        if (msg.content) setMessages(prev => [...prev, { role:"assistant", content:msg.content }]);
+        break;
+      }
+      if (finish === "tool_calls") {
+        const names = [];
+        let waiting = null;
+        for (const tc of msg.tool_calls) {
+          if (tc.function.name === "perguntar_usuario") {
+            const inp = JSON.parse(tc.function.arguments||"{}");
+            waiting = { toolCallId: tc.id, pergunta: inp.pergunta, opcoes: Array.isArray(inp.opcoes)?inp.opcoes.slice(0,4):[] };
+            continue; // não resolve ainda — fica pendente até o usuário responder
+          }
+          const inp = JSON.parse(tc.function.arguments||"{}");
+          const result = await handleToolCall(tc.function.name, inp);
+          apiHistoryRef.current.push({ role:"tool", tool_call_id:tc.id, content:JSON.stringify(result) });
+          names.push(tc.function.name.replace(/_/g," "));
+        }
+        if (names.length) setMessages(prev => [...prev, { role:"tool", content:names.join(" · ") }]);
+        if (waiting) { setPendingQuestion(waiting); return; } // pausa o loop
+      }
+    }
+  };
+
   const send = async () => {
-    if (!input.trim() || loading) return;
+    if (!input.trim() || loading || pendingQuestion) return;
     const userText = input.trim();
     setInput("");
     setMessages(prev => [...prev, { role:"user", content:userText }]);
     setLoading(true);
     try {
-      const systemMsg = { role:"system", content: CHAT_SYSTEM_PROMPT.replace("{CONTEXT}", buildCalcContext()) };
       apiHistoryRef.current.push({ role:"user", content:userText });
-      while (true) {
-        const apiMsgs = [systemMsg, ...apiHistoryRef.current];
-        const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-          method:"POST",
-          headers:{
-            "Authorization": `Bearer ${import.meta.env.VITE_CLAUDE_KEY}`,
-            "HTTP-Referer": "https://precificador-estimativa.vercel.app",
-            "content-type":"application/json"
-          },
-          body: JSON.stringify({ model:"anthropic/claude-haiku-4-5", max_tokens:1024,
-            tools: CALC_TOOLS, messages: apiMsgs }),
-        });
-        if (!res.ok) throw new Error(`Erro API: ${res.status}`);
-        const data = await res.json();
-        const msg = data.choices[0].message;
-        const finish = data.choices[0].finish_reason;
-        apiHistoryRef.current.push({ role:"assistant", content:msg.content||null, ...(msg.tool_calls?.length ? { tool_calls:msg.tool_calls } : {}) });
-        if (finish === "stop" || finish === "end_turn" || !msg.tool_calls?.length) {
-          if (msg.content) setMessages(prev => [...prev, { role:"assistant", content:msg.content }]);
-          break;
-        }
-        if (finish === "tool_calls") {
-          const names = [];
-          for (const tc of msg.tool_calls) {
-            const inp = JSON.parse(tc.function.arguments||"{}");
-            const result = await handleToolCall(tc.function.name, inp);
-            const toolMsg = { role:"tool", tool_call_id:tc.id, content:JSON.stringify(result) };
-            apiHistoryRef.current.push(toolMsg);
-            names.push(tc.function.name.replace(/_/g," "));
-          }
-          setMessages(prev => [...prev, { role:"tool", content:names.join(" · ") }]);
-        }
-      }
+      await runLoop();
+    } catch(e) {
+      setMessages(prev => [...prev, { role:"error", content:e.message }]);
+    } finally { setLoading(false); onPrecificando?.(false); }
+  };
+
+  const responderPergunta = async (valor) => {
+    if (!pendingQuestion || !valor.trim()) return;
+    const toolCallId = pendingQuestion.toolCallId;
+    setMessages(prev => [...prev, { role:"user", content:valor }]);
+    setPendingQuestion(null);
+    setOutroTexto("");
+    setLoading(true);
+    try {
+      apiHistoryRef.current.push({ role:"tool", tool_call_id:toolCallId, content:JSON.stringify({ resposta:valor }) });
+      await runLoop();
     } catch(e) {
       setMessages(prev => [...prev, { role:"error", content:e.message }]);
     } finally { setLoading(false); onPrecificando?.(false); }
@@ -3143,16 +3194,48 @@ Resultado: pF R$ ${c.pF?.toFixed(2)||"—"} | ML ${c.margPct?.toFixed(2)||"—"}
           </div>
         ))}
         {loading&&<div style={{alignSelf:"flex-start",padding:"8px 14px",background:"rgba(255,255,255,.06)",borderRadius:"12px 12px 12px 2px",fontSize:14,color:"#5a6a84",letterSpacing:4}}>●●●</div>}
+        {pendingQuestion&&(
+          <div style={{alignSelf:"flex-start",maxWidth:"92%",display:"flex",flexDirection:"column",gap:8}}>
+            <div style={{padding:"9px 13px",borderRadius:"12px 12px 12px 2px",background:"rgba(251,191,36,.1)",
+              border:"1px solid rgba(251,191,36,.3)",fontSize:12,lineHeight:1.65,color:"#fde68a"}}>
+              ❓ {pendingQuestion.pergunta}
+            </div>
+            {pendingQuestion.opcoes.length>0&&(
+              <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                {pendingQuestion.opcoes.map((op,i)=>(
+                  <button key={i} onClick={()=>responderPergunta(op)}
+                    style={{padding:"6px 12px",fontSize:11,fontWeight:600,borderRadius:20,cursor:"pointer",
+                      border:"1px solid rgba(60,219,192,.4)",background:"rgba(60,219,192,.1)",color:"#3CDBC0"}}>
+                    {op}
+                  </button>
+                ))}
+              </div>
+            )}
+            <div style={{display:"flex",gap:6}}>
+              <input value={outroTexto} onChange={e=>setOutroTexto(e.target.value)}
+                onKeyDown={e=>e.key==="Enter"&&responderPergunta(outroTexto)}
+                placeholder="Outro..." autoFocus
+                style={{flex:1,background:"rgba(255,255,255,.05)",border:"1px solid rgba(255,255,255,.12)",borderRadius:8,
+                  color:"#f1f5f9",fontSize:11,padding:"6px 10px",fontFamily:"'Montserrat',sans-serif",outline:"none"}}/>
+              <button onClick={()=>responderPergunta(outroTexto)} disabled={!outroTexto.trim()}
+                style={{padding:"6px 12px",fontSize:11,fontWeight:600,borderRadius:8,cursor:"pointer",
+                  border:"1px solid rgba(255,255,255,.15)",background:"rgba(255,255,255,.05)",color:"#a8b5cc",
+                  opacity:outroTexto.trim()?1:.4}}>
+                OK
+              </button>
+            </div>
+          </div>
+        )}
       </div>
       <div style={{padding:"10px 12px",borderTop:"1px solid rgba(255,255,255,.08)",display:"flex",gap:8,flexShrink:0}}>
         <input value={input} onChange={e=>setInput(e.target.value)}
           onKeyDown={e=>e.key==="Enter"&&!e.shiftKey&&(e.preventDefault(),send())}
-          placeholder="Descreva o cenário..." disabled={loading}
+          placeholder={pendingQuestion?"Responda a pergunta acima primeiro...":"Descreva o cenário..."} disabled={loading||!!pendingQuestion}
           style={{flex:1,background:"rgba(255,255,255,.05)",border:"1px solid rgba(255,255,255,.12)",borderRadius:8,
             color:"#f1f5f9",fontSize:12,padding:"9px 12px",fontFamily:"'Montserrat',sans-serif",outline:"none"}}/>
-        <button onClick={send} disabled={loading||!input.trim()} style={{padding:"9px 14px",background:"rgba(60,219,192,.2)",
+        <button onClick={send} disabled={loading||!input.trim()||!!pendingQuestion} style={{padding:"9px 14px",background:"rgba(60,219,192,.2)",
           border:"1px solid rgba(60,219,192,.4)",color:"#3CDBC0",borderRadius:8,cursor:"pointer",fontSize:18,fontWeight:700,
-          opacity:loading||!input.trim()?0.35:1,transition:"opacity .15s"}}>↑</button>
+          opacity:loading||!input.trim()||!!pendingQuestion?0.35:1,transition:"opacity .15s"}}>↑</button>
       </div>
     </div>
   );
@@ -5254,7 +5337,7 @@ export default function App() {
               ))}
             </div>
           )}
-          <div style={{flex:1,overflow:"hidden",display:"flex",flexDirection:"column"}}>
+          <div style={{flex:1,minHeight:0,overflow:"hidden",display:"flex",flexDirection:"column"}}>
             {modView==="precificacao"&&temPrecificacao&&<MultiTab user={user}/>}
             {modView==="cadastro"&&temCadastro&&<div style={{overflow:"auto",flex:1}}><CadastroProdutos user={user}/></div>}
           </div>
@@ -5575,7 +5658,7 @@ function MultiTab({ user }) {
   };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0, overflow: "hidden" }}>
       {/* Barra de abas */}
       <div style={{
         display: "flex", alignItems: "stretch", gap: 0,
@@ -5643,7 +5726,7 @@ function MultiTab({ user }) {
 
       {/* Conteúdo das abas */}
       {abas.map((aba, idx) => (
-        <div key={aba.id} style={{ display: idx === abaAtiva ? "flex" : "none", flex: 1, overflow: "hidden" }}>
+        <div key={aba.id} style={{ display: idx === abaAtiva ? "flex" : "none", flex: 1, minHeight: 0, overflow: "hidden" }}>
           <Calculadora user={user} isAdmin={false} nomeAba={aba.nome}
             onRenomear={nome => setAbas(p => p.map((a, i) => i === idx ? { ...a, nome } : a))}
             onCalcsChange={(c, d, prodNome) => setCalcsMap(prev => ({...prev, [aba.id]: {c, d, prodNome}}))}/>
