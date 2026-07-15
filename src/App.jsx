@@ -2941,14 +2941,11 @@ const CALC_TOOLS = [
     }, required:["regra"] } } },
 ];
 
-// API da Anthropic direto (Messages API) usa outro formato de tool que o OpenAI-style
-// acima: input_schema em vez de function.parameters, sem o wrapper type:"function".
-const ANTHROPIC_MODEL = "claude-haiku-4-5-20251001";
-const ANTHROPIC_TOOLS = CALC_TOOLS.map(t => ({
-  name: t.function.name,
-  description: t.function.description,
-  input_schema: t.function.parameters,
-}));
+// LLM interno da Positivo (IA BOX / Open WebUI) — API compatível com o formato OpenAI,
+// mesmo formato já usado em CALC_TOOLS. Requer VITE_IA_BOX_KEY configurada no Vercel
+// (nome DEVE começar com VITE_ para o Vite expor a variável ao bundle do navegador).
+const IA_BOX_URL = "https://openwebui-iabox-cits.positivo.corp/api/chat/completions";
+const IA_BOX_MODEL = "gemma-4-26b-a4b-it";
 
 // Formatador leve de markdown para as respostas do agente: negrito, títulos e tabelas
 // viram elementos simples — o chat não tem parser de markdown completo, isso evita
@@ -3302,57 +3299,58 @@ Resultado: pF R$ ${cc.pF?.toFixed(2)||"—"} | ML ${cc.margPct?.toFixed(2)||"—
 
   // Loop principal do agente (Anthropic Messages API direto). Pausa (sem fechar o loading)
   // quando o modelo chama perguntar_usuario — o tool_use_id fica pendente até o usuário responder.
+  // Loop principal do agente — IA BOX (Gemma via Open WebUI), formato tool-calling OpenAI.
+  // Pausa (sem fechar o loading) quando o modelo chama perguntar_usuario — o tool_call_id
+  // fica pendente até o usuário responder.
   const runLoop = async () => {
     while (true) {
       // Contexto remontado a cada iteração — reflete as alterações das tools do próprio turno
       const systemPrompt = CHAT_SYSTEM_PROMPT.replace("{CONTEXT}", buildCalcContext());
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
+      const apiMsgs = [{ role:"system", content:systemPrompt }, ...apiHistoryRef.current];
+      const res = await fetch(IA_BOX_URL, {
         method:"POST",
         headers:{
-          "x-api-key": import.meta.env.VITE_CLAUDE_KEY,
-          "anthropic-version": "2023-06-01",
-          "anthropic-dangerous-direct-browser-access": "true",
+          "Authorization": `Bearer ${import.meta.env.VITE_IA_BOX_KEY}`,
           "content-type":"application/json"
         },
-        body: JSON.stringify({ model: ANTHROPIC_MODEL, max_tokens:1024,
-          system: systemPrompt, tools: ANTHROPIC_TOOLS, messages: apiHistoryRef.current }),
+        body: JSON.stringify({ model: IA_BOX_MODEL, stream:false, tools: CALC_TOOLS, messages: apiMsgs }),
       });
       if (!res.ok) {
         const errBody = await res.text().catch(()=> "");
         throw new Error(`Erro API: ${res.status}${errBody?` — ${errBody.slice(0,200)}`:""}`);
       }
       const data = await res.json();
-      const content = data.content || [];
-      apiHistoryRef.current.push({ role:"assistant", content });
-      const toolBlocks = content.filter(b => b.type === "tool_use");
-      if (data.stop_reason !== "tool_use" || !toolBlocks.length) {
-        const text = content.filter(b => b.type === "text").map(b => b.text).join("\n");
-        if (text) setMessages(prev => [...prev, { role:"assistant", content:text }]);
+      const msg = data.choices?.[0]?.message || {};
+      const finish = data.choices?.[0]?.finish_reason;
+      apiHistoryRef.current.push({ role:"assistant", content: msg.content||null, ...(msg.tool_calls?.length ? { tool_calls: msg.tool_calls } : {}) });
+      if (finish !== "tool_calls" || !msg.tool_calls?.length) {
+        if (msg.content) setMessages(prev => [...prev, { role:"assistant", content: msg.content }]);
         break;
       }
       const names = [];
       const perguntas = [];
       const toolResults = [];
-      for (const tb of toolBlocks) {
-        if (tb.name === "perguntar_usuario") {
-          perguntas.push({ toolCallId: tb.id, pergunta: tb.input.pergunta, opcoes: Array.isArray(tb.input.opcoes)?tb.input.opcoes.slice(0,4):[] });
+      for (const tc of msg.tool_calls) {
+        const inp = JSON.parse(tc.function.arguments || "{}");
+        if (tc.function.name === "perguntar_usuario") {
+          perguntas.push({ toolCallId: tc.id, pergunta: inp.pergunta, opcoes: Array.isArray(inp.opcoes)?inp.opcoes.slice(0,4):[] });
           continue; // não resolve ainda — cada uma fica pendente até ser exibida e respondida
         }
-        const result = await handleToolCall(tb.name, tb.input || {});
-        toolResults.push({ type:"tool_result", tool_use_id: tb.id, content: JSON.stringify(result) });
-        names.push(tb.name.replace(/_/g," "));
+        const result = await handleToolCall(tc.function.name, inp);
+        toolResults.push({ role:"tool", tool_call_id: tc.id, content: JSON.stringify(result) });
+        names.push(tc.function.name.replace(/_/g," "));
       }
       if (names.length) setMessages(prev => [...prev, { role:"tool", content:names.join(" · ") }]);
       if (perguntas.length) {
         // guarda os tool_results já prontos deste turno; só vão pro histórico quando
         // TODAS as perguntas pendentes do mesmo turno tiverem sido respondidas
-        // (a Anthropic exige um tool_result para cada tool_use do turno, num único bloco)
+        // (é preciso responder TODOS os tool_calls do turno antes da próxima chamada à API)
         pendingToolResultsRef.current = toolResults;
         pendingQueueRef.current = perguntas.slice(1);
         setPendingQuestion(perguntas[0]);
         return; // pausa o loop
       }
-      apiHistoryRef.current.push({ role:"user", content: toolResults });
+      toolResults.forEach(tr => apiHistoryRef.current.push(tr));
     }
   };
 
@@ -3373,11 +3371,11 @@ Resultado: pF R$ ${cc.pF?.toFixed(2)||"—"} | ML ${cc.margPct?.toFixed(2)||"—
 
   const responderPergunta = async (valor) => {
     if (!pendingQuestion || !valor.trim()) return;
-    const toolUseId = pendingQuestion.toolCallId;
+    const toolCallId = pendingQuestion.toolCallId;
     setMessages(prev => [...prev, { role:"user", content:valor }]);
     setOutroTexto("");
     pendingToolResultsRef.current = [...pendingToolResultsRef.current,
-      { type:"tool_result", tool_use_id: toolUseId, content: JSON.stringify({ resposta:valor }) }];
+      { role:"tool", tool_call_id: toolCallId, content: JSON.stringify({ resposta:valor }) }];
     if (pendingQueueRef.current.length) {
       // ainda há perguntas do mesmo turno — exibe a próxima sem chamar a API de novo
       const proxima = pendingQueueRef.current[0];
@@ -3388,7 +3386,7 @@ Resultado: pF R$ ${cc.pF?.toFixed(2)||"—"} | ML ${cc.margPct?.toFixed(2)||"—
     setPendingQuestion(null);
     setLoading(true);
     try {
-      apiHistoryRef.current.push({ role:"user", content: pendingToolResultsRef.current });
+      pendingToolResultsRef.current.forEach(tr => apiHistoryRef.current.push(tr));
       pendingToolResultsRef.current = [];
       await runLoop();
     } catch(e) {
