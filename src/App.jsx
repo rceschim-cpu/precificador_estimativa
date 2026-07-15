@@ -2841,6 +2841,7 @@ REGRAS OBRIGATÓRIAS:
 - ⚠️ SEMPRE chame calcular_cf_venda com o prazo de pagamento do cliente antes de get_resultado (pergunte o prazo via perguntar_usuario se não foi dito — opções: 'À vista','30 dias','60 dias','90 dias'). Sem isso, a MC fica igual à ML, o que é sempre incorreto quando há prazo de pagamento.
 - ⚠️ MC ≠ ML: MC = ML + Custo Fixo. Se o usuário pedir para ajustar/atingir uma MC específica, use set_mc_alvo (nunca calcule a ML equivalente de cabeça — é fácil errar essa subtração).
 - ⚠️ PREÇO FIXO: se o usuário pedir um preço de venda específico ("quero vender a USD 106", "fixa em R$ 542,72"), use set_preco_alvo — NUNCA tente adivinhar/iterar uma margem chamando set_margem várias vezes, e NUNCA calcule na mão "quanto ficaria a margem com esse preço". A calculadora já tem esse modo pronto.
+- ⚠️ DÓLAR CUSTO ≠ DÓLAR PREÇO — são dois campos DIFERENTES, nunca confunda: Dólar Custo (set_custo/dolar) converte o VPL/custo em USD→BRL; Dólar Preço (set_dolar_preco) converte um preço de VENDA em USD→BRL (usado por set_preco_alvo com moeda='USD'). Se o usuário disser "dólar de custo" e "dólar de preço" como valores diferentes, use a tool certa para cada um — nunca aplique o mesmo valor nos dois campos sem o usuário confirmar que são iguais.
 - ⚠️⚠️ PROIBIDO CALCULAR NA MÃO: você NUNCA deve somar/subtrair/multiplicar índices, custos ou preços para chegar num resultado de precificação — nem em texto explicativo, nem no resultado final. TODA tool de alteração (set_margem, set_mc_alvo, set_preco_alvo, set_custo, set_indices, set_canal, aplicar_indices_completo, calcular_cf_venda) já devolve um campo resultado_real com pF/ml/mc REAIS recalculados pela calculadora — use SOMENTE esses números na sua resposta. Se por algum motivo uma tool não devolver resultado_real, chame get_resultado antes de responder. Nunca diga "ficaria aproximadamente X%" baseado em conta própria.
 - ⚠️ NUNCA invente ou "arredonde" um resultado, nem invente desculpas (ex: "aguardando sincronização") se um valor não bater com o esperado — sempre relate o resultado_real/get_resultado tal como veio, mesmo que pareça estranho.
 - APRENDIZADO: se o usuário CORRIGIR um número ("o frete da Stone é 0,9%", "o dólar certo é 5,60"), use salvar_ajuste_indice (pergunte antes, via perguntar_usuario, se vale só para este SKU, para o canal ou global). Se o usuário der uma INSTRUÇÃO permanente ("Stone sempre 45 dias", "PosiSeg não tem rebate"), use salvar_regra. Sempre confirme o que foi salvo. Siga SEMPRE as REGRAS APRENDIDAS listadas no contexto.
@@ -2880,8 +2881,10 @@ const CALC_TOOLS = [
     parameters:{ type:"object", properties:{ origem:{type:"string",enum:["MAO","IOS","CWB"]}, modalidade:{type:"string",enum:["CKD","SKD","CBU"]} }, required:["origem","modalidade"] } } },
   { type:"function", function:{ name:"set_canal", description:"Seleciona canal de venda",
     parameters:{ type:"object", properties:{ canal_id:{type:"string",description:"ID do canal (ex: 't3', 'corp', 'amzn')"} }, required:["canal_id"] } } },
-  { type:"function", function:{ name:"set_custo", description:"Define o VPL (custo padrão do produto, já com FOB/duties incluídos) em modo manual. NUNCA pergunte FOB ao usuário — o VPL do fechamento mais recente (via query_custos_historico) já inclui o FOB, basta aplicar vpl_usd+dolar (ou vpl_brl direto) aqui.",
-    parameters:{ type:"object", properties:{ vpl_usd:{type:"number",description:"VPL em USD (custo_usd_unit do fechamento mais recente)"}, dolar:{type:"number",description:"Taxa do dólar do fechamento (taxa_dolar)"}, vpl_brl:{type:"number",description:"VPL já em R$, caso já convertido — usa direto sem multiplicar pelo dólar"}, producao:{type:"number",description:"Custo de produção em R$ (componente separado do VPL)"} } } } },
+  { type:"function", function:{ name:"set_custo", description:"Define o VPL (custo padrão do produto, já com FOB/duties incluídos) em modo manual. NUNCA pergunte FOB ao usuário — o VPL do fechamento mais recente (via query_custos_historico) já inclui o FOB, basta aplicar vpl_usd+dolar (ou vpl_brl direto) aqui. O parâmetro 'dolar' aqui é o DÓLAR CUSTO (converte VPL/custo) — para o DÓLAR PREÇO (usado ao vender em USD, ex: set_preco_alvo) use a tool set_dolar_preco, são valores DIFERENTES e não podem ser confundidos.",
+    parameters:{ type:"object", properties:{ vpl_usd:{type:"number",description:"VPL em USD (custo_usd_unit do fechamento mais recente)"}, dolar:{type:"number",description:"Dólar CUSTO — taxa do dólar do fechamento (taxa_dolar), usada só para converter o VPL/custo"}, vpl_brl:{type:"number",description:"VPL já em R$, caso já convertido — usa direto sem multiplicar pelo dólar"}, producao:{type:"number",description:"Custo de produção em R$ (componente separado do VPL)"} } } } },
+  { type:"function", function:{ name:"set_dolar_preco", description:"Define o DÓLAR PREÇO — a cotação usada para converter um preço de VENDA em USD para R$ (ex: usado por set_preco_alvo com moeda='USD', e na exibição do preço final em USD). É DIFERENTE do Dólar Custo (que converte o VPL/custo) — nunca use o mesmo valor dos dois sem confirmar que são realmente iguais no caso.",
+    parameters:{ type:"object", properties:{ valor:{type:"number",description:"Cotação do Dólar Preço (R$ por USD)"} }, required:["valor"] } } },
   { type:"function", function:{ name:"set_uf_destino", description:"Define UF de destino (para cálculo de ICMS e DIFAL)",
     parameters:{ type:"object", properties:{ uf:{type:"string",description:"Sigla do estado (ex: SP, RJ, MG)"} }, required:["uf"] } } },
   { type:"function", function:{ name:"set_margem", description:"Define margem líquida alvo (ML%). Use quando o usuário pedir uma ML específica. Se o usuário pedir uma MC (Margem de Contribuição) específica, use set_mc_alvo em vez desta — MC ≠ ML, não faça a conta de cabeça.",
@@ -3046,7 +3049,9 @@ function ChatPanel({ d, setD, c, produtosDB, onClose, onPrecificando, embedded=f
     return `Produto: ${prod?.nome || dc.prodId || "não selecionado"}${sku ? ` | SKU SAP: ${sku}` : " | SKU: não disponível"}
 Origem: ${dc.origem} | Modalidade: ${dc.modalidade}
 UF destino: ${dc.ufDestino}
-Câmbio: R$ ${dc.ptax}/USD | Custo FOB: USD ${dc.fobUSD}
+Dólar Custo (converte CUSTO USD→BRL, ex: VPL): R$ ${dc.ptax}/USD
+Dólar Preço (converte PREÇO/VENDA USD→BRL, usado por set_preco_alvo com moeda USD): R$ ${dc.ptaxPreco||dc.ptax}/USD${dc.ptaxPreco?"":" (não definido — usando o Dólar Custo como fallback)"}
+Custo FOB: USD ${dc.fobUSD}
 Canal: ${canal?.label || "nenhum"}
 Margem alvo (ML): ${dc.margem}%
 Custo Fixo (soma na MC, não editável diretamente): ${cc.cfixoEf?.toFixed(2)||0}%
@@ -3100,6 +3105,11 @@ Resultado: pF R$ ${cc.pF?.toFixed(2)||"—"} | ML ${cc.margPct?.toFixed(2)||"—
       if (inp.producao !== undefined) upd.producao = inp.producao;
       setD(p => ({...p, ...upd}));
       return { ok:true, msg:"VPL atualizado (modo manual, FOB não é necessário)", vpl_brl: upd.vplManual, resultado_real: await lerResultadoReal() };
+    }
+    if (name === "set_dolar_preco") {
+      notifyFill();
+      setD(p => ({...p, ptaxPreco: inp.valor}));
+      return { ok:true, msg:`Dólar Preço definido: R$ ${inp.valor}/USD (usado para converter preços de venda em USD — diferente do Dólar Custo)`, resultado_real: await lerResultadoReal() };
     }
     if (name === "set_uf_destino") {
       notifyFill();
