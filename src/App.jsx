@@ -99,15 +99,15 @@ const KEYS = { session: "ptc_session", perfis: "ptc_perfis" };
 
 // ── MÓDULOS disponíveis no sistema ──
 const MODULOS = [
-  { id: "precificacao", label: "Precificação Completa", icone: "🧮", desc: "Calculadora tributária completa — todos os tabs e campos.", ativo: true },
-  { id: "relatorios",   label: "Relatórios",            icone: "📈", desc: "Em desenvolvimento.", ativo: false },
-  { id: "cadastro",     label: "Cadastro de Produtos",  icone: "📦", desc: "Cadastro de produtos com índices padrão.", ativo: true },
-  { id: "sap",          label: "Interface SAP",         icone: "🔗", desc: "Em desenvolvimento.", ativo: false },
+  { id: "precificacao", label: "Precificação Completa", icone: "", desc: "Calculadora tributária completa — todos os tabs e campos.", ativo: true },
+  { id: "relatorios",   label: "Relatórios",            icone: "", desc: "Em desenvolvimento.", ativo: false },
+  { id: "cadastro",     label: "Cadastro de Produtos",  icone: "", desc: "Cadastro de produtos com índices padrão.", ativo: true },
+  { id: "sap",          label: "Interface SAP",         icone: "", desc: "Em desenvolvimento.", ativo: false },
 ];
 
 const PERFIS_DEFAULT = [
-  { id: "admin",    label: "Administrador",       icone: "⚙️",  cor: "#0047BB", desc: "Acesso total ao sistema. Gerencia usuários e perfis.", modulos: ["precificacao","cadastro"], sistema: true  },
-  { id: "custos",   label: "Depto. de Custos",    icone: "📊", cor: "#059669", desc: "Acesso completo à calculadora.", modulos: ["precificacao"], sistema: false },
+  { id: "admin",    label: "Administrador",       icone: "",  cor: "#0047BB", desc: "Acesso total ao sistema. Gerencia usuários e perfis.", modulos: ["precificacao","cadastro"], sistema: true  },
+  { id: "custos",   label: "Depto. de Custos",    icone: "", cor: "#059669", desc: "Acesso completo à calculadora.", modulos: ["precificacao"], sistema: false },
 ];
 
 const loadPerfis = () => {
@@ -426,12 +426,12 @@ function PerfilBadge({ perfil }) {
 
 // ── MODAL CRIAR/EDITAR PERFIL ─────────────────────────────────────────────────
 const CORES_OPCOES = ["#0047BB","#059669","#7c3aed","#d97706","#dc2626","#0891b2","#be185d","#4f46e5","#16a34a","#9333ea","#ea580c","#0d9488"];
-const ICONES_OPCOES = ["👥","📊","📦","🏷️","🔄","📐","💼","🔐","🧮","📈","🔗","📋","💡","🎯","⚡","🛠️","📌","🔑"];
+const ICONES_OPCOES = ["","","","","","","","","","","","","","","","","",""];
 
 function ModalPerfil({ perfil, onClose, onSave, users }) {
   const isNew = !perfil;
   const [form, setForm] = useState(perfil ? { ...perfil } : {
-    id: "", label: "", icone: "👥", cor: "#0047BB", desc: "", modulos: ["precificacao"], sistema: false
+    id: "", label: "", icone: "", cor: "#0047BB", desc: "", modulos: ["precificacao"], sistema: false
   });
   const [erro, setErro] = useState("");
   const F = k => v => setForm(p => ({ ...p, [k]: v }));
@@ -835,7 +835,7 @@ function ViewPerfis({ users }) {
                   </div>
                 </div>
                 <div className="pfcard-actions">
-                  {!isAdmin&&<button className="btn-sm btn-edit" onClick={()=>setModalPerfil(p)}>✎ Editar</button>}
+                  {!isAdmin&&<button className="btn-sm btn-edit" onClick={()=>setModalPerfil(p)}>Editar</button>}
                   {!isAdmin&&(
                     confirmDel===p.id
                       ? <>
@@ -944,13 +944,13 @@ function PainelAdmin({ currentUser }) {
   const solCatsPendentes = solCats.filter(s=>!s.status||s.status==="pendente");
 
   const NAV = [
-    { id: "calc",       icon: "🧮", label: "Calculadora" },
+    { id: "calc",       icon: "", label: "Calculadora" },
     { id: "sep" },
     { id: "pendentes",  icon: "⏳", label: "Pendentes", badge: pendentes.length },
-    { id: "usuarios",   icon: "👥", label: "Usuários" },
-    { id: "perfis",     icon: "🔐", label: "Perfis" },
-    { id: "categorias", icon: "📦", label: "Categorias", badge: solCatsPendentes.length },
-    { id: "canais",     icon: "🏪", label: "Canais" },
+    { id: "usuarios",   icon: "", label: "Usuários" },
+    { id: "perfis",     icon: "", label: "Perfis" },
+    { id: "categorias", icon: "", label: "Categorias", badge: solCatsPendentes.length },
+    { id: "canais",     icon: "", label: "Canais" },
   ];
 
   // Se view === "calc", renderiza a Calculadora inline
@@ -1034,7 +1034,7 @@ function PainelAdmin({ currentUser }) {
         {view === "usuarios" && (
           <div className="tbl-wrap">
             <div className="tbl-head">
-              <span className="tbl-head-title">👥 Todos os Usuários</span>
+              <span className="tbl-head-title">Todos os Usuários</span>
               <input className="tbl-search" placeholder="Buscar por nome ou e-mail..." value={search} onChange={e => setSearch(e.target.value)}/>
             </div>
             <table>
@@ -1054,7 +1054,7 @@ function PainelAdmin({ currentUser }) {
                     <td style={{ fontSize: 12, color: "var(--muted)" }}>{u.aprovadoPor || "—"}</td>
                     <td><div className="act-row">
                       {u.perfil !== "admin" && <>
-                        <button className="btn-sm btn-edit" onClick={() => setModal({ type: "edit", user: u })}>✎ Editar</button>
+                        <button className="btn-sm btn-edit" onClick={() => setModal({ type: "edit", user: u })}>Editar</button>
                         {u.status === "ativo" && <button className="btn-sm btn-disable" onClick={() => saveUser({ ...u, status: "inativo" })}>Desativar</button>}
                         {u.status === "inativo" && <button className="btn-sm btn-approve" onClick={() => saveUser({ ...u, status: "ativo" })}>Reativar</button>}
                         {u.status === "pendente" && <button className="btn-sm btn-approve" onClick={() => setModal({ type: "aprovar", user: u })}>Analisar</button>}
@@ -1079,11 +1079,11 @@ function PainelAdmin({ currentUser }) {
         {view === "categorias" && (
           <div className="tbl-wrap">
             <div className="tbl-head">
-              <span className="tbl-head-title">📦 Solicitações de Categoria</span>
+              <span className="tbl-head-title">Solicitações de Categoria</span>
               <span style={{ fontSize: 12, color: "var(--muted)" }}>{solCatsPendentes.length} pendente{solCatsPendentes.length!==1?"s":""}</span>
             </div>
             {solCats.length === 0
-              ? <div className="empty"><div className="empty-icon">📦</div><div className="empty-text">Nenhuma solicitação</div><div className="empty-sub">Nenhuma solicitação de categoria recebida</div></div>
+              ? <div className="empty"><div className="empty-icon"></div><div className="empty-text">Nenhuma solicitação</div><div className="empty-sub">Nenhuma solicitação de categoria recebida</div></div>
               : <table>
                   <thead><tr>
                     <th>Categoria</th><th>Prefixo</th><th>Solicitado por</th><th>Descrição</th><th>Status</th><th>Ações</th>
@@ -1185,7 +1185,7 @@ function ViewCanais() {
   return(
     <div className="tbl-wrap">
       <div className="tbl-head">
-        <span className="tbl-head-title">🏪 Taxas por Canal × Categoria</span>
+        <span className="tbl-head-title">Taxas por Canal × Categoria</span>
         <span style={{fontSize:12,color:"var(--muted)"}}>Valores em destaque = personalizados por categoria</span>
       </div>
       <div style={{padding:12,display:"flex",flexDirection:"column",gap:6}}>
@@ -1380,12 +1380,12 @@ const MODALIDADES = [
 
 // ── CATEGORIAS DE PRODUTO ─────────────────────────────────────────────────────
 const CATS = [
-  { id:"informatica", label:"Informática",              icon:"💻" },
-  { id:"smartphones",  label:"Smartphones",              icon:"📱" },
+  { id:"informatica", label:"Informática",              icon:"" },
+  { id:"smartphones",  label:"Smartphones",              icon:"" },
   { id:"mobilidade",   label:"Mobilidade",               icon:"⌚" },
-  { id:"smarthome",    label:"Smart Home",               icon:"🏠" },
-  { id:"posiseg",      label:"PosiSeg (Segurança)",      icon:"🔒" },
-  { id:"pos",          label:"Terminais de Pagamento",   icon:"💳" },
+  { id:"smarthome",    label:"Smart Home",               icon:"" },
+  { id:"posiseg",      label:"PosiSeg (Segurança)",      icon:"" },
+  { id:"pos",          label:"Terminais de Pagamento",   icon:"" },
 ];
 
 // ── CANAIS — presets comerciais (fontes: planilhas abr/2026) ──────────────────
@@ -2097,13 +2097,13 @@ function ModalRegistros({onClose, onLoad, currentD, currentCalcs, prodNome, user
           <div style={{display:"flex",flexDirection:"column",gap:6}}>
             <div onClick={()=>handleMover(null)}
               style={{padding:"10px 14px",background:"#302e2d",border:"1px solid rgba(255,255,255,.1)",borderRadius:4,cursor:"pointer",fontSize:12,color:"#f0f0f0",display:"flex",alignItems:"center",gap:8}}>
-              <span>🏠</span> Raiz (sem pasta)
+              <span></span> Raiz (sem pasta)
             </div>
             {pastas.map(p=>(
               <div key={p.id} onClick={()=>handleMover(p.id)}
                 style={{padding:"10px 14px",background:"#302e2d",border:"1px solid rgba(255,255,255,.1)",borderRadius:4,cursor:"pointer",fontSize:12,color:"#f0f0f0",display:"flex",alignItems:"center",gap:8,
                   paddingLeft: p.pai ? 28 : 14}}>
-                <span>{p.pai?"└ 📂":"📁"}</span>
+                <span>{p.pai?"└ ":""}</span>
                 {p.pai ? (pastas.find(x=>x.id===p.pai)?.nome||"") + " / " : ""}{p.nome}
                 <span style={{fontSize:10,color:"#5a6a84",marginLeft:"auto"}}>{registros.filter(r=>r.pastaId===p.id).length} reg.</span>
               </div>
@@ -2119,7 +2119,7 @@ function ModalRegistros({onClose, onLoad, currentD, currentCalcs, prodNome, user
     <div className="ov">
       <div className="mb" style={{maxWidth:580}} onClick={e=>e.stopPropagation()}>
         <div className="mh">
-          <span className="mt">📋 Registros</span>
+          <span className="mt">Registros</span>
           {isSP&&<span style={{fontSize:9,fontWeight:700,padding:"2px 8px",background:"rgba(0,120,212,.15)",border:"1px solid rgba(0,120,212,.35)",color:"#60a5fa",borderRadius:10,letterSpacing:.5}}>SharePoint</span>}
           {isSP
             ? <span style={{fontSize:9,fontWeight:700,padding:"2px 8px",background:"rgba(0,120,212,.2)",border:"1px solid rgba(0,120,212,.4)",color:"#60a5fa",borderRadius:10,letterSpacing:.5}}>SharePoint</span>
@@ -2133,7 +2133,7 @@ function ModalRegistros({onClose, onLoad, currentD, currentCalcs, prodNome, user
           {/* ── Migração local → nuvem ── */}
           {localCount()>0&&!migMsg&&(
             <div style={{display:"flex",alignItems:"center",gap:10,padding:"8px 12px",background:"rgba(217,119,6,.08)",border:"1px solid rgba(217,119,6,.25)",borderRadius:4,marginBottom:10}}>
-              <span style={{fontSize:11,color:"#fbbf24",flex:1}}>📦 {localCount()} registro{localCount()!==1?"s":""} local{localCount()!==1?"is":""} encontrado{localCount()!==1?"s":""}. Migrar para a nuvem?</span>
+              <span style={{fontSize:11,color:"#fbbf24",flex:1}}>{localCount()} registro{localCount()!==1?"s":""} local{localCount()!==1?"is":""} encontrado{localCount()!==1?"s":""}. Migrar para a nuvem?</span>
               <button onClick={handleMigrar} disabled={migrando}
                 style={{padding:"4px 12px",background:"rgba(217,119,6,.2)",border:"1px solid rgba(217,119,6,.4)",color:"#fbbf24",fontSize:11,fontWeight:700,cursor:"pointer",borderRadius:3,flexShrink:0}}>
                 {migrando?"Migrando...":"⬆ Migrar"}
@@ -2155,14 +2155,14 @@ function ModalRegistros({onClose, onLoad, currentD, currentCalcs, prodNome, user
                   style={{background:"none",border:"none",outline:"none",fontFamily:"'Montserrat',sans-serif",fontSize:12,color:"#f0f0f0",padding:"7px 10px",width:"100%"}}/>
               </div>
               <button className="mapp" style={{padding:"7px 16px",borderRadius:4,fontSize:12,flexShrink:0}} onClick={handleSave} disabled={saving}>
-                {saving ? "..." : sobrescrever ? "↺ Sobrescrever" : "💾 Salvar novo"}
+                {saving ? "..." : sobrescrever ? "↺ Sobrescrever" : "Salvar novo"}
               </button>
             </div>
             <div style={{display:"flex",alignItems:"center",gap:16,marginBottom:6}}>
               <label style={{display:"flex",alignItems:"center",gap:6,cursor:"pointer",fontSize:11,color:compartilhado?"#93c5fd":"#7a90b0",userSelect:"none"}}>
                 <input type="checkbox" checked={compartilhado} onChange={e=>setCompartilhado(e.target.checked)}
                   style={{accentColor:"#3CDBC0",cursor:"pointer"}}/>
-                🌐 Compartilhar com todos
+                Compartilhar com todos
               </label>
             </div>
             {/* Sobrescrever dropdown — apenas Supabase */}
@@ -2173,7 +2173,7 @@ function ModalRegistros({onClose, onLoad, currentD, currentCalcs, prodNome, user
                 style={{flex:1,background:"#201f1e",border:"1px solid rgba(255,255,255,.12)",color:sobrescrever?"#fbbf24":"#7a90b0",padding:"4px 8px",fontSize:11,borderRadius:3,outline:"none"}}>
                 <option value="">— selecionar registro —</option>
                 {regsParaSobrescrever.map(r=>(
-                  <option key={r.id} value={r.id}>{r.compartilhado?"🌐 ":""}{r.nome} ({r.data})</option>
+                  <option key={r.id} value={r.id}>{r.compartilhado?"":""}{r.nome} ({r.data})</option>
                 ))}
               </select>
               {sobrescrever&&<button onClick={()=>setSobrescrever(null)}
@@ -2183,18 +2183,18 @@ function ModalRegistros({onClose, onLoad, currentD, currentCalcs, prodNome, user
 
           {/* ── Navegação de pastas com breadcrumb ── */}
           <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8,flexWrap:"wrap"}}>
-            <button style={btnStyle(pastaAtual===null)} onClick={()=>setPastaAtual(null)}>🏠</button>
+            <button style={btnStyle(pastaAtual===null)} onClick={()=>setPastaAtual(null)}></button>
             {caminho.map((p,i)=>(
               <span key={p.id} style={{display:"flex",alignItems:"center",gap:4}}>
                 <span style={{color:"#3d5070",fontSize:10}}>/</span>
                 <button style={btnStyle(i===caminho.length-1)} onClick={()=>setPastaAtual(p.id)}>
-                  📂 {p.nome}
+                  {p.nome}
                 </button>
               </span>
             ))}
             {subpastasAtuais.map(p=>(
               <button key={p.id} style={btnStyle(false)} onClick={()=>setPastaAtual(p.id)}>
-                {p.compartilhado?"🌐":"📁"} {p.nome}
+                {p.compartilhado?"":""} {p.nome}
                 <span style={{fontSize:9,marginLeft:3,opacity:.6}}>{registros.filter(r=>r.pastaId===p.id).length}</span>
               </button>
             ))}
@@ -2221,7 +2221,7 @@ function ModalRegistros({onClose, onLoad, currentD, currentCalcs, prodNome, user
                   </div>
                 : <button onClick={()=>setConfirmDelPasta(pastaAtual)}
                     style={{marginLeft:"auto",padding:"3px 8px",background:"rgba(220,38,38,.1)",border:"1px solid rgba(220,38,38,.25)",color:"#f87171",fontSize:10,cursor:"pointer",borderRadius:3}}>
-                    🗑
+                    
                   </button>
             )}
           </div>
@@ -2243,7 +2243,7 @@ function ModalRegistros({onClose, onLoad, currentD, currentCalcs, prodNome, user
                               style={{flex:1,background:"rgba(255,255,255,.08)",border:"1px solid rgba(255,255,255,.2)",color:"#f0f0f0",padding:"4px 8px",fontSize:12,borderRadius:3,outline:"none"}}/>
                           : <div style={{flex:1,minWidth:0}}>
                               <div style={{fontSize:13,fontWeight:700,color:"#f0f0f0",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>
-                                {r.compartilhado&&<span title="Compartilhado" style={{marginRight:4}}>🌐</span>}{r.nome}
+                                {r.compartilhado&&<span title="Compartilhado" style={{marginRight:4}}></span>}{r.nome}
                               </div>
                               <div style={{fontSize:10,fontFamily:"'Montserrat',sans-serif",color:"#5a6a84",marginTop:2}}>
                                 {r.data} · {r.d?.ufDestino||""} · MC {r.calcs?.mc!=null ? pct(r.calcs.mc) : `${r.d?.margem||0}%`}
@@ -2261,10 +2261,10 @@ function ModalRegistros({onClose, onLoad, currentD, currentCalcs, prodNome, user
                                 style={{padding:"5px 11px",background:"#3CDBC0",border:"none",color:"#2C2A29",fontSize:11,fontWeight:700,cursor:"pointer",borderRadius:3}}>↩ Carregar</button>
                               <button onClick={()=>{setEditNome(r.id);setEditVal(r.nome);}}
                                 title="Renomear"
-                                style={{padding:"5px 8px",background:"rgba(255,255,255,.05)",border:"1px solid rgba(255,255,255,.12)",color:"#a8b5cc",fontSize:11,cursor:"pointer",borderRadius:3}}>✎</button>
+                                style={{padding:"5px 8px",background:"rgba(255,255,255,.05)",border:"1px solid rgba(255,255,255,.12)",color:"#a8b5cc",fontSize:11,cursor:"pointer",borderRadius:3}}></button>
                               <button onClick={()=>{setRegistroMover(r.id);setView("mover");}}
                                 title="Mover"
-                                style={{padding:"5px 8px",background:"rgba(255,255,255,.05)",border:"1px solid rgba(255,255,255,.12)",color:"#a8b5cc",fontSize:11,cursor:"pointer",borderRadius:3}}>📁</button>
+                                style={{padding:"5px 8px",background:"rgba(255,255,255,.05)",border:"1px solid rgba(255,255,255,.12)",color:"#a8b5cc",fontSize:11,cursor:"pointer",borderRadius:3}}></button>
                               {(r.userId===String(user?.id)||canManageShared)&&
                                 <button onClick={()=>setConfirmDel(r.id)}
                                   style={{padding:"5px 8px",background:"rgba(220,38,38,.1)",border:"1px solid rgba(220,38,38,.25)",color:"#f87171",fontSize:11,cursor:"pointer",borderRadius:3}}>✕</button>
@@ -2495,7 +2495,7 @@ function ModalGestaoUsers({ onClose, currentUser }) {
     <div className="modal-ov" onClick={onClose}>
       <div className="modal-box" style={{maxWidth:760,width:"95vw"}} onClick={e=>e.stopPropagation()}>
         <div className="modal-head">
-          <span className="modal-title">👥 Gestão de Usuários e Perfis</span>
+          <span className="modal-title">Gestão de Usuários e Perfis</span>
           <button className="modal-close" onClick={onClose}>×</button>
         </div>
 
@@ -2504,8 +2504,8 @@ function ModalGestaoUsers({ onClose, currentUser }) {
           <button style={btnStyle(aba==="pendentes")} onClick={()=>setAba("pendentes")}>
             ⏳ Pendentes {pendentes.length>0&&<span style={{marginLeft:4,background:"#d97706",color:"#fff",borderRadius:20,padding:"0 6px",fontSize:10}}>{pendentes.length}</span>}
           </button>
-          <button style={btnStyle(aba==="usuarios")} onClick={()=>setAba("usuarios")}>👥 Usuários</button>
-          <button style={btnStyle(aba==="perfis")} onClick={()=>setAba("perfis")}>🔐 Perfis</button>
+          <button style={btnStyle(aba==="usuarios")} onClick={()=>setAba("usuarios")}>Usuários</button>
+          <button style={btnStyle(aba==="perfis")} onClick={()=>setAba("perfis")}>Perfis</button>
         </div>
 
         <div style={{padding:16,maxHeight:"70vh",overflowY:"auto"}}>
@@ -2567,7 +2567,7 @@ function ModalGestaoUsers({ onClose, currentUser }) {
                       <td style={{padding:"10px 12px"}}><StatusBadge status={u.status}/></td>
                       <td style={{padding:"10px 12px"}}>
                         <div style={{display:"flex",gap:5}}>
-                          {u.id!=="master"&&<button className="btn-sm btn-edit" onClick={()=>setModal({type:"edit",user:u})}>✎</button>}
+                          {u.id!=="master"&&<button className="btn-sm btn-edit" onClick={()=>setModal({type:"edit",user:u})}></button>}
                           {u.id!=="master"&&u.status==="ativo"&&<button className="btn-sm btn-disable" onClick={()=>saveUser({...u,status:"inativo"})}>Desativar</button>}
                           {u.id!=="master"&&u.status==="inativo"&&<button className="btn-sm btn-approve" onClick={()=>saveUser({...u,status:"ativo"})}>Reativar</button>}
                           {u.id!=="master"&&u.status==="pendente"&&<button className="btn-sm btn-approve" onClick={()=>setModal({type:"aprovar",user:u})}>Analisar</button>}
@@ -2601,7 +2601,7 @@ function ModalGestaoUsers({ onClose, currentUser }) {
                           <div className="pfcard-count" style={{color:p.cor}}>{count} ativo{count!==1?"s":""}</div>
                         </div>
                         <div className="pfcard-actions">
-                          {!isAdminP&&<button className="btn-sm btn-edit" onClick={()=>setModalPerfil(p)}>✎</button>}
+                          {!isAdminP&&<button className="btn-sm btn-edit" onClick={()=>setModalPerfil(p)}></button>}
                           {!isAdminP&&(confirmDel===p.id
                             ? <><button className="btn-sm btn-reject" onClick={()=>deletarPerfil(p.id)}>Sim</button>
                                 <button className="btn-sm btn-disable" onClick={()=>setConfirmDel(null)}>Não</button></>
@@ -2648,11 +2648,14 @@ input::-webkit-inner-spin-button,input::-webkit-outer-spin-button{-webkit-appear
 .bdf{padding:3px 9px;font-family:'Montserrat',sans-serif;font-size:9px;border-radius:20px;background:rgba(220,38,38,.12);border:1px solid rgba(220,38,38,.25);color:#f87171}
 .layout{display:grid;grid-template-columns:360px 1fr;flex:1;min-height:0}
 .pleft{background:#0d0d15;border-right:1px solid rgba(255,255,255,.07);display:flex;flex-direction:column;min-height:0;overflow:hidden}
-.tnav{display:flex;flex-wrap:nowrap;align-items:stretch;border-bottom:1px solid rgba(255,255,255,.07);background:#0a0a12;flex-shrink:0;overflow-x:auto;scrollbar-width:none}.tnav::-webkit-scrollbar{display:none}
+.tnav{display:flex;flex-wrap:nowrap;align-items:stretch;border-bottom:1px solid rgba(255,255,255,.07);background:var(--surface,#0d0d15);flex-shrink:0;overflow-x:auto;scrollbar-width:none}.tnav::-webkit-scrollbar{display:none}
 .tbtn{flex:0 0 auto;padding:9px 10px;background:none;border:none;border-bottom:2px solid transparent;color:#A7A8AA;font-family:'Montserrat',sans-serif;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;cursor:pointer;transition:.15s;white-space:nowrap}
 .tbtn.on{color:#3CDBC0;border-bottom-color:#3CDBC0;font-weight:800}
 .tbtn:hover:not(.on){color:#c4d4e8}
 .tsep{align-self:center;color:rgba(255,255,255,.14);font-size:12px;user-select:none;flex-shrink:0}
+.modnav{padding:0 20px;flex-shrink:0}
+.modnav .tbtn{padding:11px 4px;font-size:11px;text-transform:none;letter-spacing:0}
+.modnav .tsep{margin:0 14px}
 /* botões de registro — só ícone, texto só aparece no hover (padrão do mockup aprovado) */
 .icon3d{position:relative;display:flex;align-items:center;justify-content:center;width:32px;height:30px;flex-shrink:0;
   background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);border-bottom:2px solid rgba(255,255,255,.15);
@@ -2663,9 +2666,10 @@ input::-webkit-inner-spin-button,input::-webkit-outer-spin-button{-webkit-appear
 .icon3d.accent{background:rgba(60,219,192,.15);border-color:rgba(60,219,192,.4);color:#3CDBC0}
 .icon3d.danger{color:#f87171}
 .icon3d.danger:hover{border-color:rgba(248,113,113,.4);color:#f87171}
-.icon3d[data-tip]::after{content:attr(data-tip);position:absolute;bottom:calc(100% + 7px);left:50%;transform:translateX(-50%);
-  background:#0d0d15;color:#fff;font-size:10px;font-weight:600;padding:4px 9px;border-radius:5px;white-space:nowrap;
-  opacity:0;pointer-events:none;transition:opacity .12s;box-shadow:0 4px 10px rgba(0,0,0,.4);z-index:20}
+/* tooltip abre para BAIXO (a faixa acima dos botões costuma clipar overflow) */
+.icon3d[data-tip]::after{content:attr(data-tip);position:absolute;top:calc(100% + 7px);left:50%;transform:translateX(-50%);
+  background:#050508;color:#fff;font-size:10px;font-weight:600;padding:4px 9px;border-radius:5px;white-space:nowrap;
+  opacity:0;pointer-events:none;transition:opacity .12s;box-shadow:0 4px 10px rgba(0,0,0,.4);z-index:200}
 .icon3d:hover[data-tip]::after{opacity:1}
 .pscroll{overflow-y:auto;padding:8px;display:flex;flex-direction:column;gap:6px;flex:1;min-height:0}
 .sec{border:1px solid rgba(255,255,255,.09);overflow:hidden;background:#1a1b27;border-radius:10px}
@@ -2852,13 +2856,13 @@ REGRAS OBRIGATÓRIAS:
 - Formatação da resposta final: seja curto. Use no máximo 1 título em negrito e uma lista simples "Campo: valor" (uma por linha, com **negrito** no rótulo). NUNCA use tabelas markdown (|---|---|) nem headers com #/##/### — o chat não renderiza tabelas, só negrito e linhas.
 - REGRA CENTRAL: use SEMPRE por padrão os valores da base de dados (custos e índices), sem perguntar ao usuário. Só pergunte algo que só o usuário sabe.
 - NUNCA peça FOB (USD) ao usuário. O VPL (custo_usd_unit do fechamento mais recente) JÁ inclui o FOB — buscar e aplicar automaticamente via query_custos_historico + set_custo. FOB nunca precisa ser perguntado nem informado separadamente.
-- ⚠️ NUNCA ASSUMA valores que só o usuário sabe — em especial UF de destino, canal/cliente e prazo de pagamento. Se o usuário não informou, use perguntar_usuario (interativo, com opções) em vez de adivinhar ou perguntar em texto livre solto. Nunca assuma São Paulo (ou qualquer UF) como destino por padrão.
-- ⚠️ SEMPRE chame calcular_cf_venda com o prazo de pagamento do cliente antes de get_resultado (pergunte o prazo via perguntar_usuario se não foi dito — opções: 'À vista','30 dias','60 dias','90 dias'). Sem isso, a MC fica igual à ML, o que é sempre incorreto quando há prazo de pagamento.
-- ⚠️ MC ≠ ML: MC = ML + Custo Fixo. Se o usuário pedir para ajustar/atingir uma MC específica, use set_mc_alvo (nunca calcule a ML equivalente de cabeça — é fácil errar essa subtração).
-- ⚠️ PREÇO FIXO: se o usuário pedir um preço de venda específico ("quero vender a USD 106", "fixa em R$ 542,72"), use set_preco_alvo — NUNCA tente adivinhar/iterar uma margem chamando set_margem várias vezes, e NUNCA calcule na mão "quanto ficaria a margem com esse preço". A calculadora já tem esse modo pronto.
-- ⚠️ DÓLAR CUSTO ≠ DÓLAR PREÇO — são dois campos DIFERENTES, nunca confunda: Dólar Custo (set_custo/dolar) converte o VPL/custo em USD→BRL; Dólar Preço (set_dolar_preco) converte um preço de VENDA em USD→BRL (usado por set_preco_alvo com moeda='USD'). Se o usuário disser "dólar de custo" e "dólar de preço" como valores diferentes, use a tool certa para cada um — nunca aplique o mesmo valor nos dois campos sem o usuário confirmar que são iguais.
-- ⚠️⚠️ PROIBIDO CALCULAR NA MÃO: você NUNCA deve somar/subtrair/multiplicar índices, custos ou preços para chegar num resultado de precificação — nem em texto explicativo, nem no resultado final. TODA tool de alteração (set_margem, set_mc_alvo, set_preco_alvo, set_custo, set_indices, set_canal, aplicar_indices_completo, calcular_cf_venda) já devolve um campo resultado_real com pF/ml/mc REAIS recalculados pela calculadora — use SOMENTE esses números na sua resposta. Se por algum motivo uma tool não devolver resultado_real, chame get_resultado antes de responder. Nunca diga "ficaria aproximadamente X%" baseado em conta própria.
-- ⚠️ NUNCA invente ou "arredonde" um resultado, nem invente desculpas (ex: "aguardando sincronização") se um valor não bater com o esperado — sempre relate o resultado_real/get_resultado tal como veio, mesmo que pareça estranho.
+- ⚠NUNCA ASSUMA valores que só o usuário sabe — em especial UF de destino, canal/cliente e prazo de pagamento. Se o usuário não informou, use perguntar_usuario (interativo, com opções) em vez de adivinhar ou perguntar em texto livre solto. Nunca assuma São Paulo (ou qualquer UF) como destino por padrão.
+- ⚠SEMPRE chame calcular_cf_venda com o prazo de pagamento do cliente antes de get_resultado (pergunte o prazo via perguntar_usuario se não foi dito — opções: 'À vista','30 dias','60 dias','90 dias'). Sem isso, a MC fica igual à ML, o que é sempre incorreto quando há prazo de pagamento.
+- ⚠MC ≠ ML: MC = ML + Custo Fixo. Se o usuário pedir para ajustar/atingir uma MC específica, use set_mc_alvo (nunca calcule a ML equivalente de cabeça — é fácil errar essa subtração).
+- ⚠PREÇO FIXO: se o usuário pedir um preço de venda específico ("quero vender a USD 106", "fixa em R$ 542,72"), use set_preco_alvo — NUNCA tente adivinhar/iterar uma margem chamando set_margem várias vezes, e NUNCA calcule na mão "quanto ficaria a margem com esse preço". A calculadora já tem esse modo pronto.
+- ⚠DÓLAR CUSTO ≠ DÓLAR PREÇO — são dois campos DIFERENTES, nunca confunda: Dólar Custo (set_custo/dolar) converte o VPL/custo em USD→BRL; Dólar Preço (set_dolar_preco) converte um preço de VENDA em USD→BRL (usado por set_preco_alvo com moeda='USD'). Se o usuário disser "dólar de custo" e "dólar de preço" como valores diferentes, use a tool certa para cada um — nunca aplique o mesmo valor nos dois campos sem o usuário confirmar que são iguais.
+- ⚠⚠PROIBIDO CALCULAR NA MÃO: você NUNCA deve somar/subtrair/multiplicar índices, custos ou preços para chegar num resultado de precificação — nem em texto explicativo, nem no resultado final. TODA tool de alteração (set_margem, set_mc_alvo, set_preco_alvo, set_custo, set_indices, set_canal, aplicar_indices_completo, calcular_cf_venda) já devolve um campo resultado_real com pF/ml/mc REAIS recalculados pela calculadora — use SOMENTE esses números na sua resposta. Se por algum motivo uma tool não devolver resultado_real, chame get_resultado antes de responder. Nunca diga "ficaria aproximadamente X%" baseado em conta própria.
+- ⚠NUNCA invente ou "arredonde" um resultado, nem invente desculpas (ex: "aguardando sincronização") se um valor não bater com o esperado — sempre relate o resultado_real/get_resultado tal como veio, mesmo que pareça estranho.
 - APRENDIZADO: se o usuário CORRIGIR um número ("o frete da Stone é 0,9%", "o dólar certo é 5,60"), use salvar_ajuste_indice (pergunte antes, via perguntar_usuario, se vale só para este SKU, para o canal ou global). Se o usuário der uma INSTRUÇÃO permanente ("Stone sempre 45 dias", "PosiSeg não tem rebate"), use salvar_regra. Sempre confirme o que foi salvo. Siga SEMPRE as REGRAS APRENDIDAS listadas no contexto.
 - Formato de valores monetários: R$ com 2 casas decimais.
 - Seja direto. Confirme o que foi preenchido em uma linha.
@@ -2866,12 +2870,12 @@ REGRAS OBRIGATÓRIAS:
 FLUXO OBRIGATÓRIO PARA PRECIFICAR (siga sempre nesta ordem; use perguntar_usuario nos passos que dependem só do usuário, sem pausar nos passos que a base resolve sozinha):
 1. buscar_produto se o produto_id não for conhecido → set_produto (guarda o SKU retornado)
 2. set_origem_modalidade → perguntar_usuario para UF de destino se não informada (opções: UFs mais comuns, ex: 'SP','RJ','MG','PR') → set_uf_destino
-3. ⚠️ OBRIGATÓRIO E AUTOMÁTICO: query_custos_historico com o SKU → aplique IMEDIATAMENTE via
+3. ⚠OBRIGATÓRIO E AUTOMÁTICO: query_custos_historico com o SKU → aplique IMEDIATAMENTE via
    set_custo(vpl_usd: custo_usd_unit, dolar: taxa_dolar) do registro mais_recente.
    Isso já é o VPL completo — não peça FOB, não pergunte custo ao usuário.
    Informe ao usuário de qual mês veio (ex: "VPL de Mar/2026: USD 68,32 × 5,54").
 4. perguntar_usuario para canal/cliente se não informado → set_canal
-5. ⚠️ OBRIGATÓRIO E AUTOMÁTICO: query_indices_historico com o SKU → aplicar_indices_completo
+5. ⚠OBRIGATÓRIO E AUTOMÁTICO: query_indices_historico com o SKU → aplicar_indices_completo
    passando apenas o canal_sap do registro mais relevante em por_canal (o sistema copia
    os números sozinho — inclusive o Custo Fixo, que compõe a MC). Não redigite valores.
 6. perguntar_usuario para prazo de pagamento se não informado → calcular_cf_venda (OBRIGATÓRIO,
@@ -2906,7 +2910,7 @@ const CALC_TOOLS = [
     parameters:{ type:"object", properties:{ margem:{type:"number",description:"Percentual de margem líquida"} }, required:["margem"] } } },
   { type:"function", function:{ name:"set_mc_alvo", description:"Define a Margem de Contribuição (MC) alvo — use quando o usuário pedir para atingir/ajustar uma MC específica (ex: 'aumenta o preço pra 10% de MC'). NUNCA calcule a ML equivalente de cabeça (MC = ML + Custo Fixo, uma subtração fácil de errar) — esta ferramenta faz o cálculo exato e já devolve o resultado_real na resposta. Use SEMPRE os números de resultado_real na sua resposta ao usuário, nunca calcule por conta própria.",
     parameters:{ type:"object", properties:{ mc_pct:{type:"number",description:"Percentual de MC desejado"} }, required:["mc_pct"] } } },
-  { type:"function", function:{ name:"set_preco_alvo", description:"⚠️ USE ESTA FERRAMENTA sempre que o usuário pedir um PREÇO DE VENDA FIXO (em R$ ou USD) em vez de uma margem alvo — ex: 'quero vender a USD 106', 'fixa o preço em R$ 542,72'. A calculadora RESOLVE isso sozinha e devolve a ML/MC resultantes exatas em resultado_real — NUNCA calcule manualmente 'quanto ficaria a margem com esse preço', nunca faça busca binária chamando set_margem repetidas vezes. Esta é a ÚNICA forma correta de fixar preço. Se moeda='USD', a conversão usa o Dólar de Preço (ptaxPreco), não o Dólar de Custo.",
+  { type:"function", function:{ name:"set_preco_alvo", description:"⚠USE ESTA FERRAMENTA sempre que o usuário pedir um PREÇO DE VENDA FIXO (em R$ ou USD) em vez de uma margem alvo — ex: 'quero vender a USD 106', 'fixa o preço em R$ 542,72'. A calculadora RESOLVE isso sozinha e devolve a ML/MC resultantes exatas em resultado_real — NUNCA calcule manualmente 'quanto ficaria a margem com esse preço', nunca faça busca binária chamando set_margem repetidas vezes. Esta é a ÚNICA forma correta de fixar preço. Se moeda='USD', a conversão usa o Dólar de Preço (ptaxPreco), não o Dólar de Custo.",
     parameters:{ type:"object", properties:{
       preco:{type:"number",description:"Valor do preço de venda desejado"},
       moeda:{type:"string",enum:["BRL","USD"],description:"Moeda do valor informado. USD converte usando o Dólar de Preço do produto/categoria."},
@@ -2920,7 +2924,7 @@ const CALC_TOOLS = [
       sku:{type:"string",description:"SKU SAP do produto — use exatamente o valor 'sku' retornado por set_produto. Alternativamente passe o produto_id que o sistema resolve."},
       canal_filtro:{type:"string",description:"Filtro opcional por nome do cliente/canal (ex: 'AMAZON', 'MAGAZINE', 'GAZIN', 'CASAS BAHIA')"},
     }, required:["sku"] } } },
-  { type:"function", function:{ name:"query_custos_historico", description:"⚠️ SEMPRE chamar automaticamente ao precificar, ANTES de perguntar qualquer coisa sobre custo — nunca peça FOB ao usuário. Consulta o VPL (custo USD do mês corrente, campo custo_usd_unit) e a taxa de dólar do fechamento mais recente da Controladoria, além de custo transformação, GGF, CMV, garantia %, backup %, impostos e preço médio praticado. O VPL já inclui o FOB (não solicite FOB separadamente). Aplique o resultado via set_custo(vpl_usd, dolar) automaticamente e informe ao usuário a fonte/mês usado.",
+  { type:"function", function:{ name:"query_custos_historico", description:"⚠SEMPRE chamar automaticamente ao precificar, ANTES de perguntar qualquer coisa sobre custo — nunca peça FOB ao usuário. Consulta o VPL (custo USD do mês corrente, campo custo_usd_unit) e a taxa de dólar do fechamento mais recente da Controladoria, além de custo transformação, GGF, CMV, garantia %, backup %, impostos e preço médio praticado. O VPL já inclui o FOB (não solicite FOB separadamente). Aplique o resultado via set_custo(vpl_usd, dolar) automaticamente e informe ao usuário a fonte/mês usado.",
     parameters:{ type:"object", properties:{
       sku:{type:"string",description:"SKU SAP do produto — use o valor 'sku' retornado por set_produto. Alternativamente passe o produto_id."},
       planta:{type:"string",description:"Filtro opcional por planta (ex: 'Manaus', 'Ilhéus', 'Curitiba')"},
@@ -2931,12 +2935,12 @@ const CALC_TOOLS = [
       planta:{type:"string",description:"Planta do registro, opcional, só para desambiguar se houver mais de um canal_sap igual em plantas diferentes"},
       margem:{type:"number",description:"Margem líquida alvo % — só se o usuário definiu uma meta explícita"},
     } } } },
-  { type:"function", function:{ name:"perguntar_usuario", description:"Use SEMPRE que precisar de uma informação que não está na base de dados nem foi dita pelo usuário (ex: UF de destino, canal/cliente, prazo de pagamento). NUNCA assuma um valor (ex: nunca assuma São Paulo como UF de destino) — pergunte de forma interativa com opções. O usuário verá botões com as opções e um campo para digitar outro valor. ⚠️ NUNCA escreva a pergunta como texto normal na resposta — SEMPRE chame esta ferramenta, uma pergunta por vez (uma de cada vez, não numere várias perguntas num único texto). Se precisar de várias informações, chame esta ferramenta várias vezes (uma por informação) — cada uma será exibida em sequência.",
+  { type:"function", function:{ name:"perguntar_usuario", description:"Use SEMPRE que precisar de uma informação que não está na base de dados nem foi dita pelo usuário (ex: UF de destino, canal/cliente, prazo de pagamento). NUNCA assuma um valor (ex: nunca assuma São Paulo como UF de destino) — pergunte de forma interativa com opções. O usuário verá botões com as opções e um campo para digitar outro valor. ⚠NUNCA escreva a pergunta como texto normal na resposta — SEMPRE chame esta ferramenta, uma pergunta por vez (uma de cada vez, não numere várias perguntas num único texto). Se precisar de várias informações, chame esta ferramenta várias vezes (uma por informação) — cada uma será exibida em sequência.",
     parameters:{ type:"object", properties:{
       pergunta:{type:"string",description:"Pergunta objetiva e curta a exibir ao usuário"},
       opcoes:{type:"array",items:{type:"string"},description:"2 a 4 opções sugeridas, mutuamente exclusivas (o usuário também pode digitar uma resposta livre)"},
     }, required:["pergunta","opcoes"] } } },
-  { type:"function", function:{ name:"calcular_cf_venda", description:"Calcula e aplica o Custo Financeiro de Venda (CF Venda) a partir do prazo de pagamento concedido ao cliente. ⚠️ OBRIGATÓRIO aplicar sempre que houver prazo de pagamento > 0 — sem isso a Margem de Contribuição (MC) fica IGUAL à Margem Líquida (ML), o que está errado. Se o prazo não foi informado, use perguntar_usuario primeiro (opções comuns: 'À vista', '30 dias', '60 dias', '90 dias').",
+  { type:"function", function:{ name:"calcular_cf_venda", description:"Calcula e aplica o Custo Financeiro de Venda (CF Venda) a partir do prazo de pagamento concedido ao cliente. ⚠OBRIGATÓRIO aplicar sempre que houver prazo de pagamento > 0 — sem isso a Margem de Contribuição (MC) fica IGUAL à Margem Líquida (ML), o que está errado. Se o prazo não foi informado, use perguntar_usuario primeiro (opções comuns: 'À vista', '30 dias', '60 dias', '90 dias').",
     parameters:{ type:"object", properties:{
       prazo_dias:{type:"number",description:"Prazo de pagamento em dias (0 se à vista)"},
       taxa_pct:{type:"number",description:"Taxa financeira mensal % (padrão 1,14% a.m. se não informado)"},
@@ -3419,7 +3423,7 @@ Resultado: pF R$ ${cc.pF?.toFixed(2)||"—"} | ML ${cc.margPct?.toFixed(2)||"—
           resultado = await chamarIABox(systemPrompt, apiHistoryRef.current);
           usado = "gemma";
         } catch (e) {
-          setMessages(prev => [...prev, { role:"tool", content:`⚠️ IA BOX indisponível (${e.message}) — usando Claude como fallback` }]);
+          setMessages(prev => [...prev, { role:"tool", content:`⚠IA BOX indisponível (${e.message}) — usando Claude como fallback` }]);
           resultado = await chamarAnthropic(systemPrompt, apiHistoryRef.current);
           usado = "claude (fallback)";
         }
@@ -3505,11 +3509,11 @@ Resultado: pF R$ ${cc.pF?.toFixed(2)||"—"} | ML ${cc.margPct?.toFixed(2)||"—
   return (
     <div style={wrapStyle}>
       <div style={{padding:"14px 16px",borderBottom:"1px solid rgba(255,255,255,.08)",display:"flex",alignItems:"center",gap:10,flexShrink:0,flexWrap:"wrap"}}>
-        <span style={{fontSize:18}}>🤖</span>
+        <span style={{fontSize:18}}></span>
         <div style={{flex:1,minWidth:120}}>
           <div style={{fontSize:13,fontWeight:700,color:"#f0f4ff"}}>Assistente Positec</div>
           <div style={{fontSize:10,color:loading?"#3CDBC0":"#5a6a84",transition:".3s"}}>
-            {loading?"⚡ Preenchendo a calculadora...":"Descreva o cenário — eu preencho os campos"}
+            {loading?"Preenchendo a calculadora...":"Descreva o cenário — eu preencho os campos"}
           </div>
         </div>
         <div style={{display:"flex",gap:3,background:"rgba(255,255,255,.04)",borderRadius:20,padding:2}}>
@@ -3529,7 +3533,7 @@ Resultado: pF R$ ${cc.pF?.toFixed(2)||"—"} | ML ${cc.margPct?.toFixed(2)||"—
       <div ref={scrollRef} style={{flex:1,minHeight:0,overflowY:"auto",padding:"12px 14px",display:"flex",flexDirection:"column",gap:10}}>
         {messages.length===0&&(
           <div style={{color:"#5a6a84",fontSize:11,textAlign:"center",marginTop:24}}>
-            <div style={{fontSize:28,marginBottom:8}}>💬</div>
+            <div style={{fontSize:28,marginBottom:8}}></div>
             <div style={{marginBottom:6}}>Exemplo de uso:</div>
             <div style={{padding:"10px 14px",background:"rgba(255,255,255,.04)",borderRadius:8,color:"#7a90b0",lineHeight:1.6,textAlign:"left"}}>
               "Precifica notebook Celeron 14 pra T3 SP, margem 12%" — custo e índices vêm da base automaticamente
@@ -3537,7 +3541,7 @@ Resultado: pF R$ ${cc.pF?.toFixed(2)||"—"} | ML ${cc.margPct?.toFixed(2)||"—
           </div>
         )}
         {messages.map((m,i) => m.role==="tool" ? (
-          <div key={i} style={{fontSize:10,color:"#3CDBC0",padding:"3px 10px",background:"rgba(60,219,192,.06)",border:"1px solid rgba(60,219,192,.12)",borderRadius:4,alignSelf:"center"}}>⚙ {m.content}</div>
+          <div key={i} style={{fontSize:10,color:"#3CDBC0",padding:"3px 10px",background:"rgba(60,219,192,.06)",border:"1px solid rgba(60,219,192,.12)",borderRadius:4,alignSelf:"center"}}>{m.content}</div>
         ) : (
           <div key={i} style={{alignSelf:m.role==="user"?"flex-end":"flex-start",maxWidth:"90%"}}>
             <div style={{padding:"9px 13px",
@@ -3554,7 +3558,7 @@ Resultado: pF R$ ${cc.pF?.toFixed(2)||"—"} | ML ${cc.margPct?.toFixed(2)||"—
           <div style={{alignSelf:"flex-start",maxWidth:"92%",display:"flex",flexDirection:"column",gap:8}}>
             <div style={{padding:"9px 13px",borderRadius:"12px 12px 12px 2px",background:"rgba(251,191,36,.1)",
               border:"1px solid rgba(251,191,36,.3)",fontSize:12,lineHeight:1.65,color:"#fde68a"}}>
-              ❓ {pendingQuestion.pergunta}
+              {pendingQuestion.pergunta}
             </div>
             {pendingQuestion.opcoes.length>0&&(
               <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
@@ -4131,7 +4135,7 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
         <div className="ov" onClick={()=>setEditCadModal(false)}>
           <div className="mb" style={{maxWidth:520}} onClick={e=>e.stopPropagation()}>
             <div className="mh">
-              <span className="mt">✏ Editar cadastro — {editCadForm.nome}</span>
+              <span className="mt">Editar cadastro — {editCadForm.nome}</span>
               <button className="mc" onClick={()=>setEditCadModal(false)}>×</button>
             </div>
             <div className="mbody" style={{gap:14}}>
@@ -4216,7 +4220,7 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
       const rows=historIndices;
       return(
         <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.75)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center"}} onClick={e=>{if(e.target===e.currentTarget)setShowHistorModal(false);}}>
-          <div style={{background:"#1a2332",border:"1px solid rgba(255,255,255,.15)",borderRadius:10,width:"min(92vw,980px)",maxHeight:"80vh",display:"flex",flexDirection:"column",overflow:"hidden"}}>
+          <div style={{background:"var(--card,#1a1b27)",border:"1px solid rgba(255,255,255,.15)",borderRadius:10,width:"min(92vw,980px)",maxHeight:"80vh",display:"flex",flexDirection:"column",overflow:"hidden"}}>
             <div style={{padding:"14px 20px",borderBottom:"1px solid rgba(255,255,255,.1)",display:"flex",alignItems:"center",gap:10}}>
               <span style={{fontWeight:700,fontSize:14,color:"#e2e8f0"}}>Histórico Real — SKU {sku}</span>
               {canalAtual&&<span style={{fontSize:11,color:"#63b3ed",background:"rgba(99,179,237,.1)",padding:"2px 8px",borderRadius:12,border:"1px solid rgba(99,179,237,.3)"}}>{canalAtual.label}</span>}
@@ -4227,7 +4231,7 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
             rows.length===0?<div style={{padding:40,textAlign:"center",color:"#5a6a84"}}>Nenhum registro encontrado para este SKU.</div>:(
             <div style={{overflowY:"auto",flex:1}}>
               <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
-                <thead style={{position:"sticky",top:0,background:"#1a2332",zIndex:1}}>
+                <thead style={{position:"sticky",top:0,background:"var(--card,#1a1b27)",zIndex:1}}>
                   <tr>
                     {cols.map(c=><th key={c.k} style={{padding:"8px 10px",textAlign:"left",color:"#94a3b8",fontWeight:600,borderBottom:"1px solid rgba(255,255,255,.08)",minWidth:c.w,maxWidth:c.w,overflow:"hidden",whiteSpace:"nowrap"}}>{c.l}</th>)}
                     <th style={{padding:"8px 10px",color:"#94a3b8",fontWeight:600,borderBottom:"1px solid rgba(255,255,255,.08)"}}>Aplicar</th>
@@ -4259,8 +4263,8 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
     <div className={`app${chatPrecificando?" agent-ativo":""}`} style={{display:viewMode==="agent"?"flex":"none",flexDirection:"column",height:"100%",minHeight:0,overflow:"hidden"}}>
         <style>{CSS}</style>
         {/* Header — modo agente */}
-        <div style={{display:"flex",alignItems:"center",gap:10,padding:"10px 16px",background:"#1e2a3d",borderBottom:"1px solid rgba(255,255,255,.07)",flexShrink:0,flexWrap:"wrap"}}>
-          <span style={{fontSize:13,fontWeight:700,color:"#3CDBC0",display:"flex",alignItems:"center",gap:6}}>🤖 Assistente de Precificação</span>
+        <div style={{display:"flex",alignItems:"center",gap:10,padding:"10px 16px",background:"var(--card,#1a1b27)",borderBottom:"1px solid rgba(255,255,255,.07)",flexShrink:0,flexWrap:"wrap"}}>
+          <span style={{fontSize:13,fontWeight:700,color:"#3CDBC0",display:"flex",alignItems:"center",gap:6}}>Assistente de Precificação</span>
           {nomeAba&&(
             <span style={{fontSize:11,fontWeight:600,color:"#3CDBC0",padding:"2px 8px",background:"rgba(60,219,192,.15)",borderRadius:20,border:"1px solid rgba(60,219,192,.3)"}}>
               {nomeAba}
@@ -4272,44 +4276,46 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
             onRegistros={()=>setModal("registros")}/>
           {isAdmin&&<button onClick={()=>setModal("gestao")}
             style={{padding:"4px 12px",background:"rgba(5,150,105,.15)",border:"1px solid rgba(5,150,105,.4)",color:"#34d399",fontFamily:"'Montserrat',sans-serif",fontSize:11,fontWeight:700,letterSpacing:.5,cursor:"pointer",borderRadius:20}}>
-            👥 Gestão de Usuários
+            Gestão de Usuários
           </button>}
           <ViewToggle viewMode={viewMode} setViewMode={setViewMode}/>
         </div>
 
         <div style={{flex:1,minHeight:0,display:"flex",overflow:"hidden"}}>
-          {/* Resumo da precificação sendo formada */}
-          <div style={{width:380,minWidth:320,borderRight:"1px solid rgba(255,255,255,.08)",overflowY:"auto",padding:16,display:"flex",flexDirection:"column",gap:14}}>
-            <div className="price-hero">
-              <div>
-                <div style={{fontFamily:"'Montserrat',sans-serif",fontSize:9,fontWeight:700,letterSpacing:2,color:"#A7A8AA",marginBottom:4}}>
-                  {d.modoCalc==="margem"?"MC RESULTANTE":"PREÇO DE VENDA FINAL"}
-                </div>
-                {d.modoCalc==="margem"
-                  ? <div style={{fontFamily:"'Montserrat',sans-serif",fontSize:36,fontWeight:800,letterSpacing:-1.5,lineHeight:1,display:"flex",alignItems:"flex-end",gap:4,
-                      color:c.mcSugerida!==null?(c.mcSugerida>=0?"#4ade80":"#f87171"):"#f1f5f9"}}>
-                      {c.mcSugerida!==null?n3(c.mcSugerida):"—"}
-                      <span style={{fontSize:16,fontWeight:400,marginBottom:4}}>%</span>
-                    </div>
-                  : <div style={{fontFamily:"'Montserrat',sans-serif",fontSize:36,fontWeight:800,color:"#f1f5f9",letterSpacing:-1.5,lineHeight:1,display:"flex",alignItems:"flex-start",gap:4}}>
-                      <span style={{fontSize:16,fontWeight:400,color:"#3CDBC0",marginTop:5}}>R$</span>{c.pF?n3(c.pF):"—"}
-                    </div>
-                }
-                <div style={{fontFamily:"'Montserrat',sans-serif",fontSize:9,color:"#5a6a84",marginTop:4,lineHeight:1.6}}>
-                  {prod?.nome?`${prod.nome} · ${d.origem||"—"}/${d.modalidade||"—"}`:"Aguardando o agente selecionar o produto..."}
-                </div>
-              </div>
-              <div style={{display:"flex",gap:5,flexWrap:"wrap",marginTop:8}}>
-                {[["CARGA","kpi-red",pct(c.cargaPct)],["ML","kpi-blue",pct(c.margPct)],["MC","kpi-green",pct(c.mc)],["MKP","",n3(c.mkp)+"x"]].map(([l,cls,v])=>(
-                  <div key={l} className={`kpi ${cls}`} style={{minWidth:60}}>
-                    <span style={{display:"block",fontFamily:"'Montserrat',sans-serif",fontSize:7,fontWeight:700,letterSpacing:1,color:"#475569",marginBottom:2}}>{l}</span>
-                    <span style={{fontFamily:"'Montserrat',sans-serif",fontSize:13,fontWeight:700}}>{v}</span>
+          {/* Resumo da precificação — mesma marcação/CSS do modo Calculadora (pleft/pscroll), pra não "pular" ao alternar */}
+          <aside className="pleft" style={{width:360,flexShrink:0}}>
+            <div className="pscroll">
+              <div className="price-hero">
+                <div>
+                  <div style={{fontFamily:"'Montserrat',sans-serif",fontSize:9,fontWeight:700,letterSpacing:2,color:"#A7A8AA",marginBottom:4}}>
+                    {d.modoCalc==="margem"?"MC RESULTANTE":"PREÇO DE VENDA FINAL"}
                   </div>
-                ))}
+                  {d.modoCalc==="margem"
+                    ? <div style={{fontFamily:"'Montserrat',sans-serif",fontSize:44,fontWeight:800,letterSpacing:-1.5,lineHeight:1,display:"flex",alignItems:"flex-end",gap:4,
+                        color:c.mcSugerida!==null?(c.mcSugerida>=0?"#4ade80":"#f87171"):"#f1f5f9"}}>
+                        {c.mcSugerida!==null?n3(c.mcSugerida):"—"}
+                        <span style={{fontSize:18,fontWeight:400,marginBottom:6}}>%</span>
+                      </div>
+                    : <div style={{fontFamily:"'Montserrat',sans-serif",fontSize:44,fontWeight:800,color:"#f1f5f9",letterSpacing:-1.5,lineHeight:1,display:"flex",alignItems:"flex-start",gap:4}}>
+                        <span style={{fontSize:18,fontWeight:400,color:"#3CDBC0",marginTop:6}}>R$</span>{c.pF?n3(c.pF):"—"}
+                      </div>
+                  }
+                  <div style={{fontFamily:"'Montserrat',sans-serif",fontSize:9,color:"#5a6a84",marginTop:4,lineHeight:1.6}}>
+                    {prod?.nome?`${prod.nome} · ${d.origem||"—"}/${d.modalidade||"—"}`:"Aguardando o agente selecionar o produto..."}
+                  </div>
+                </div>
+                <div style={{display:"flex",gap:5,flexWrap:"wrap",marginTop:8}}>
+                  {[["CARGA","kpi-red",pct(c.cargaPct)],["ML","kpi-blue",pct(c.margPct)],["MC","kpi-green",pct(c.mc)],["MKP","",n3(c.mkp)+"x"]].map(([l,cls,v])=>(
+                    <div key={l} className={`kpi ${cls}`} style={{minWidth:60}}>
+                      <span style={{display:"block",fontFamily:"'Montserrat',sans-serif",fontSize:7,fontWeight:700,letterSpacing:1,color:"#475569",marginBottom:2}}>{l}</span>
+                      <span style={{fontFamily:"'Montserrat',sans-serif",fontSize:13,fontWeight:700}}>{v}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
+              <BreakdownPanel c={c} d={d} prod={prod} ppbTot={ppbTot} calcs={calcs}/>
             </div>
-            <BreakdownPanel c={c} d={d} prod={prod} ppbTot={ppbTot} calcs={calcs}/>
-          </div>
+          </aside>
 
           {/* Chat em evidência */}
           <ChatPanel embedded d={d} setD={setD} c={c} produtosDB={produtosDB} setProd={setProd} usuario={currentUser?.nome}
@@ -4323,7 +4329,7 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
     <style>{CSS}</style>
 
       {/* sub-header: badges de contexto + nome da aba + botões */}
-      <div style={{display:"flex",alignItems:"center",gap:6,padding:"6px 16px",background:"#1e2a3d",borderBottom:"1px solid rgba(255,255,255,.07)",flexWrap:"wrap",flexShrink:0,flexBasis:"auto"}}>
+      <div style={{display:"flex",alignItems:"center",gap:6,padding:"6px 16px",background:"var(--card,#1a1b27)",borderBottom:"1px solid rgba(255,255,255,.07)",flexWrap:"wrap",flexShrink:0,flexBasis:"auto"}}>
         {isZFM&&<span className="buf zmf">ZFM / MAO</span>}
         {prodAtrib.uf==="BA"&&<span className="buf ios">IOS / BA</span>}
         {prodAtrib.uf==="PR"&&<span className="buf cwb">CWB / PR</span>}
@@ -4356,7 +4362,7 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
           onRegistros={()=>setModal("registros")}/>
         {isAdmin&&<button onClick={()=>setModal("gestao")}
           style={{padding:"4px 12px",background:"rgba(5,150,105,.15)",border:"1px solid rgba(5,150,105,.4)",color:"#34d399",fontFamily:"'Montserrat',sans-serif",fontSize:11,fontWeight:700,letterSpacing:.5,cursor:"pointer",borderRadius:20,display:"flex",alignItems:"center",gap:5}}>
-          👥 Gestão de Usuários
+          Gestão de Usuários
         </button>}
         <ViewToggle viewMode={viewMode} setViewMode={setViewMode}/>
       </div>
@@ -4427,7 +4433,7 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
                   {produtosDB.length>0&&(
                     <input
                       className="psel"
-                      placeholder="🔍 Buscar por nome, NCM ou ID..."
+                      placeholder="Buscar por nome, NCM ou ID..."
                       value={buscaProd}
                       onChange={e=>setBuscaProd(e.target.value)}
                       style={{marginBottom:4,fontSize:11}}
@@ -4484,7 +4490,7 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
                             style={{padding:"2px 8px",fontSize:10,fontWeight:700,cursor:"pointer",
                               background:"rgba(60,219,192,.1)",border:"1px solid rgba(60,219,192,.3)",
                               color:"#3CDBC0",borderRadius:3}}>
-                            ✏ Editar cadastro
+                            Editar cadastro
                           </button>
                         )}
                       </div>
@@ -4523,7 +4529,7 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
                     <div style={{fontSize:9,color:"#5a6a84",marginTop:4}}>{MODALIDADES.find(m=>m.id===d.modalidade)?.desc}</div>
                     {d.modalidade==="SKD"&&(
                       <div style={{marginTop:6,padding:"8px 10px",background:"rgba(217,119,6,.1)",border:"1px solid rgba(217,119,6,.3)",borderRadius:4,fontSize:10,color:"#fbbf24",lineHeight:1.5}}>
-                        ⚠️ <strong>SKD — confira o II:</strong> a alíquota de Imposto de Importação da placa pode ser diferente da do produto acabado. Verifique o NCM da placa e ajuste o campo II na aba Importação.
+                        ⚠<strong>SKD — confira o II:</strong> a alíquota de Imposto de Importação da placa pode ser diferente da do produto acabado. Verifique o NCM da placa e ajuste o campo II na aba Importação.
                       </div>
                     )}
                     {d.modalidade==="CBU"&&(
@@ -4532,8 +4538,8 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
                         border:`1px solid ${iiStatus==="ok"?"rgba(5,150,105,.3)":iiStatus==="err"?"rgba(220,38,38,.3)":"rgba(60,219,192,.2)"}`,
                         color: iiStatus==="ok"?"#34d399":iiStatus==="err"?"#f87171":"#93c5fd"}}>
                         {iiStatus==="ok"&&`✓ II preenchido automaticamente (${n3(d.aliqII)}%) pela tabela TEC — confira na aba Importação.`}
-                        {iiStatus==="err"&&"⚠️ NCM não encontrado na tabela TEC local. Preencha o II manualmente na aba Importação."}
-                        {!iiStatus&&"ℹ️ Selecione o produto para preencher o II automaticamente."}
+                        {iiStatus==="err"&&"⚠NCM não encontrado na tabela TEC local. Preencha o II manualmente na aba Importação."}
+                        {!iiStatus&&"ℹSelecione o produto para preencher o II automaticamente."}
                       </div>
                     )}
                   </div>
@@ -4814,7 +4820,7 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
                   style={{padding:"6px 14px",fontSize:10,fontWeight:700,cursor:"pointer",borderRadius:20,
                     border:"1px solid rgba(60,219,192,.5)",background:"rgba(60,219,192,.15)",
                     color:"#3CDBC0",whiteSpace:"nowrap",flexShrink:0}}>
-                  ⚡ Aplicar Padrões
+                  Aplicar Padrões
                 </button>
               </div>
             )}
@@ -4889,7 +4895,7 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
                   {produtoDB?.sku&&<button
                     onClick={()=>{if(!historIndices.length)fetchHistoricoIndices(produtoDB.sku);setShowHistorModal(true);}}
                     style={{marginTop:4,padding:"4px 10px",fontSize:10,fontWeight:700,cursor:"pointer",borderRadius:4,border:"1px solid rgba(99,179,237,.4)",background:"rgba(99,179,237,.1)",color:"#63b3ed",outline:"none"}}>
-                    {historLoading?"Carregando...":`📊 Histórico Real${historIndices.length?` (${historIndices.length})`:""}`}
+                    {historLoading?"Carregando...":`Histórico Real${historIndices.length?` (${historIndices.length})`:""}`}
                   </button>}
                   {/* Sugestão automática: registro mais recente da base consolidada */}
                   {produtoDB?.sku&&historIndices.length>0&&(()=>{const r=historIndices[0];return(
@@ -4905,7 +4911,7 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
                           frete:+(r.frete_pct||0).toFixed(2),pedCan:+(r.pd_pct||0).toFixed(2),
                           scrapCan:+(r.scrap_pct||0).toFixed(2)}))}
                         style={{alignSelf:"flex-start",padding:"3px 12px",fontSize:10,fontWeight:700,cursor:"pointer",borderRadius:4,border:"1px solid rgba(60,219,192,.5)",background:"rgba(60,219,192,.15)",color:"#3CDBC0",outline:"none"}}>
-                        ⚡ Aplicar índices reais
+                        Aplicar índices reais
                       </button>
                     </div>
                   );})()}
@@ -5106,7 +5112,7 @@ function RevCalc({precoAlvo,onChange,c,margem}){
   const mr=c.mcAlvo; // MC como referência principal
   return(
     <div className="rcard">
-      <div className="rlbl">PRECO ALVO -> MARGEM</div>
+      <div className="rlbl">PREÇO ALVO → MARGEM</div>
       <div className="rbody">
         <div className="riw">
           <span className="rpfx">R$</span>
@@ -5145,25 +5151,25 @@ const FORM_VAZIO={
 };
 
 const INDICES_GRUPOS=[
-  {id:"impostos",label:"Impostos",icone:"🏛",campos:[
+  {id:"impostos",label:"Impostos",icone:"",campos:[
     {k:"ipi_mao",l:"IPI MAO",sfx:"%"},{k:"ipi_ios",l:"IPI IOS",sfx:"%"},{k:"ipi_cwb",l:"IPI CWB",sfx:"%"},
     {k:"cred_mao",l:"Créd. MAO",sfx:"%"},{k:"cred_ios",l:"Créd. IOS",sfx:"%"},{k:"cred_cwb",l:"Créd. CWB",sfx:"%"},
     {k:"icms_mao",l:"ICMS MAO",sfx:"%"},{k:"icms_ios",l:"ICMS IOS",sfx:"%"},{k:"icms_cwb",l:"ICMS CWB",sfx:"%"},
     {k:"mva",l:"MVA",sfx:"%"},{k:"fti",l:"FTI/UEA",sfx:"%"},{k:"aliq_st",l:"Aliq. ST",sfx:"%"},
   ]},
-  {id:"vpl",label:"VPL",icone:"💰",campos:[
+  {id:"vpl",label:"VPL",icone:"",campos:[
     {k:"vpl_padrao",l:"VPL Padrão",sfx:"R$"},
   ]},
-  {id:"garantia",label:"Garantia / BKP",icone:"🛡",campos:[
+  {id:"garantia",label:"Garantia / BKP",icone:"",campos:[
     {k:"garantia",l:"Garantia",sfx:"R$"},{k:"bkp_pct",l:"BKP",sfx:"%"},
   ]},
-  {id:"custos",label:"Custos Locais",icone:"🏭",campos:[
+  {id:"custos",label:"Custos Locais",icone:"",campos:[
     {k:"producao",l:"Produção",sfx:"R$"},{k:"embalagem",l:"Embalagem",sfx:"R$"},
   ]},
-  {id:"gerais",label:"Índices Gerais",icone:"📊",campos:[
+  {id:"gerais",label:"Índices Gerais",icone:"",campos:[
     {k:"pd",l:"P&D",sfx:"%"},{k:"scrap",l:"Scrap",sfx:"%"},{k:"royal",l:"Royalties",sfx:"%"},{k:"frete_venda",l:"Frete Venda",sfx:"%"},
   ]},
-  {id:"comerciais",label:"Índices Comerciais",icone:"📈",campos:[
+  {id:"comerciais",label:"Índices Comerciais",icone:"",campos:[
     {k:"marg_ger",l:"Margem Ger.",sfx:"%"},{k:"mkt",l:"Marketing",sfx:"%"},{k:"rebate",l:"Rebate",sfx:"%"},
   ]},
 ];
@@ -5360,11 +5366,11 @@ function CadastroProdutos({user}){
               <a href="https://www.gov.br/receitafederal/pt-br/assuntos/aduana-e-comercio-exterior/classificacao-fiscal-de-mercadorias" target="_blank" rel="noopener noreferrer"
                 onClick={e=>e.stopPropagation()}
                 style={{fontSize:10,color:"#60a5fa",textDecoration:"none",padding:"2px 8px",border:"1px solid rgba(96,165,250,.3)",borderRadius:3}}>
-                🔗 Consultar NCM
+                Consultar NCM
               </a>
             )}
             <button style={{padding:"3px 10px",background:aberta?"rgba(60,219,192,.2)":"rgba(255,255,255,.06)",border:`1px solid ${aberta?"rgba(60,219,192,.4)":"rgba(255,255,255,.12)"}`,color:aberta?"#93c5fd":"#7a90b0",fontSize:10,fontWeight:700,cursor:"pointer",borderRadius:3}}>
-              {aberta?"✕ Fechar":"✏ Alterar"}
+              {aberta?"✕ Fechar":"Alterar"}
             </button>
           </div>
         </div>
@@ -5372,7 +5378,7 @@ function CadastroProdutos({user}){
           <div style={{padding:"12px 14px",background:"rgba(0,0,0,.15)"}}>
             {grupo.id==="impostos"&&(
               <div style={{fontSize:10,color:"#60a5fa",marginBottom:10,padding:"6px 10px",background:"rgba(96,165,250,.06)",border:"1px solid rgba(96,165,250,.2)",borderRadius:3}}>
-                💡 Consulte as alíquotas em:{" "}
+                Consulte as alíquotas em:{" "}
                 <a href="https://www.gov.br/receitafederal/pt-br/assuntos/aduana-e-comercio-exterior/classificacao-fiscal-de-mercadorias" target="_blank" rel="noopener noreferrer" style={{color:"#60a5fa"}}>Receita Federal — Classificação Fiscal</a>
               </div>
             )}
@@ -5407,7 +5413,7 @@ function CadastroProdutos({user}){
         {selecionados.size>0&&(
           <button onClick={abrirBulk}
             style={{padding:"9px 18px",background:"rgba(60,219,192,.2)",border:"1px solid rgba(60,219,192,.4)",color:"#3CDBC0",fontSize:12,fontWeight:700,cursor:"pointer",borderRadius:4,whiteSpace:"nowrap"}}>
-            ✏ Atualizar índices ({selecionados.size} produto{selecionados.size!==1?"s":""})
+            Atualizar índices ({selecionados.size} produto{selecionados.size!==1?"s":""})
           </button>
         )}
         <button style={{padding:"9px 16px",background:"rgba(124,58,237,.15)",border:"1px solid rgba(124,58,237,.35)",color:"#a78bfa",fontSize:12,fontWeight:700,cursor:"pointer",borderRadius:4,whiteSpace:"nowrap"}}
@@ -5538,7 +5544,7 @@ function CadastroProdutos({user}){
         <div className="modal-ov" onClick={e=>{if(e.target===e.currentTarget)setModal(null);}}>
           <div className="modal-box" style={{maxWidth:bulkPasso===2?900:520,maxHeight:"90vh",overflowY:"auto"}}>
             <div className="modal-head">
-              <span className="modal-title">✏ Atualizar índices em lote</span>
+              <span className="modal-title">Atualizar índices em lote</span>
               <button className="modal-close" onClick={()=>setModal(null)}>×</button>
             </div>
             <div className="modal-body">
@@ -5669,7 +5675,6 @@ function CadastroProdutos({user}){
 export default function App() {
   const [user, setUser] = useState(() => loadSession());
   const [modView, setModView] = useState("precificacao");
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
   const handleLogin = (u) => setUser(u);
   const handleLogout = () => { saveSession(null); setUser(null); };
 
@@ -5702,29 +5707,24 @@ export default function App() {
             <div className="topbar-avatar" style={{ background: p.cor || "#0047BB" }}>{initials(user.nome)}</div>
             <div>
               <div className="topbar-uname">{user.nome.split(" ")[0]} {user.nome.split(" ").slice(-1)[0]}</div>
-              <div className="topbar-uperfil">{p.icone} {p.label}</div>
+              <div className="topbar-uperfil">{p.label}</div>
             </div>
             {isAdmin&&<button onClick={()=>document.dispatchEvent(new CustomEvent("openGestao"))}
               style={{padding:"4px 10px",background:"rgba(5,150,105,.15)",border:"1px solid rgba(5,150,105,.4)",color:"#34d399",fontFamily:"'Montserrat',sans-serif",fontSize:10,fontWeight:700,letterSpacing:.5,cursor:"pointer",borderRadius:20}}>
-              👥 Gestão
+              Gestão
             </button>}
             <button className="btn-logout" onClick={handleLogout}>Sair</button>
           </div>
         </div>
+        {mostraSidebar&&(
+          <nav className="tnav modnav">
+            {MODULOS.filter(m=>m.ativo&&userModulos.includes(m.id)).flatMap((m,i)=>[
+              i>0&&<span key={m.id+"-sep"} className="tsep">|</span>,
+              <button key={m.id} className={`tbtn ${modView===m.id?"on":""}`} onClick={()=>setModView(m.id)}>{m.label}</button>,
+            ])}
+          </nav>
+        )}
         <div className="dash-body">
-          {mostraSidebar&&(
-            <div className={`sidebar${sidebarCollapsed?" collapsed":""}`}>
-              <div className="snav-toggle" title={sidebarCollapsed?"Expandir menu":"Recolher menu"} onClick={()=>setSidebarCollapsed(v=>!v)}>
-                {sidebarCollapsed ? "▶" : "◀"}
-              </div>
-              {MODULOS.filter(m=>m.ativo&&userModulos.includes(m.id)).map(m=>(
-                <div key={m.id} data-label={m.label} className={`snav-item ${modView===m.id?"on":""}`} onClick={()=>setModView(m.id)}>
-                  <span className="snav-icon">{m.icone}</span>
-                  <span className="snav-label">{m.label}</span>
-                </div>
-              ))}
-            </div>
-          )}
           <div style={{flex:1,minHeight:0,overflow:"hidden",display:"flex",flexDirection:"column"}}>
             {modView==="precificacao"&&temPrecificacao&&<MultiTab user={user}/>}
             {modView==="cadastro"&&temCadastro&&<div style={{overflow:"auto",flex:1}}><CadastroProdutos user={user}/></div>}
@@ -6050,7 +6050,7 @@ function MultiTab({ user }) {
       {/* Barra de abas */}
       <div style={{
         display: "flex", alignItems: "stretch", gap: 0,
-        background: "#0f1520", borderBottom: "1px solid rgba(255,255,255,.08)",
+        background: "var(--surface,#0d0d15)", borderBottom: "1px solid rgba(255,255,255,.08)",
         padding: "0 8px", overflowX: "auto", flexShrink: 0, minHeight: 38,
       }}>
         {abas.flatMap((aba, idx) => {
