@@ -2947,6 +2947,88 @@ const CALC_TOOLS = [
 const IA_BOX_URL = "https://openwebui-iabox-cits.positivo.corp/api/chat/completions";
 const IA_BOX_MODEL = "gemma-4-26b-a4b-it";
 
+// Claude como fallback — só usado se a IA BOX falhar (rede/erro) OU se o usuário forçar
+// manualmente pelo seletor no chat. Fala outro formato de tool (Anthropic Messages API),
+// por isso as conversões abaixo mantêm o histórico em formato canônico (OpenAI-style).
+const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
+const ANTHROPIC_MODEL = "claude-haiku-4-5-20251001";
+const ANTHROPIC_TOOLS = CALC_TOOLS.map(t => ({
+  name: t.function.name,
+  description: t.function.description,
+  input_schema: t.function.parameters,
+}));
+
+// Converte o histórico canônico (OpenAI-style: assistant.tool_calls, role:"tool") para o
+// formato de mensagens da Anthropic (content blocks, tool_result agrupado por turno).
+const paraFormatoAnthropic = (msgs) => {
+  const out = [];
+  for (const m of msgs) {
+    if (m.role === "tool") {
+      const bloco = { type:"tool_result", tool_use_id: m.tool_call_id, content: m.content };
+      const anterior = out[out.length-1];
+      if (anterior?.role === "user" && Array.isArray(anterior.content) && anterior.content[0]?.type === "tool_result") {
+        anterior.content.push(bloco);
+      } else {
+        out.push({ role:"user", content:[bloco] });
+      }
+      continue;
+    }
+    if (m.role === "assistant" && m.tool_calls?.length) {
+      const content = [];
+      if (m.content) content.push({ type:"text", text:m.content });
+      m.tool_calls.forEach(tc => content.push({ type:"tool_use", id:tc.id, name:tc.function.name, input: JSON.parse(tc.function.arguments||"{}") }));
+      out.push({ role:"assistant", content });
+      continue;
+    }
+    out.push({ role:m.role, content:m.content });
+  }
+  return out;
+};
+
+// Chama a Anthropic e devolve no formato canônico {message:{content, tool_calls}, finish_reason}
+const chamarAnthropic = async (systemPrompt, canonicalMsgs) => {
+  const res = await fetch(ANTHROPIC_URL, {
+    method:"POST",
+    headers:{
+      "x-api-key": import.meta.env.VITE_CLAUDE_KEY,
+      "anthropic-version": "2023-06-01",
+      "anthropic-dangerous-direct-browser-access": "true",
+      "content-type":"application/json"
+    },
+    body: JSON.stringify({ model: ANTHROPIC_MODEL, max_tokens:1024,
+      system: systemPrompt, tools: ANTHROPIC_TOOLS, messages: paraFormatoAnthropic(canonicalMsgs) }),
+  });
+  if (!res.ok) {
+    const errBody = await res.text().catch(()=> "");
+    throw new Error(`Erro Claude: ${res.status}${errBody?` — ${errBody.slice(0,200)}`:""}`);
+  }
+  const data = await res.json();
+  const content = data.content || [];
+  const text = content.filter(b => b.type === "text").map(b => b.text).join("\n");
+  const toolUse = content.filter(b => b.type === "tool_use");
+  return {
+    message: { content: text || null, ...(toolUse.length ? { tool_calls: toolUse.map(tb => ({ id:tb.id, function:{ name:tb.name, arguments: JSON.stringify(tb.input) } })) } : {}) },
+    finish_reason: data.stop_reason === "tool_use" ? "tool_calls" : "stop",
+  };
+};
+
+// Chama a IA BOX (Gemma) e devolve no mesmo formato canônico
+const chamarIABox = async (systemPrompt, canonicalMsgs) => {
+  const apiMsgs = [{ role:"system", content:systemPrompt }, ...canonicalMsgs];
+  const res = await fetch(IA_BOX_URL, {
+    method:"POST",
+    headers:{ "Authorization": `Bearer ${import.meta.env.VITE_IA_BOX_KEY}`, "content-type":"application/json" },
+    body: JSON.stringify({ model: IA_BOX_MODEL, stream:false, tools: CALC_TOOLS, messages: apiMsgs }),
+  });
+  if (!res.ok) {
+    const errBody = await res.text().catch(()=> "");
+    throw new Error(`Erro IA BOX: ${res.status}${errBody?` — ${errBody.slice(0,200)}`:""}`);
+  }
+  const data = await res.json();
+  const msg = data.choices?.[0]?.message || {};
+  return { message: msg, finish_reason: data.choices?.[0]?.finish_reason };
+};
+
 // Formatador leve de markdown para as respostas do agente: negrito, títulos e tabelas
 // viram elementos simples — o chat não tem parser de markdown completo, isso evita
 // mostrar "**"/"##"/"|---|---|" cru na tela.
@@ -3003,6 +3085,9 @@ function ChatPanel({ d, setD, c, produtosDB, onClose, onPrecificando, embedded=f
   const [loading, setLoading] = useState(false);
   const [pendingQuestion, setPendingQuestion] = useState(null); // {toolCallId, pergunta, opcoes}
   const [outroTexto, setOutroTexto] = useState("");
+  // "auto" = tenta IA BOX (Gemma), cai pro Claude só se der erro técnico | "gemma"/"claude" = força manualmente
+  const [provedor, setProvedor] = useState("auto");
+  const [ultimoProvedorUsado, setUltimoProvedorUsado] = useState(null);
   const scrollRef = useRef(null);
   const apiHistoryRef = useRef([]);
   const ultimoResumoRef = useRef([]); // último resumo de query_indices_historico, para aplicar_indices_completo copiar direto (sem depender do modelo re-digitar números)
@@ -3299,29 +3384,33 @@ Resultado: pF R$ ${cc.pF?.toFixed(2)||"—"} | ML ${cc.margPct?.toFixed(2)||"—
 
   // Loop principal do agente (Anthropic Messages API direto). Pausa (sem fechar o loading)
   // quando o modelo chama perguntar_usuario — o tool_use_id fica pendente até o usuário responder.
-  // Loop principal do agente — IA BOX (Gemma via Open WebUI), formato tool-calling OpenAI.
-  // Pausa (sem fechar o loading) quando o modelo chama perguntar_usuario — o tool_call_id
-  // fica pendente até o usuário responder.
+  // Loop principal do agente. Provedor "auto": tenta a IA BOX (Gemma) e só cai pro Claude
+  // se der erro técnico (rede/API fora do ar). "gemma"/"claude": força um dos dois sem
+  // fallback (pra você conseguir avaliar cada um isoladamente). Pausa (sem fechar o loading)
+  // quando o modelo chama perguntar_usuario — o tool_call_id fica pendente até responder.
   const runLoop = async () => {
     while (true) {
       // Contexto remontado a cada iteração — reflete as alterações das tools do próprio turno
       const systemPrompt = CHAT_SYSTEM_PROMPT.replace("{CONTEXT}", buildCalcContext());
-      const apiMsgs = [{ role:"system", content:systemPrompt }, ...apiHistoryRef.current];
-      const res = await fetch(IA_BOX_URL, {
-        method:"POST",
-        headers:{
-          "Authorization": `Bearer ${import.meta.env.VITE_IA_BOX_KEY}`,
-          "content-type":"application/json"
-        },
-        body: JSON.stringify({ model: IA_BOX_MODEL, stream:false, tools: CALC_TOOLS, messages: apiMsgs }),
-      });
-      if (!res.ok) {
-        const errBody = await res.text().catch(()=> "");
-        throw new Error(`Erro API: ${res.status}${errBody?` — ${errBody.slice(0,200)}`:""}`);
+      let resultado, usado;
+      if (provedor === "claude") {
+        resultado = await chamarAnthropic(systemPrompt, apiHistoryRef.current);
+        usado = "claude";
+      } else if (provedor === "gemma") {
+        resultado = await chamarIABox(systemPrompt, apiHistoryRef.current);
+        usado = "gemma";
+      } else {
+        try {
+          resultado = await chamarIABox(systemPrompt, apiHistoryRef.current);
+          usado = "gemma";
+        } catch (e) {
+          setMessages(prev => [...prev, { role:"tool", content:`⚠️ IA BOX indisponível (${e.message}) — usando Claude como fallback` }]);
+          resultado = await chamarAnthropic(systemPrompt, apiHistoryRef.current);
+          usado = "claude (fallback)";
+        }
       }
-      const data = await res.json();
-      const msg = data.choices?.[0]?.message || {};
-      const finish = data.choices?.[0]?.finish_reason;
+      setUltimoProvedorUsado(usado);
+      const { message: msg, finish_reason: finish } = resultado;
       apiHistoryRef.current.push({ role:"assistant", content: msg.content||null, ...(msg.tool_calls?.length ? { tool_calls: msg.tool_calls } : {}) });
       if (finish !== "tool_calls" || !msg.tool_calls?.length) {
         if (msg.content) setMessages(prev => [...prev, { role:"assistant", content: msg.content }]);
@@ -3400,16 +3489,28 @@ Resultado: pF R$ ${cc.pF?.toFixed(2)||"—"} | ML ${cc.margPct?.toFixed(2)||"—
     : {position:"fixed",top:0,right:0,bottom:0,width:400,background:"#0d0d15",borderLeft:"2px solid rgba(60,219,192,.25)",display:"flex",flexDirection:"column",zIndex:1000,...S};
   return (
     <div style={wrapStyle}>
-      <div style={{padding:"14px 16px",borderBottom:"1px solid rgba(255,255,255,.08)",display:"flex",alignItems:"center",gap:10,flexShrink:0}}>
+      <div style={{padding:"14px 16px",borderBottom:"1px solid rgba(255,255,255,.08)",display:"flex",alignItems:"center",gap:10,flexShrink:0,flexWrap:"wrap"}}>
         <span style={{fontSize:18}}>🤖</span>
-        <div style={{flex:1}}>
+        <div style={{flex:1,minWidth:120}}>
           <div style={{fontSize:13,fontWeight:700,color:"#f0f4ff"}}>Assistente Positec</div>
           <div style={{fontSize:10,color:loading?"#3CDBC0":"#5a6a84",transition:".3s"}}>
             {loading?"⚡ Preenchendo a calculadora...":"Descreva o cenário — eu preencho os campos"}
           </div>
         </div>
+        <div style={{display:"flex",gap:3,background:"rgba(255,255,255,.04)",borderRadius:20,padding:2}}>
+          {[["auto","Auto"],["gemma","Gemma"],["claude","Claude"]].map(([id,label])=>(
+            <button key={id} onClick={()=>setProvedor(id)} title={id==="auto"?"Tenta Gemma, cai pro Claude se falhar":`Força ${label}`}
+              style={{padding:"3px 9px",fontSize:9,fontWeight:700,borderRadius:16,border:"none",cursor:"pointer",
+                background:provedor===id?"rgba(60,219,192,.25)":"transparent",color:provedor===id?"#3CDBC0":"#7a90b0"}}>
+              {label}
+            </button>
+          ))}
+        </div>
         {!embedded&&<button onClick={onClose} style={{background:"none",border:"none",color:"#5a6a84",cursor:"pointer",fontSize:18,lineHeight:1,padding:"2px 6px"}}>✕</button>}
       </div>
+      {ultimoProvedorUsado&&<div style={{padding:"3px 16px",fontSize:9,color:"#5a6a84",borderBottom:"1px solid rgba(255,255,255,.05)",flexShrink:0}}>
+        Última resposta: {ultimoProvedorUsado==="gemma"?"Gemma (IA BOX)":ultimoProvedorUsado==="claude"?"Claude":"Claude (fallback — IA BOX falhou)"}
+      </div>}
       <div ref={scrollRef} style={{flex:1,minHeight:0,overflowY:"auto",padding:"12px 14px",display:"flex",flexDirection:"column",gap:10}}>
         {messages.length===0&&(
           <div style={{color:"#5a6a84",fontSize:11,textAlign:"center",marginTop:24}}>
