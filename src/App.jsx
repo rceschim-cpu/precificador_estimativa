@@ -2984,23 +2984,32 @@ function ChatPanel({ d, setD, c, produtosDB, onClose, onPrecificando, embedded=f
   const pendingQueueRef = useRef([]); // fila de perguntar_usuario ainda não exibidas do batch atual
   const notifyFill = () => onPrecificando?.(true);
 
+  // Refs de valor-mais-recente: o loop do agente é async e atravessa vários re-renders.
+  // Sem isso, handleToolCall lê o `c`/`d` congelados do render em que o turno começou —
+  // get_resultado devolvia o cálculo de ANTES das alterações do próprio turno.
+  const dRef = useRef(d); dRef.current = d;
+  const cRef = useRef(c); cRef.current = c;
+  // Espera o React re-renderizar e recalcular `c` após um setD (2 frames + margem)
+  const aguardarRecalculo = () => new Promise(res => setTimeout(res, 120));
+
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages]);
 
   const buildCalcContext = () => {
-    const prod = produtosDB.find(p => p.id === d.prodId);
-    const canal = CANAIS.find(c => c.id === d.canalId);
+    const dc = dRef.current, cc = cRef.current;
+    const prod = produtosDB.find(p => p.id === dc.prodId);
+    const canal = CANAIS.find(x => x.id === dc.canalId);
     const sku = prod?.sku || null;
-    return `Produto: ${prod?.nome || d.prodId || "não selecionado"}${sku ? ` | SKU SAP: ${sku}` : " | SKU: não disponível"}
-Origem: ${d.origem} | Modalidade: ${d.modalidade}
-UF destino: ${d.ufDestino}
-Câmbio: R$ ${d.ptax}/USD | Custo FOB: USD ${d.fobUSD}
+    return `Produto: ${prod?.nome || dc.prodId || "não selecionado"}${sku ? ` | SKU SAP: ${sku}` : " | SKU: não disponível"}
+Origem: ${dc.origem} | Modalidade: ${dc.modalidade}
+UF destino: ${dc.ufDestino}
+Câmbio: R$ ${dc.ptax}/USD | Custo FOB: USD ${dc.fobUSD}
 Canal: ${canal?.label || "nenhum"}
-Margem alvo (ML): ${d.margem}%
-Custo Fixo (soma na MC, não editável diretamente): ${c.cfixoEf?.toFixed(2)||0}%
-Índices: comis ${d.comis}% mkt ${d.mkt}% rebate ${d.rebate}% pdd ${d.pdd||2.5}% vpc ${d.vpc||0}%
-Resultado: pF R$ ${c.pF?.toFixed(2)||"—"} | ML ${c.margPct?.toFixed(2)||"—"}% | MC ${c.mc?.toFixed(2)||"—"}%`;
+Margem alvo (ML): ${dc.margem}%
+Custo Fixo (soma na MC, não editável diretamente): ${cc.cfixoEf?.toFixed(2)||0}%
+Índices: comis ${dc.comis}% mkt ${dc.mkt}% rebate ${dc.rebate}% pdd ${dc.pdd||2.5}% vpc ${dc.vpc||0}%
+Resultado: pF R$ ${cc.pF?.toFixed(2)||"—"} | ML ${cc.margPct?.toFixed(2)||"—"}% | MC ${cc.mc?.toFixed(2)||"—"}%`;
   };
 
   const handleToolCall = async (name, inp) => {
@@ -3036,7 +3045,7 @@ Resultado: pF R$ ${c.pF?.toFixed(2)||"—"} | ML ${c.margPct?.toFixed(2)||"—"}
     if (name === "set_custo") {
       notifyFill();
       const upd = {};
-      const dolarUsado = inp.dolar !== undefined ? inp.dolar : d.ptax;
+      const dolarUsado = inp.dolar !== undefined ? inp.dolar : dRef.current.ptax;
       if (inp.dolar !== undefined) upd.ptax = inp.dolar;
       if (inp.vpl_brl !== undefined) {
         upd.vplModo = "manual";
@@ -3063,11 +3072,16 @@ Resultado: pF R$ ${c.pF?.toFixed(2)||"—"} | ML ${c.margPct?.toFixed(2)||"—"}
       notifyFill();
       // MC = ML + Custo Fixo. Calcula o ML necessário para a MC pedida sem depender
       // do modelo fazer a subtração — evita a MC sair diferente do pedido.
-      const cfixoEf = c.cfixoEf || 0;
-      const margemNecessaria = +(inp.mc_pct - cfixoEf).toFixed(2);
+      await aguardarRecalculo(); // garante que alterações anteriores do turno já refletiram em c
+      const cfixoEf = cRef.current.cfixoEf || 0;
+      const mgAtiva = dRef.current.margGerAtivo ? (cRef.current.margGerPct || 0) : 0;
+      const margemNecessaria = +(inp.mc_pct - cfixoEf - mgAtiva).toFixed(2);
       setD(p => ({...p, margem: margemNecessaria}));
-      return { ok:true, mc_alvo: inp.mc_pct, custo_fixo_pct: cfixoEf, ml_calculado: margemNecessaria,
-        msg:`Para MC=${inp.mc_pct}% com Custo Fixo de ${cfixoEf}%, ML foi ajustada para ${margemNecessaria}%. Chame get_resultado para confirmar o novo preço e MC reais.` };
+      await aguardarRecalculo();
+      const cc = cRef.current;
+      return { ok:true, mc_alvo: inp.mc_pct, custo_fixo_pct: cfixoEf, ml_calculada: margemNecessaria,
+        resultado_real: { pF: cc.pF, ml: cc.margPct, mc: cc.mc },
+        msg:`ML ajustada para ${margemNecessaria}% (MC ${inp.mc_pct}% − Custo Fixo ${cfixoEf}%). Resultado REAL recalculado: pF R$ ${cc.pF?.toFixed(2)}, ML ${cc.margPct?.toFixed(2)}%, MC ${cc.mc?.toFixed(2)}% — use ESTES números na resposta.` };
     }
     if (name === "set_indices") {
       notifyFill();
@@ -3107,7 +3121,9 @@ Resultado: pF R$ ${c.pF?.toFixed(2)||"—"} | ML ${c.margPct?.toFixed(2)||"—"}
       return { ok:true, cf_venda_pct: +cfPct.toFixed(3), msg:`CF Venda aplicado: ${cfPct.toFixed(2)}% (prazo ${prazo}d, taxa ${taxa}% a.m.) — MC agora reflete esse custo` };
     }
     if (name === "get_resultado") {
-      return { pF: c.pF, ml: c.margPct, mc: c.mc, markup: c.mkp };
+      await aguardarRecalculo(); // espera o React recalcular após setD's anteriores do turno
+      const cc = cRef.current;
+      return { pF: cc.pF, ml: cc.margPct, mc: cc.mc, markup: cc.mkp };
     }
     if (name === "query_custos_historico") {
       try {
@@ -3166,8 +3182,9 @@ Resultado: pF R$ ${c.pF?.toFixed(2)||"—"} | ML ${c.margPct?.toFixed(2)||"—"}
   // Loop principal do agente (Anthropic Messages API direto). Pausa (sem fechar o loading)
   // quando o modelo chama perguntar_usuario — o tool_use_id fica pendente até o usuário responder.
   const runLoop = async () => {
-    const systemPrompt = CHAT_SYSTEM_PROMPT.replace("{CONTEXT}", buildCalcContext());
     while (true) {
+      // Contexto remontado a cada iteração — reflete as alterações das tools do próprio turno
+      const systemPrompt = CHAT_SYSTEM_PROMPT.replace("{CONTEXT}", buildCalcContext());
       const res = await fetch("https://api.anthropic.com/v1/messages", {
         method:"POST",
         headers:{
@@ -3711,7 +3728,8 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
     const cargaTotf=pcVf+ipiVf+icmsEfVf+difalVf+(stV||0)+fcpVf;
     const cargaPctf=pFbase>0?(cargaTotf/pFbase)*100:0;
     const margPctf=margPctEf;  // já é o valor correto para ambos os modos
-    const mcf=pFbase>0?((margVf+(d.margGerAtivo?margGerVf:0))/pFbase)*100:0;
+    // MC = ML + Custo Fixo (+ MG se toggle ON) — este mcf é o `mc` exportado/exibido
+    const mcf=pFbase>0?((margVf+cfxVf+(d.margGerAtivo?margGerVf:0))/pFbase)*100:0;
     const mkpf=cmvTotal>0?pFbase/cmvTotal:0;
     const pUSDf=(d.ptaxPreco||d.ptax)>0?pFbase/(d.ptaxPreco||d.ptax):0;
     return{cfrUSD,cfrBRL,iiV:iiV,iiUSD,vpl,vplEstimado,bkpV,bkpBase,cfrImp,cmvImp,cmvTotal,ppbTot,despesas,
