@@ -2648,10 +2648,25 @@ input::-webkit-inner-spin-button,input::-webkit-outer-spin-button{-webkit-appear
 .bdf{padding:3px 9px;font-family:'Montserrat',sans-serif;font-size:9px;border-radius:20px;background:rgba(220,38,38,.12);border:1px solid rgba(220,38,38,.25);color:#f87171}
 .layout{display:grid;grid-template-columns:360px 1fr;flex:1;min-height:0}
 .pleft{background:#0d0d15;border-right:1px solid rgba(255,255,255,.07);display:flex;flex-direction:column;min-height:0;overflow:hidden}
-.tnav{display:flex;flex-wrap:nowrap;border-bottom:1px solid rgba(255,255,255,.07);background:#0a0a12;flex-shrink:0;overflow-x:auto;scrollbar-width:none}.tnav::-webkit-scrollbar{display:none}
-.tbtn{flex:0 0 auto;padding:9px 7px;background:none;border:none;border-bottom:2px solid transparent;color:#A7A8AA;font-family:'Montserrat',sans-serif;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;cursor:pointer;transition:.15s;white-space:nowrap}
-.tbtn.on{color:#3CDBC0;border-bottom-color:#3CDBC0;background:rgba(60,219,192,.1)}
-.tbtn:hover:not(.on){color:#c4d4e8;background:rgba(255,255,255,.04)}
+.tnav{display:flex;flex-wrap:nowrap;align-items:stretch;border-bottom:1px solid rgba(255,255,255,.07);background:#0a0a12;flex-shrink:0;overflow-x:auto;scrollbar-width:none}.tnav::-webkit-scrollbar{display:none}
+.tbtn{flex:0 0 auto;padding:9px 10px;background:none;border:none;border-bottom:2px solid transparent;color:#A7A8AA;font-family:'Montserrat',sans-serif;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;cursor:pointer;transition:.15s;white-space:nowrap}
+.tbtn.on{color:#3CDBC0;border-bottom-color:#3CDBC0;font-weight:800}
+.tbtn:hover:not(.on){color:#c4d4e8}
+.tsep{align-self:center;color:rgba(255,255,255,.14);font-size:12px;user-select:none;flex-shrink:0}
+/* botões de registro — só ícone, texto só aparece no hover (padrão do mockup aprovado) */
+.icon3d{position:relative;display:flex;align-items:center;justify-content:center;width:32px;height:30px;flex-shrink:0;
+  background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);border-bottom:2px solid rgba(255,255,255,.15);
+  border-radius:7px;color:#a8b5cc;cursor:pointer;transition:.15s;
+  box-shadow:0 1px 0 rgba(255,255,255,.06) inset,0 2px 6px -2px rgba(0,0,0,.4)}
+.icon3d:hover{border-color:rgba(60,219,192,.4);color:#3CDBC0}
+.icon3d:active{transform:translateY(1px);border-bottom-width:1px}
+.icon3d.accent{background:rgba(60,219,192,.15);border-color:rgba(60,219,192,.4);color:#3CDBC0}
+.icon3d.danger{color:#f87171}
+.icon3d.danger:hover{border-color:rgba(248,113,113,.4);color:#f87171}
+.icon3d[data-tip]::after{content:attr(data-tip);position:absolute;bottom:calc(100% + 7px);left:50%;transform:translateX(-50%);
+  background:#0d0d15;color:#fff;font-size:10px;font-weight:600;padding:4px 9px;border-radius:5px;white-space:nowrap;
+  opacity:0;pointer-events:none;transition:opacity .12s;box-shadow:0 4px 10px rgba(0,0,0,.4);z-index:20}
+.icon3d:hover[data-tip]::after{opacity:1}
 .pscroll{overflow-y:auto;padding:8px;display:flex;flex-direction:column;gap:6px;flex:1;min-height:0}
 .sec{border:1px solid rgba(255,255,255,.09);overflow:hidden;background:#1a1b27;border-radius:10px}
 .sec.hl{border-color:rgba(60,219,192,.5)}
@@ -3582,6 +3597,67 @@ Resultado: pF R$ ${cc.pF?.toFixed(2)||"—"} | ML ${cc.margPct?.toFixed(2)||"—
   );
 }
 
+// ── Ícones monocromáticos (toggle Assistente/Calculadora + registros) ──────────
+const IcoRobo=()=>(
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="5" y="8" width="14" height="10" rx="2"/><path d="M9 8V5a3 3 0 0 1 6 0v3"/>
+    <circle cx="9" cy="13" r=".6" fill="currentColor"/><circle cx="15" cy="13" r=".6" fill="currentColor"/>
+    <path d="M9 16.5h6"/><path d="M3 12h2"/><path d="M19 12h2"/>
+  </svg>
+);
+const IcoCalc=()=>(
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="5" y="2" width="14" height="20" rx="2"/><line x1="8" y1="6.5" x2="16" y2="6.5"/>
+    <circle cx="8" cy="11" r=".6" fill="currentColor"/><circle cx="12" cy="11" r=".6" fill="currentColor"/><circle cx="16" cy="11" r=".6" fill="currentColor"/>
+    <circle cx="8" cy="15" r=".6" fill="currentColor"/><circle cx="12" cy="15" r=".6" fill="currentColor"/><circle cx="16" cy="15" r=".6" fill="currentColor"/>
+    <circle cx="8" cy="19" r=".6" fill="currentColor"/><circle cx="12" cy="19" r=".6" fill="currentColor"/><circle cx="16" cy="19" r=".6" fill="currentColor"/>
+  </svg>
+);
+const IcoSalvar=()=>(
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z"/><path d="M17 21v-8H7v8"/><path d="M7 3v5h8"/>
+  </svg>
+);
+const IcoCarregar=()=>(
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.9 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/>
+  </svg>
+);
+const IcoNovo=()=>(
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 5v14M5 12h14"/>
+  </svg>
+);
+
+// Toggle único Assistente ⇄ Calculadora Detalhada — ícones monocromáticos, canto superior direito do header
+function ViewToggle({viewMode,setViewMode}){
+  return(
+    <div style={{display:"flex",gap:2,background:"rgba(255,255,255,.06)",border:"1px solid rgba(255,255,255,.14)",borderRadius:8,padding:3}}>
+      <button className="icon3d" data-tip="Assistente" aria-label="Assistente" aria-pressed={viewMode==="agent"}
+        onClick={()=>setViewMode("agent")}
+        style={{width:30,height:26,border:"none",boxShadow:"none",background:viewMode==="agent"?"#3CDBC0":"none",color:viewMode==="agent"?"#0d0d15":"#a8b5cc"}}>
+        <IcoRobo/>
+      </button>
+      <button className="icon3d" data-tip="Calculadora Detalhada" aria-label="Calculadora Detalhada" aria-pressed={viewMode==="manual"}
+        onClick={()=>setViewMode("manual")}
+        style={{width:30,height:26,border:"none",boxShadow:"none",background:viewMode==="manual"?"#3CDBC0":"none",color:viewMode==="manual"?"#0d0d15":"#a8b5cc"}}>
+        <IcoCalc/>
+      </button>
+    </div>
+  );
+}
+
+// Botões de registro — só ícone, texto aparece só no hover
+function RegistrosBtns({onNovo,onRegistros}){
+  return(
+    <div style={{display:"flex",gap:6}}>
+      <button className="icon3d danger" data-tip="Nova precificação" aria-label="Nova precificação" onClick={onNovo}><IcoNovo/></button>
+      <button className="icon3d" data-tip="Carregar registro" aria-label="Carregar registro" onClick={onRegistros}><IcoCarregar/></button>
+      <button className="icon3d accent" data-tip="Salvar registro" aria-label="Salvar registro" onClick={onRegistros}><IcoSalvar/></button>
+    </div>
+  );
+}
+
 // ── APP ────────────────────────────────────────────────────────────────────────
 function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=null, onCalcsChange=null}){
   const [d,setD]=useState(()=>({...DEF}));
@@ -4191,22 +4267,14 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
             </span>
           )}
           <div style={{flex:1}}/>
-          <button onClick={()=>{setD({...DEF});setCalcs({...CALC_DEF});setTab("perfil");if(onRenomear)onRenomear("Nova Precificação");}}
-            style={{padding:"4px 10px",background:"rgba(220,38,38,.15)",border:"1px solid rgba(220,38,38,.35)",color:"#f87171",fontFamily:"'Montserrat',sans-serif",fontSize:11,fontWeight:700,letterSpacing:.5,cursor:"pointer",borderRadius:20}}>
-            Novo
-          </button>
-          <button onClick={()=>setModal("registros")}
-            style={{padding:"4px 10px",background:"rgba(60,219,192,.2)",border:"1px solid rgba(60,219,192,.45)",color:"#3CDBC0",fontFamily:"'Montserrat',sans-serif",fontSize:11,fontWeight:700,letterSpacing:.5,cursor:"pointer",borderRadius:20}}>
-            Salvar/Carregar
-          </button>
+          <RegistrosBtns
+            onNovo={()=>{setD({...DEF});setCalcs({...CALC_DEF});setTab("perfil");if(onRenomear)onRenomear("Nova Precificação");}}
+            onRegistros={()=>setModal("registros")}/>
           {isAdmin&&<button onClick={()=>setModal("gestao")}
             style={{padding:"4px 12px",background:"rgba(5,150,105,.15)",border:"1px solid rgba(5,150,105,.4)",color:"#34d399",fontFamily:"'Montserrat',sans-serif",fontSize:11,fontWeight:700,letterSpacing:.5,cursor:"pointer",borderRadius:20}}>
             👥 Gestão de Usuários
           </button>}
-          <button onClick={()=>setViewMode("manual")}
-            style={{padding:"5px 14px",background:"rgba(96,165,250,.15)",border:"1px solid rgba(96,165,250,.4)",color:"#60a5fa",fontFamily:"'Montserrat',sans-serif",fontSize:11,fontWeight:700,letterSpacing:.5,cursor:"pointer",borderRadius:20}}>
-            🧮 Calculadora Detalhada
-          </button>
+          <ViewToggle viewMode={viewMode} setViewMode={setViewMode}/>
         </div>
 
         <div style={{flex:1,minHeight:0,display:"flex",overflow:"hidden"}}>
@@ -4283,33 +4351,14 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
           <input type="number" step="0.01" value={d.ptaxPreco||d.ptax} onChange={e=>S("ptaxPreco")(parseFloat(e.target.value)||0)}
             style={{background:"none",border:"none",outline:"none",fontFamily:"'Montserrat',sans-serif",fontSize:12,fontWeight:700,color:"#60a5fa",width:52,textAlign:"right"}}/>
         </div>
-        {/* Registros — Novo / Salvar / Carregar */}
-        <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
-          <span style={{fontSize:8,fontWeight:700,color:"#5a6a84",letterSpacing:.8,textTransform:"uppercase"}}>Registros</span>
-          <div style={{display:"flex",gap:4}}>
-            <button onClick={()=>{setD({...DEF});setCalcs({...CALC_DEF});setTab("perfil");setIiStatus(null);if(onRenomear)onRenomear("Nova Precificação");}}
-              style={{padding:"4px 10px",background:"rgba(220,38,38,.15)",border:"1px solid rgba(220,38,38,.35)",color:"#f87171",fontFamily:"'Montserrat',sans-serif",fontSize:11,fontWeight:700,letterSpacing:.5,cursor:"pointer",borderRadius:20}}>
-              Novo
-            </button>
-            <button onClick={()=>setModal("registros")}
-              style={{padding:"4px 10px",background:"rgba(60,219,192,.2)",border:"1px solid rgba(60,219,192,.45)",color:"#3CDBC0",fontFamily:"'Montserrat',sans-serif",fontSize:11,fontWeight:700,letterSpacing:.5,cursor:"pointer",borderRadius:20}}>
-              Salvar
-            </button>
-            <button onClick={()=>setModal("registros")}
-              style={{padding:"4px 10px",background:"rgba(255,255,255,.05)",border:"1px solid rgba(255,255,255,.15)",color:"#a8b5cc",fontFamily:"'Montserrat',sans-serif",fontSize:11,fontWeight:700,letterSpacing:.5,cursor:"pointer",borderRadius:20}}>
-              Carregar
-            </button>
-          </div>
-        </div>
+        <RegistrosBtns
+          onNovo={()=>{setD({...DEF});setCalcs({...CALC_DEF});setTab("perfil");setIiStatus(null);if(onRenomear)onRenomear("Nova Precificação");}}
+          onRegistros={()=>setModal("registros")}/>
         {isAdmin&&<button onClick={()=>setModal("gestao")}
           style={{padding:"4px 12px",background:"rgba(5,150,105,.15)",border:"1px solid rgba(5,150,105,.4)",color:"#34d399",fontFamily:"'Montserrat',sans-serif",fontSize:11,fontWeight:700,letterSpacing:.5,cursor:"pointer",borderRadius:20,display:"flex",alignItems:"center",gap:5}}>
           👥 Gestão de Usuários
         </button>}
-        <button onClick={()=>setViewMode("agent")}
-          title="Voltar para a tela do assistente (o histórico do chat é preservado)"
-          style={{padding:"4px 12px",background:"rgba(60,219,192,.15)",border:"1px solid rgba(60,219,192,.4)",color:"#3CDBC0",fontFamily:"'Montserrat',sans-serif",fontSize:11,fontWeight:700,letterSpacing:.5,cursor:"pointer",borderRadius:20}}>
-          🤖 Voltar ao Assistente
-        </button>
+        <ViewToggle viewMode={viewMode} setViewMode={setViewMode}/>
       </div>
 
       <div className="layout">
@@ -4357,7 +4406,10 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
         <main className="pright">
           <div className="form-topbar">
             <nav className="tnav" style={{flex:1,background:"transparent",borderBottom:"none"}}>
-              {TABS.map((t,i)=><button key={t} className={`tbtn ${tab===t?"on":""}`} onClick={()=>setTab(t)}>{TLBL[i]}</button>)}
+              {TABS.flatMap((t,i)=>[
+                i>0&&<span key={t+"-sep"} className="tsep">|</span>,
+                <button key={t} className={`tbtn ${tab===t?"on":""}`} onClick={()=>setTab(t)}>{TLBL[i]}</button>,
+              ])}
             </nav>
             <div style={{display:"flex",alignItems:"center",gap:6,padding:"0 12px",flexShrink:0}}>
               <span style={{fontSize:10,fontWeight:700,color:"#5a6a84",letterSpacing:".4px",textTransform:"uppercase"}}>Moeda</span>
@@ -5254,7 +5306,8 @@ function CadastroProdutos({user}){
   const filtrados=produtos.filter(p=>{
     if(categFiltro&&!p.id.startsWith(categFiltro))return false;
     if(!busca)return true;
-    return p.nome.toLowerCase().includes(busca.toLowerCase())||p.ncm.includes(busca)||p.id.toLowerCase().includes(busca.toLowerCase());
+    const q=busca.toLowerCase();
+    return p.nome.toLowerCase().includes(q)||p.ncm.includes(busca)||p.id.toLowerCase().includes(q)||(p.sku||"").toLowerCase().includes(q);
   });
 
   // categorias que têm pelo menos um produto cadastrado
@@ -5350,7 +5403,7 @@ function CadastroProdutos({user}){
       {msg&&<div className={`auth-msg ${msg.t}`} style={{marginBottom:16}}>{msg.txt}</div>}
 
       <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:20,flexWrap:"wrap"}}>
-        <input className="tbl-search" placeholder="Buscar por nome, NCM ou ID..." value={busca} onChange={e=>setBusca(e.target.value)} style={{flex:1,minWidth:200}}/>
+        <input className="tbl-search" placeholder="Buscar por nome, NCM, ID ou SKU..." value={busca} onChange={e=>setBusca(e.target.value)} style={{flex:1,minWidth:200}}/>
         {selecionados.size>0&&(
           <button onClick={abrirBulk}
             style={{padding:"9px 18px",background:"rgba(60,219,192,.2)",border:"1px solid rgba(60,219,192,.4)",color:"#3CDBC0",fontSize:12,fontWeight:700,cursor:"pointer",borderRadius:4,whiteSpace:"nowrap"}}>
@@ -6000,18 +6053,16 @@ function MultiTab({ user }) {
         background: "#0f1520", borderBottom: "1px solid rgba(255,255,255,.08)",
         padding: "0 8px", overflowX: "auto", flexShrink: 0, minHeight: 38,
       }}>
-        {abas.map((aba, idx) => {
+        {abas.flatMap((aba, idx) => {
           const sel = selecionadas.has(aba.id);
           const podeSelecionar = sel || selecionadas.size < 3;
-          return (
+          const tabEl = (
           <div key={aba.id}
             onClick={() => setAbaAtiva(idx)}
             style={{
               display: "flex", alignItems: "center", gap: 6,
               padding: "0 10px", cursor: "pointer", position: "relative",
-              borderRight: "1px solid rgba(255,255,255,.06)",
               borderBottom: idx === abaAtiva ? "2px solid #3CDBC0" : "2px solid transparent",
-              background: idx === abaAtiva ? "#1e2a3d" : "transparent",
               minWidth: 120, maxWidth: 200, flexShrink: 0, transition: ".15s",
             }}>
             {/* Checkbox de seleção para comparar */}
@@ -6047,6 +6098,7 @@ function MultiTab({ user }) {
             )}
           </div>
           );
+          return idx > 0 ? [<span key={aba.id+"-sep"} className="tsep">|</span>, tabEl] : [tabEl];
         })}
         <button onClick={addAba}
           style={{ background: "none", border: "none", cursor: "pointer", color: "#5a6a84", fontSize: 18, padding: "0 12px", flexShrink: 0, transition: ".15s" }}
