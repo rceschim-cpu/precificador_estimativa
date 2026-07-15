@@ -2840,7 +2840,9 @@ REGRAS OBRIGATÓRIAS:
 - ⚠️ NUNCA ASSUMA valores que só o usuário sabe — em especial UF de destino, canal/cliente e prazo de pagamento. Se o usuário não informou, use perguntar_usuario (interativo, com opções) em vez de adivinhar ou perguntar em texto livre solto. Nunca assuma São Paulo (ou qualquer UF) como destino por padrão.
 - ⚠️ SEMPRE chame calcular_cf_venda com o prazo de pagamento do cliente antes de get_resultado (pergunte o prazo via perguntar_usuario se não foi dito — opções: 'À vista','30 dias','60 dias','90 dias'). Sem isso, a MC fica igual à ML, o que é sempre incorreto quando há prazo de pagamento.
 - ⚠️ MC ≠ ML: MC = ML + Custo Fixo. Se o usuário pedir para ajustar/atingir uma MC específica, use set_mc_alvo (nunca calcule a ML equivalente de cabeça — é fácil errar essa subtração).
-- ⚠️ NUNCA invente ou "arredonde" um resultado. Depois de QUALQUER alteração (preço, margem, índices), chame get_resultado e relate exatamente o que ele retornou — nunca diga que algo foi ajustado para um valor específico sem confirmar via get_resultado. Se o resultado real não bater com o que você esperava, NÃO invente desculpas (ex: "aguardando sincronização") — ajuste os parâmetros de novo e confira até bater, ou informe o valor real ao usuário.
+- ⚠️ PREÇO FIXO: se o usuário pedir um preço de venda específico ("quero vender a USD 106", "fixa em R$ 542,72"), use set_preco_alvo — NUNCA tente adivinhar/iterar uma margem chamando set_margem várias vezes, e NUNCA calcule na mão "quanto ficaria a margem com esse preço". A calculadora já tem esse modo pronto.
+- ⚠️⚠️ PROIBIDO CALCULAR NA MÃO: você NUNCA deve somar/subtrair/multiplicar índices, custos ou preços para chegar num resultado de precificação — nem em texto explicativo, nem no resultado final. TODA tool de alteração (set_margem, set_mc_alvo, set_preco_alvo, set_custo, set_indices, set_canal, aplicar_indices_completo, calcular_cf_venda) já devolve um campo resultado_real com pF/ml/mc REAIS recalculados pela calculadora — use SOMENTE esses números na sua resposta. Se por algum motivo uma tool não devolver resultado_real, chame get_resultado antes de responder. Nunca diga "ficaria aproximadamente X%" baseado em conta própria.
+- ⚠️ NUNCA invente ou "arredonde" um resultado, nem invente desculpas (ex: "aguardando sincronização") se um valor não bater com o esperado — sempre relate o resultado_real/get_resultado tal como veio, mesmo que pareça estranho.
 - APRENDIZADO: se o usuário CORRIGIR um número ("o frete da Stone é 0,9%", "o dólar certo é 5,60"), use salvar_ajuste_indice (pergunte antes, via perguntar_usuario, se vale só para este SKU, para o canal ou global). Se o usuário der uma INSTRUÇÃO permanente ("Stone sempre 45 dias", "PosiSeg não tem rebate"), use salvar_regra. Sempre confirme o que foi salvo. Siga SEMPRE as REGRAS APRENDIDAS listadas no contexto.
 - Formato de valores monetários: R$ com 2 casas decimais.
 - Seja direto. Confirme o que foi preenchido em uma linha.
@@ -2884,8 +2886,13 @@ const CALC_TOOLS = [
     parameters:{ type:"object", properties:{ uf:{type:"string",description:"Sigla do estado (ex: SP, RJ, MG)"} }, required:["uf"] } } },
   { type:"function", function:{ name:"set_margem", description:"Define margem líquida alvo (ML%). Use quando o usuário pedir uma ML específica. Se o usuário pedir uma MC (Margem de Contribuição) específica, use set_mc_alvo em vez desta — MC ≠ ML, não faça a conta de cabeça.",
     parameters:{ type:"object", properties:{ margem:{type:"number",description:"Percentual de margem líquida"} }, required:["margem"] } } },
-  { type:"function", function:{ name:"set_mc_alvo", description:"Define a Margem de Contribuição (MC) alvo — use quando o usuário pedir para atingir/ajustar uma MC específica (ex: 'aumenta o preço pra 10% de MC'). NUNCA calcule a ML equivalente de cabeça (MC = ML + Custo Fixo, uma subtração fácil de errar) — esta ferramenta faz o cálculo exato. Depois de chamar, SEMPRE confira com get_resultado antes de informar o resultado ao usuário.",
+  { type:"function", function:{ name:"set_mc_alvo", description:"Define a Margem de Contribuição (MC) alvo — use quando o usuário pedir para atingir/ajustar uma MC específica (ex: 'aumenta o preço pra 10% de MC'). NUNCA calcule a ML equivalente de cabeça (MC = ML + Custo Fixo, uma subtração fácil de errar) — esta ferramenta faz o cálculo exato e já devolve o resultado_real na resposta. Use SEMPRE os números de resultado_real na sua resposta ao usuário, nunca calcule por conta própria.",
     parameters:{ type:"object", properties:{ mc_pct:{type:"number",description:"Percentual de MC desejado"} }, required:["mc_pct"] } } },
+  { type:"function", function:{ name:"set_preco_alvo", description:"⚠️ USE ESTA FERRAMENTA sempre que o usuário pedir um PREÇO DE VENDA FIXO (em R$ ou USD) em vez de uma margem alvo — ex: 'quero vender a USD 106', 'fixa o preço em R$ 542,72'. A calculadora RESOLVE isso sozinha e devolve a ML/MC resultantes exatas em resultado_real — NUNCA calcule manualmente 'quanto ficaria a margem com esse preço', nunca faça busca binária chamando set_margem repetidas vezes. Esta é a ÚNICA forma correta de fixar preço. Se moeda='USD', a conversão usa o Dólar de Preço (ptaxPreco), não o Dólar de Custo.",
+    parameters:{ type:"object", properties:{
+      preco:{type:"number",description:"Valor do preço de venda desejado"},
+      moeda:{type:"string",enum:["BRL","USD"],description:"Moeda do valor informado. USD converte usando o Dólar de Preço do produto/categoria."},
+    }, required:["preco","moeda"] } } },
   { type:"function", function:{ name:"set_indices", description:"Sobrescreve índices comerciais específicos",
     parameters:{ type:"object", properties:{ rebate:{type:"number"}, mkt:{type:"number"}, frete:{type:"number"}, vpc:{type:"number"}, pdd:{type:"number"}, comis:{type:"number"} } } } },
   { type:"function", function:{ name:"get_resultado", description:"Retorna o preço calculado atual (pF, ML%, MC%, markup). Chamar sempre ao final.",
@@ -3019,6 +3026,13 @@ function ChatPanel({ d, setD, c, produtosDB, onClose, onPrecificando, embedded=f
   const cRef = useRef(c); cRef.current = c;
   // Espera o React re-renderizar e recalcular `c` após um setD (2 frames + margem)
   const aguardarRecalculo = () => new Promise(res => setTimeout(res, 120));
+  // Lê o resultado REAL após um setD — toda tool de alteração deve devolver isso na resposta,
+  // nunca deixar o modelo calcular/estimar por conta própria (raiz de confabulação observada).
+  const lerResultadoReal = async () => {
+    await aguardarRecalculo();
+    const cc = cRef.current;
+    return { pF: +(cc.pF||0).toFixed(2), ml: +(cc.margPct||0).toFixed(2), mc: +(cc.mc||0).toFixed(2), markup: +(cc.mkp||0).toFixed(3) };
+  };
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -3061,7 +3075,7 @@ Resultado: pF R$ ${cc.pF?.toFixed(2)||"—"} | ML ${cc.margPct?.toFixed(2)||"—
     if (name === "set_origem_modalidade") {
       notifyFill();
       setD(p => ({...p, origem: inp.origem, modalidade: inp.modalidade}));
-      return { ok:true, msg:`${inp.origem} / ${inp.modalidade}` };
+      return { ok:true, msg:`${inp.origem} / ${inp.modalidade}`, resultado_real: await lerResultadoReal() };
     }
     if (name === "set_canal") {
       notifyFill();
@@ -3069,7 +3083,7 @@ Resultado: pF R$ ${cc.pF?.toFixed(2)||"—"} | ML ${cc.margPct?.toFixed(2)||"—
       if (!canal?.default) return { ok:false, msg:"Canal não encontrado" };
       const rates = getCanalRates(inp.canal_id, "");
       setD(p => ({...p, canalId:canal.id, comis:rates.comis, mkt:rates.mkt, rebate:rates.rebate, pdd:rates.pdd, vpc:rates.vpc, custoFin:rates.custoFin||0, custoFixoCan:rates.custoFixoCan||0, pedCan:rates.pedCan||0, scrapCan:rates.scrapCan||0}));
-      return { ok:true, msg:`Canal: ${canal.label}` };
+      return { ok:true, msg:`Canal: ${canal.label}`, resultado_real: await lerResultadoReal() };
     }
     if (name === "set_custo") {
       notifyFill();
@@ -3085,17 +3099,33 @@ Resultado: pF R$ ${cc.pF?.toFixed(2)||"—"} | ML ${cc.margPct?.toFixed(2)||"—
       }
       if (inp.producao !== undefined) upd.producao = inp.producao;
       setD(p => ({...p, ...upd}));
-      return { ok:true, msg:"VPL atualizado (modo manual, FOB não é necessário)", vpl_brl: upd.vplManual };
+      return { ok:true, msg:"VPL atualizado (modo manual, FOB não é necessário)", vpl_brl: upd.vplManual, resultado_real: await lerResultadoReal() };
     }
     if (name === "set_uf_destino") {
       notifyFill();
       setD(p => ({...p, ufDestino: inp.uf.toUpperCase()}));
-      return { ok:true, msg:`UF: ${inp.uf.toUpperCase()}` };
+      return { ok:true, msg:`UF: ${inp.uf.toUpperCase()}`, resultado_real: await lerResultadoReal() };
+    }
+    if (name === "set_preco_alvo") {
+      notifyFill();
+      // Modo "preço fixo → margem resultante". Usa o mecanismo JÁ EXISTENTE na calculadora
+      // (modoCalc="margem" + precoSugerido, o mesmo do campo "Preço sugerido" da tela manual)
+      // — nunca faça essa conta na mão, a calculadora já resolve isso.
+      const dolarPreco = dRef.current.ptaxPreco || dRef.current.ptax || 0;
+      const precoBRL = inp.moeda === "USD" ? +(inp.preco * dolarPreco).toFixed(2) : +inp.preco.toFixed(2);
+      setD(p => ({...p, modoCalc:"margem", precoSugerido: precoBRL}));
+      await aguardarRecalculo();
+      const cc = cRef.current;
+      const mcReal = cc.mcSugerida ?? cc.mc;
+      const mlReal = cc.margemSugerida ?? cc.margPct;
+      return { ok:true, preco_fixado_brl: precoBRL, dolar_preco_usado: inp.moeda==="USD"?dolarPreco:undefined,
+        resultado_real: { pF: +precoBRL.toFixed(2), ml: +(mlReal||0).toFixed(2), mc: +(mcReal||0).toFixed(2) },
+        msg:`Preço fixado em R$ ${precoBRL.toFixed(2)}${inp.moeda==="USD"?` (USD ${inp.preco} × ${dolarPreco})`:""}. Resultado REAL: ML ${(mlReal||0).toFixed(2)}%, MC ${(mcReal||0).toFixed(2)}% — use ESTES números na resposta, não calcule de novo.` };
     }
     if (name === "set_margem") {
       notifyFill();
-      setD(p => ({...p, margem: inp.margem}));
-      return { ok:true, msg:`ML: ${inp.margem}%` };
+      setD(p => ({...p, margem: inp.margem, modoCalc:"preco", precoSugerido:0})); // sai do modo preço-fixo se estava nele
+      return { ok:true, msg:`ML: ${inp.margem}%`, resultado_real: await lerResultadoReal() };
     }
     if (name === "set_mc_alvo") {
       notifyFill();
@@ -3105,19 +3135,18 @@ Resultado: pF R$ ${cc.pF?.toFixed(2)||"—"} | ML ${cc.margPct?.toFixed(2)||"—
       const cfixoEf = cRef.current.cfixoEf || 0;
       const mgAtiva = dRef.current.margGerAtivo ? (cRef.current.margGerPct || 0) : 0;
       const margemNecessaria = +(inp.mc_pct - cfixoEf - mgAtiva).toFixed(2);
-      setD(p => ({...p, margem: margemNecessaria}));
-      await aguardarRecalculo();
-      const cc = cRef.current;
+      setD(p => ({...p, margem: margemNecessaria, modoCalc:"preco", precoSugerido:0})); // sai do modo preço-fixo se estava nele
+      const cc = await lerResultadoReal();
       return { ok:true, mc_alvo: inp.mc_pct, custo_fixo_pct: cfixoEf, ml_calculada: margemNecessaria,
-        resultado_real: { pF: cc.pF, ml: cc.margPct, mc: cc.mc },
-        msg:`ML ajustada para ${margemNecessaria}% (MC ${inp.mc_pct}% − Custo Fixo ${cfixoEf}%). Resultado REAL recalculado: pF R$ ${cc.pF?.toFixed(2)}, ML ${cc.margPct?.toFixed(2)}%, MC ${cc.mc?.toFixed(2)}% — use ESTES números na resposta.` };
+        resultado_real: cc,
+        msg:`ML ajustada para ${margemNecessaria}% (MC ${inp.mc_pct}% − Custo Fixo ${cfixoEf}%). Resultado REAL recalculado: pF R$ ${cc.pF}, ML ${cc.ml}%, MC ${cc.mc}% — use ESTES números na resposta.` };
     }
     if (name === "set_indices") {
       notifyFill();
       const upd = {};
       ["rebate","mkt","frete","vpc","pdd","comis"].forEach(k => { if (inp[k] !== undefined) upd[k] = inp[k]; });
       setD(p => ({...p, ...upd}));
-      return { ok:true, msg:"Índices atualizados" };
+      return { ok:true, msg:"Índices atualizados", resultado_real: await lerResultadoReal() };
     }
     if (name === "aplicar_indices_completo") {
       notifyFill();
@@ -3139,6 +3168,7 @@ Resultado: pF R$ ${cc.pF?.toFixed(2)||"—"} | ML ${cc.margPct?.toFixed(2)||"—
       if (inp.margem !== undefined) upd.margem = +parseFloat(inp.margem).toFixed(2);
       setD(p => ({...p, ...upd}));
       return { ok:true, aplicado_de:`canal ${rec.canal_sap}/${rec.planta} (${rec.clientes})`, campos: upd,
+        resultado_real: await lerResultadoReal(),
         msg:`Índices aplicados: rebate ${rec.rebate}%, mkt ${rec.mkt}%, frete ${rec.frete}%, custo financeiro ${rec.zv09_custoFin}%, custo fixo ${rec.zv11_cfixoCan}%, P&D ${rec.pd}%, scrap ${rec.scrap ?? 0}%` };
     }
     if (name === "calcular_cf_venda") {
@@ -3147,7 +3177,8 @@ Resultado: pF R$ ${cc.pF?.toFixed(2)||"—"} | ML ${cc.margPct?.toFixed(2)||"—
       const taxa = inp.taxa_pct !== undefined ? inp.taxa_pct : 1.14;
       const cfPct = (Math.pow(1 + taxa/100/30, prazo+10) - 1) * 100;
       setD(p => ({...p, cfVenda: +cfPct.toFixed(3)}));
-      return { ok:true, cf_venda_pct: +cfPct.toFixed(3), msg:`CF Venda aplicado: ${cfPct.toFixed(2)}% (prazo ${prazo}d, taxa ${taxa}% a.m.) — MC agora reflete esse custo` };
+      return { ok:true, cf_venda_pct: +cfPct.toFixed(3), resultado_real: await lerResultadoReal(),
+        msg:`CF Venda aplicado: ${cfPct.toFixed(2)}% (prazo ${prazo}d, taxa ${taxa}% a.m.) — MC agora reflete esse custo` };
     }
     if (name === "salvar_ajuste_indice") {
       try {
