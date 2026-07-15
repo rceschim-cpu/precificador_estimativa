@@ -280,7 +280,12 @@ input,select,textarea,button{font-family:inherit}
 .stat-card.red .stat-val{color:#f87171}
 
 /* ── TABLE ── */
-.tbl-wrap{background:var(--card);border:1px solid var(--border);overflow:hidden;border-radius:12px}
+.tbl-wrap{background:var(--card);border:1px solid var(--border);border-radius:12px;overflow-x:auto}
+.tbl-wrap table{min-width:920px}
+.tbl-wrap td,.tbl-wrap th{padding:10px 12px;white-space:nowrap}
+.tbl-wrap td.td-nome{white-space:normal;min-width:180px;max-width:280px}
+.tbl-wrap td:last-child,.tbl-wrap th:last-child{position:sticky;right:0;background:var(--card);box-shadow:-8px 0 12px -8px rgba(0,0,0,.5)}
+.tbl-wrap tr:hover td:last-child{background:#1e2230}
 .tbl-head{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px}
 .tbl-head-title{font-family:'Montserrat',sans-serif;font-size:14px;font-weight:700;color:#fff}
 .tbl-search{background:rgba(255,255,255,.05);border:1px solid var(--border);color:var(--text);padding:7px 12px;font-size:13px;outline:none;min-width:200px;transition:.15s;border-radius:6px}
@@ -2836,6 +2841,7 @@ REGRAS OBRIGATÓRIAS:
 - ⚠️ SEMPRE chame calcular_cf_venda com o prazo de pagamento do cliente antes de get_resultado (pergunte o prazo via perguntar_usuario se não foi dito — opções: 'À vista','30 dias','60 dias','90 dias'). Sem isso, a MC fica igual à ML, o que é sempre incorreto quando há prazo de pagamento.
 - ⚠️ MC ≠ ML: MC = ML + Custo Fixo. Se o usuário pedir para ajustar/atingir uma MC específica, use set_mc_alvo (nunca calcule a ML equivalente de cabeça — é fácil errar essa subtração).
 - ⚠️ NUNCA invente ou "arredonde" um resultado. Depois de QUALQUER alteração (preço, margem, índices), chame get_resultado e relate exatamente o que ele retornou — nunca diga que algo foi ajustado para um valor específico sem confirmar via get_resultado. Se o resultado real não bater com o que você esperava, NÃO invente desculpas (ex: "aguardando sincronização") — ajuste os parâmetros de novo e confira até bater, ou informe o valor real ao usuário.
+- APRENDIZADO: se o usuário CORRIGIR um número ("o frete da Stone é 0,9%", "o dólar certo é 5,60"), use salvar_ajuste_indice (pergunte antes, via perguntar_usuario, se vale só para este SKU, para o canal ou global). Se o usuário der uma INSTRUÇÃO permanente ("Stone sempre 45 dias", "PosiSeg não tem rebate"), use salvar_regra. Sempre confirme o que foi salvo. Siga SEMPRE as REGRAS APRENDIDAS listadas no contexto.
 - Formato de valores monetários: R$ com 2 casas decimais.
 - Seja direto. Confirme o que foi preenchido em uma linha.
 
@@ -2910,6 +2916,19 @@ const CALC_TOOLS = [
       prazo_dias:{type:"number",description:"Prazo de pagamento em dias (0 se à vista)"},
       taxa_pct:{type:"number",description:"Taxa financeira mensal % (padrão 1,14% a.m. se não informado)"},
     }, required:["prazo_dias"] } } },
+  { type:"function", function:{ name:"salvar_ajuste_indice", description:"Grava PERMANENTEMENTE uma correção de índice/valor que o usuário informou (ex: 'o frete da Stone na verdade é 0,9%'). O valor corrigido passa a sobrescrever automaticamente o histórico em TODAS as consultas futuras (de todos os usuários). Use SEMPRE que o usuário corrigir um número — e confirme o que foi salvo. Antes de salvar, confirme com o usuário via perguntar_usuario se o ajuste vale só para este SKU, para o canal todo, ou global.",
+    parameters:{ type:"object", properties:{
+      campo:{type:"string",enum:["rebate","mkt","frete","zv09","zv11","pd","scrap","comis","custo_usd","taxa_dolar"],description:"Qual índice/valor está sendo corrigido"},
+      valor:{type:"number",description:"O valor correto informado pelo usuário"},
+      sku:{type:"string",description:"SKU específico (omitir = vale para todos os SKUs)"},
+      canal_sap:{type:"string",description:"Canal SAP específico (omitir = vale para todos os canais)"},
+      motivo:{type:"string",description:"Breve justificativa dita pelo usuário"},
+    }, required:["campo","valor"] } } },
+  { type:"function", function:{ name:"salvar_regra", description:"Grava PERMANENTEMENTE uma regra/instrução de negócio que o usuário ensinou (ex: 'canal Stone sempre usa prazo 45 dias', 'PosiSeg nunca tem rebate'). A regra será relembrada em todas as conversas futuras de todos os usuários. Use quando o usuário der uma instrução que deve valer sempre — e confirme o que foi salvo.",
+    parameters:{ type:"object", properties:{
+      regra:{type:"string",description:"A regra em uma frase objetiva e autocontida"},
+      escopo:{type:"string",description:"Escopo curto, ex: 'global', 'canal:Stone', 'sku:3950394', 'categoria:pos'"},
+    }, required:["regra"] } } },
 ];
 
 // API da Anthropic direto (Messages API) usa outro formato de tool que o OpenAI-style
@@ -2971,7 +2990,7 @@ const renderChatMd = (text) => {
   return out;
 };
 
-function ChatPanel({ d, setD, c, produtosDB, onClose, onPrecificando, embedded=false, setProd }) {
+function ChatPanel({ d, setD, c, produtosDB, onClose, onPrecificando, embedded=false, setProd, usuario }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -2982,7 +3001,16 @@ function ChatPanel({ d, setD, c, produtosDB, onClose, onPrecificando, embedded=f
   const ultimoResumoRef = useRef([]); // último resumo de query_indices_historico, para aplicar_indices_completo copiar direto (sem depender do modelo re-digitar números)
   const pendingToolResultsRef = useRef([]); // tool_results já resolvidos do turno atual, aguardando as perguntas pendentes serem respondidas
   const pendingQueueRef = useRef([]); // fila de perguntar_usuario ainda não exibidas do batch atual
+  const regrasRef = useRef(null); // regras aprendidas (agente_regras) — null = ainda não carregadas
   const notifyFill = () => onPrecificando?.(true);
+
+  const carregarRegras = async () => {
+    if (regrasRef.current !== null) return;
+    try {
+      const rows = await sbFetch("agente_regras?ativo=eq.true&select=escopo,regra&order=criado_em.asc&limit=100");
+      regrasRef.current = Array.isArray(rows) ? rows : [];
+    } catch { regrasRef.current = []; } // tabela pode não existir ainda — segue sem regras
+  };
 
   // Refs de valor-mais-recente: o loop do agente é async e atravessa vários re-renders.
   // Sem isso, handleToolCall lê o `c`/`d` congelados do render em que o turno começou —
@@ -3009,7 +3037,8 @@ Canal: ${canal?.label || "nenhum"}
 Margem alvo (ML): ${dc.margem}%
 Custo Fixo (soma na MC, não editável diretamente): ${cc.cfixoEf?.toFixed(2)||0}%
 Índices: comis ${dc.comis}% mkt ${dc.mkt}% rebate ${dc.rebate}% pdd ${dc.pdd||2.5}% vpc ${dc.vpc||0}%
-Resultado: pF R$ ${cc.pF?.toFixed(2)||"—"} | ML ${cc.margPct?.toFixed(2)||"—"}% | MC ${cc.mc?.toFixed(2)||"—"}%`;
+Resultado: pF R$ ${cc.pF?.toFixed(2)||"—"} | ML ${cc.margPct?.toFixed(2)||"—"}% | MC ${cc.mc?.toFixed(2)||"—"}%${
+  (regrasRef.current||[]).length ? `\n\nREGRAS APRENDIDAS (ensinadas pelos usuários — siga SEMPRE):\n${regrasRef.current.map(r=>`- [${r.escopo}] ${r.regra}`).join("\n")}` : ""}`;
   };
 
   const handleToolCall = async (name, inp) => {
@@ -3120,6 +3149,26 @@ Resultado: pF R$ ${cc.pF?.toFixed(2)||"—"} | ML ${cc.margPct?.toFixed(2)||"—
       setD(p => ({...p, cfVenda: +cfPct.toFixed(3)}));
       return { ok:true, cf_venda_pct: +cfPct.toFixed(3), msg:`CF Venda aplicado: ${cfPct.toFixed(2)}% (prazo ${prazo}d, taxa ${taxa}% a.m.) — MC agora reflete esse custo` };
     }
+    if (name === "salvar_ajuste_indice") {
+      try {
+        await sbFetch("indices_ajustes", { method:"POST", body: JSON.stringify({
+          sku: inp.sku || null, canal_sap: inp.canal_sap || null,
+          campo: inp.campo, valor: inp.valor, motivo: inp.motivo || null,
+          criado_por: usuario || "agente",
+        }), prefer:"return=minimal" });
+        return { ok:true, msg:`Ajuste salvo: ${inp.campo} = ${inp.valor}${inp.sku?` (SKU ${inp.sku})`:""}${inp.canal_sap?` (canal ${inp.canal_sap})`:""} — será aplicado automaticamente em todas as consultas futuras.` };
+      } catch(e) { return { ok:false, error:String(e), msg:"Erro ao salvar ajuste — a tabela indices_ajustes existe no Supabase?" }; }
+    }
+    if (name === "salvar_regra") {
+      try {
+        await sbFetch("agente_regras", { method:"POST", body: JSON.stringify({
+          regra: inp.regra, escopo: inp.escopo || "global",
+          criado_por: usuario || "agente",
+        }), prefer:"return=minimal" });
+        regrasRef.current = null; // força recarregar as regras na próxima mensagem
+        return { ok:true, msg:`Regra salva (${inp.escopo||"global"}): "${inp.regra}" — será relembrada em todas as conversas futuras.` };
+      } catch(e) { return { ok:false, error:String(e), msg:"Erro ao salvar regra — a tabela agente_regras existe no Supabase?" }; }
+    }
     if (name === "get_resultado") {
       await aguardarRecalculo(); // espera o React recalcular após setD's anteriores do turno
       const cc = cRef.current;
@@ -3135,7 +3184,18 @@ Resultado: pF R$ ${cc.pF?.toFixed(2)||"—"} | ML ${cc.margPct?.toFixed(2)||"—
           `precificacao_custos?sku=eq.${sku}${fPlanta}&select=planta,data_ref,volume,preco_medio,custo_usd_unit,taxa_dolar,custo_brl_unit,custo_transf_unit,ggf_unit,cmv_unit,garantia_pct,backup_pct,st_pct,difal_pct,icms_pct,ipi_pct,pis_pct,cofins_pct,cred_presum_pct,fti_pct,mc_pct,ml_pct,fonte&order=data_ref.desc&limit=12`
         );
         if (!data?.length) return { found:false, msg:`Nenhum custo histórico para SKU ${sku}` };
-        return { found:true, sku, mais_recente:data[0], historico_12m:data,
+        const maisRecente = { ...data[0] };
+        let ajustesCusto = [];
+        try {
+          const aj = await sbFetch(`indices_ajustes?ativo=eq.true&or=(sku.eq.${sku},sku.is.null)&campo=in.(custo_usd,taxa_dolar)&select=sku,campo,valor,motivo&order=criado_em.asc`);
+          (aj||[]).sort((a,b)=>(a.sku?1:0)-(b.sku?1:0)).forEach(a => {
+            if (a.campo === "custo_usd") maisRecente.custo_usd_unit = +a.valor;
+            if (a.campo === "taxa_dolar") maisRecente.taxa_dolar = +a.valor;
+            ajustesCusto.push(`${a.campo}=${a.valor}${a.motivo?` (${a.motivo})`:""}`);
+          });
+        } catch { /* tabela pode não existir ainda */ }
+        return { found:true, sku, mais_recente:maisRecente, historico_12m:data,
+          ajustes_aplicados: ajustesCusto.length ? ajustesCusto : undefined,
           obs:"Valores unitários dos fechamentos mensais. Use mais_recente como referência e SEMPRE informe a fonte ao usuário." };
       } catch(e) { return { found:false, error:String(e) }; }
     }
@@ -3172,8 +3232,28 @@ Resultado: pF R$ ${cc.pF?.toFixed(2)||"—"} | ML ${cc.margPct?.toFixed(2)||"—
           pd:med(rs.map(r=>r.pd_pct)), scrap:med(rs.map(r=>r.scrap_pct)), mc_mediana:med(rs.map(r=>r.mc_pct)),
         }));
         resumo.sort((a,b)=>b.qtd-a.qtd);
+        // Aplica correções permanentes ensinadas pelos usuários (indices_ajustes)
+        // por cima das medianas históricas. Específico (com sku) vence genérico (sku null).
+        try {
+          const ajustes = await sbFetch(`indices_ajustes?ativo=eq.true&or=(sku.eq.${sku},sku.is.null)&select=sku,canal_sap,campo,valor,motivo&order=criado_em.asc`);
+          if (ajustes?.length) {
+            const campoMap = { rebate:"rebate", mkt:"mkt", frete:"frete", zv09:"zv09_custoFin", zv11:"zv11_cfixoCan", pd:"pd", scrap:"scrap" };
+            const ordenados = [...ajustes].sort((a,b)=>(a.sku?1:0)-(b.sku?1:0)); // genéricos primeiro, específicos por último (vencem)
+            resumo.forEach(r => {
+              ordenados.forEach(a => {
+                if (a.canal_sap && String(a.canal_sap)!==String(r.canal_sap)) return;
+                const k = campoMap[a.campo];
+                if (k && k in r) {
+                  r[k] = +a.valor;
+                  r.ajustes_aplicados = [...(r.ajustes_aplicados||[]), `${a.campo}=${a.valor}${a.motivo?` (${a.motivo})`:""}`];
+                }
+              });
+            });
+          }
+        } catch { /* tabela indices_ajustes pode não existir ainda */ }
         ultimoResumoRef.current = resumo;
-        return { found:true, sku, total_registros:data.length, por_canal:resumo };
+        return { found:true, sku, total_registros:data.length, por_canal:resumo,
+          obs: resumo.some(r=>r.ajustes_aplicados) ? "Alguns valores foram sobrescritos por correções salvas pelos usuários (campo ajustes_aplicados)." : undefined };
       } catch(e) { return { found:false, error:String(e) }; }
     }
     return { ok:false, msg:"Tool desconhecida" };
@@ -3242,6 +3322,7 @@ Resultado: pF R$ ${cc.pF?.toFixed(2)||"—"} | ML ${cc.margPct?.toFixed(2)||"—
     setMessages(prev => [...prev, { role:"user", content:userText }]);
     setLoading(true);
     try {
+      await carregarRegras();
       apiHistoryRef.current.push({ role:"user", content:userText });
       await runLoop();
     } catch(e) {
@@ -3367,7 +3448,6 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
   const [calcs,setCalcs]=useState(()=>({...CALC_DEF}));
   const [tab,setTab]=useState("perfil");
   const [modal,setModal]=useState(null);
-  const [chatOpen,setChatOpen]=useState(false);
   const [chatPrecificando,setChatPrecificando]=useState(false);
   const [viewMode,setViewMode]=useState("agent"); // "agent" (padrão) | "manual" (calculadora detalhada)
   const [produtosDB,setProdutosDB]=useState([]);
@@ -3959,8 +4039,8 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
       );
     })()}
 
-    {viewMode==="agent"&&(
-      <div className={`app${chatPrecificando?" agent-ativo":""}`} style={{display:"flex",flexDirection:"column",height:"100%",minHeight:0,overflow:"hidden"}}>
+    {/* Modo agente fica sempre MONTADO (display toggle) — preserva o histórico do chat ao alternar de vista */}
+    <div className={`app${chatPrecificando?" agent-ativo":""}`} style={{display:viewMode==="agent"?"flex":"none",flexDirection:"column",height:"100%",minHeight:0,overflow:"hidden"}}>
         <style>{CSS}</style>
         {/* Header — modo agente */}
         <div style={{display:"flex",alignItems:"center",gap:10,padding:"10px 16px",background:"#1e2a3d",borderBottom:"1px solid rgba(255,255,255,.07)",flexShrink:0,flexWrap:"wrap"}}>
@@ -4024,14 +4104,14 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
           </div>
 
           {/* Chat em evidência */}
-          <ChatPanel embedded d={d} setD={setD} c={c} produtosDB={produtosDB} setProd={setProd}
+          <ChatPanel embedded d={d} setD={setD} c={c} produtosDB={produtosDB} setProd={setProd} usuario={currentUser?.nome}
             onClose={()=>{}} onPrecificando={v=>setChatPrecificando(v)}/>
         </div>
       </div>
-    )}
 
-    {viewMode==="manual"&&(<>
-    <div className={`app${chatPrecificando?" agent-ativo":""}`} style={{transition:"margin-right .25s ease",marginRight:chatOpen?400:0}}>
+    {/* Modo manual também sempre montado (display toggle) */}
+    <div style={{display:viewMode==="manual"?"contents":"none"}}>
+    <div className={`app${chatPrecificando?" agent-ativo":""}`}>
     <style>{CSS}</style>
 
       {/* sub-header: badges de contexto + nome da aba + botões */}
@@ -4085,14 +4165,10 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
           style={{padding:"4px 12px",background:"rgba(5,150,105,.15)",border:"1px solid rgba(5,150,105,.4)",color:"#34d399",fontFamily:"'Montserrat',sans-serif",fontSize:11,fontWeight:700,letterSpacing:.5,cursor:"pointer",borderRadius:20,display:"flex",alignItems:"center",gap:5}}>
           👥 Gestão de Usuários
         </button>}
-        <button onClick={()=>setChatOpen(o=>!o)}
-          style={{padding:"4px 12px",background:chatOpen?"rgba(60,219,192,.25)":"rgba(60,219,192,.1)",border:`1px solid ${chatOpen?"rgba(60,219,192,.6)":"rgba(60,219,192,.3)"}`,color:"#3CDBC0",fontFamily:"'Montserrat',sans-serif",fontSize:11,fontWeight:700,letterSpacing:.5,cursor:"pointer",borderRadius:20,display:"flex",alignItems:"center",gap:5,transition:".15s"}}>
-          🤖 Assistente IA
-        </button>
-        <button onClick={()=>{setChatOpen(false);setViewMode("agent");}}
-          title="Voltar para a tela do assistente"
-          style={{padding:"4px 12px",background:"rgba(96,165,250,.1)",border:"1px solid rgba(96,165,250,.3)",color:"#60a5fa",fontFamily:"'Montserrat',sans-serif",fontSize:11,fontWeight:700,letterSpacing:.5,cursor:"pointer",borderRadius:20}}>
-          ← Modo Assistente
+        <button onClick={()=>setViewMode("agent")}
+          title="Voltar para a tela do assistente (o histórico do chat é preservado)"
+          style={{padding:"4px 12px",background:"rgba(60,219,192,.15)",border:"1px solid rgba(60,219,192,.4)",color:"#3CDBC0",fontFamily:"'Montserrat',sans-serif",fontSize:11,fontWeight:700,letterSpacing:.5,cursor:"pointer",borderRadius:20}}>
+          🤖 Voltar ao Assistente
         </button>
       </div>
 
@@ -4828,8 +4904,7 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
         </main>
       </div>
     </div>
-    {chatOpen&&<ChatPanel d={d} setD={setD} c={c} produtosDB={produtosDB} setProd={setProd} onClose={()=>{setChatOpen(false);setChatPrecificando(false);}} onPrecificando={v=>setChatPrecificando(v)}/>}
-    </>)}
+    </div>
     </>
   );
 }
@@ -5196,7 +5271,7 @@ function CadastroProdutos({user}){
                 <td><code style={{fontSize:12,color:"#3CDBC0"}}>{p.id}</code></td>
                 <td style={{fontFamily:"'Montserrat',sans-serif",fontSize:11,color:"#A7A8AA"}}>{p.sku||"—"}</td>
                 <td style={{fontFamily:"'Montserrat',sans-serif",fontSize:12}}>{p.ncm}</td>
-                <td style={{fontWeight:600}}>{p.nome}</td>
+                <td className="td-nome" style={{fontWeight:600}}>{p.nome}</td>
                 <td style={{fontFamily:"'Montserrat',sans-serif",fontSize:12,color:(p.vpl_padrao||0)>0?"#34d399":"#7a7f96"}}>
                   {(p.vpl_padrao||0)>0?`R$ ${(+p.vpl_padrao).toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2})}`:"—"}
                 </td>
