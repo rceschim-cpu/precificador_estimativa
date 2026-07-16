@@ -3318,7 +3318,7 @@ Resultado: pF R$ ${cc.pF?.toFixed(2)||"—"} | ML ${cc.margPct?.toFixed(2)||"—
     }
     if (name === "query_custos_historico") {
       try {
-        const prod = produtosDB.find(p => p.sku === inp.sku || p.id === inp.sku);
+        const prod = produtosDB.find(p => (!!inp.sku && p.sku === inp.sku) || p.id === inp.sku);
         const sku = prod?.sku || inp.sku;
         if (!sku) return { found:false, msg:"SKU não encontrado" };
         const fPlanta = inp.planta ? `&planta=ilike.*${encodeURIComponent(inp.planta)}*` : "";
@@ -3343,7 +3343,7 @@ Resultado: pF R$ ${cc.pF?.toFixed(2)||"—"} | ML ${cc.margPct?.toFixed(2)||"—
     }
     if (name === "query_indices_historico") {
       try {
-        const prod = produtosDB.find(p => p.sku === inp.sku || p.id === inp.sku);
+        const prod = produtosDB.find(p => (!!inp.sku && p.sku === inp.sku) || p.id === inp.sku);
         const sku = inp.sku || prod?.sku;
         if (!sku) return { found:false, msg:"SKU não encontrado" };
         const filtro = inp.canal_filtro
