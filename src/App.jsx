@@ -4259,113 +4259,47 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
       );
     })()}
 
-    {/* Modo agente fica sempre MONTADO (display toggle) — preserva o histórico do chat ao alternar de vista */}
-    <div className={`app${chatPrecificando?" agent-ativo":""}`} style={{display:viewMode==="agent"?"flex":"none",flexDirection:"column",height:"100%",minHeight:0,overflow:"hidden"}}>
+    {/* Shell único — header e ledger ficam sempre montados; só o conteúdo do body alterna entre Assistente e Calculadora */}
+    <div className={`app${chatPrecificando?" agent-ativo":""}`}>
         <style>{CSS}</style>
-        {/* Header — modo agente */}
-        <div style={{display:"flex",alignItems:"center",gap:10,padding:"10px 16px",background:"var(--card,#1a1b27)",borderBottom:"1px solid rgba(255,255,255,.07)",flexShrink:0,flexWrap:"wrap"}}>
-          <span style={{fontSize:13,fontWeight:700,color:"#3CDBC0",display:"flex",alignItems:"center",gap:6}}>Assistente de Precificação</span>
+
+        {/* header único — igual nos dois modos */}
+        <div style={{display:"flex",alignItems:"center",gap:6,padding:"6px 16px",background:"var(--card,#1a1b27)",borderBottom:"1px solid rgba(255,255,255,.07)",flexWrap:"wrap",flexShrink:0,flexBasis:"auto"}}>
+          {isZFM&&<span className="buf zmf">ZFM / MAO</span>}
+          {prodAtrib.uf==="BA"&&<span className="buf ios">IOS / BA</span>}
+          {prodAtrib.uf==="PR"&&<span className="buf cwb">CWB / PR</span>}
+          {isCBU&&<span className="buf" style={{background:"rgba(220,38,38,.15)",color:"#f87171",border:"1px solid rgba(220,38,38,.3)"}}>CBU</span>}
+          <span className="brt">{c.ufO} → {d.ufDestino}</span>
+          <span className="bdf">{c.difal>0?`DIFAL ${pct(c.difal)}`:"DIFAL 0%"}</span>
           {nomeAba&&(
             <span style={{fontSize:11,fontWeight:600,color:"#3CDBC0",padding:"2px 8px",background:"rgba(60,219,192,.15)",borderRadius:20,border:"1px solid rgba(60,219,192,.3)"}}>
               {nomeAba}
             </span>
           )}
           <div style={{flex:1}}/>
+          {/* Dólar Custo — PTAX para conversão de todos os custos USD */}
+          <div style={{display:"flex",alignItems:"center",gap:6,padding:"3px 10px",background:"rgba(255,255,255,.04)",border:"1px solid rgba(255,255,255,.1)",borderRadius:8}}>
+            <span style={{fontSize:9,fontWeight:700,color:"#5a6a84",letterSpacing:.5,textTransform:"uppercase"}}>Dólar Custo</span>
+            <span style={{fontSize:9,color:"#475569"}}>R$/USD</span>
+            <input type="number" step="0.01" value={d.ptax} onChange={e=>S("ptax")(parseFloat(e.target.value)||0)}
+              style={{background:"none",border:"none",outline:"none",fontFamily:"'Montserrat',sans-serif",fontSize:12,fontWeight:700,color:"#3CDBC0",width:52,textAlign:"right"}}/>
+          </div>
+          {/* Dólar Preço — cotação para precificação indexada em USD */}
+          <div style={{display:"flex",alignItems:"center",gap:6,padding:"3px 10px",background:"rgba(60,219,192,.06)",border:"1px solid rgba(60,219,192,.2)",borderRadius:8}}>
+            <span style={{fontSize:9,fontWeight:700,color:"#5a6a84",letterSpacing:.5,textTransform:"uppercase"}}>Dólar Preço</span>
+            <span style={{fontSize:9,color:"#475569"}}>R$/USD</span>
+            <input type="number" step="0.01" value={d.ptaxPreco||d.ptax} onChange={e=>S("ptaxPreco")(parseFloat(e.target.value)||0)}
+              style={{background:"none",border:"none",outline:"none",fontFamily:"'Montserrat',sans-serif",fontSize:12,fontWeight:700,color:"#60a5fa",width:52,textAlign:"right"}}/>
+          </div>
           <RegistrosBtns
-            onNovo={()=>{setD({...DEF});setCalcs({...CALC_DEF});setTab("perfil");if(onRenomear)onRenomear("Nova Precificação");}}
+            onNovo={()=>{setD({...DEF});setCalcs({...CALC_DEF});setTab("perfil");setIiStatus(null);if(onRenomear)onRenomear("Nova Precificação");}}
             onRegistros={()=>setModal("registros")}/>
           {isAdmin&&<button onClick={()=>setModal("gestao")}
-            style={{padding:"4px 12px",background:"rgba(5,150,105,.15)",border:"1px solid rgba(5,150,105,.4)",color:"#34d399",fontFamily:"'Montserrat',sans-serif",fontSize:11,fontWeight:700,letterSpacing:.5,cursor:"pointer",borderRadius:20}}>
+            style={{padding:"4px 12px",background:"rgba(5,150,105,.15)",border:"1px solid rgba(5,150,105,.4)",color:"#34d399",fontFamily:"'Montserrat',sans-serif",fontSize:11,fontWeight:700,letterSpacing:.5,cursor:"pointer",borderRadius:20,display:"flex",alignItems:"center",gap:5}}>
             Gestão de Usuários
           </button>}
           <ViewToggle viewMode={viewMode} setViewMode={setViewMode}/>
         </div>
-
-        <div style={{flex:1,minHeight:0,display:"flex",overflow:"hidden"}}>
-          {/* Resumo da precificação — mesma marcação/CSS do modo Calculadora (pleft/pscroll), pra não "pular" ao alternar */}
-          <aside className="pleft" style={{width:360,flexShrink:0}}>
-            <div className="pscroll">
-              <div className="price-hero">
-                <div>
-                  <div style={{fontFamily:"'Montserrat',sans-serif",fontSize:9,fontWeight:700,letterSpacing:2,color:"#A7A8AA",marginBottom:4}}>
-                    {d.modoCalc==="margem"?"MC RESULTANTE":"PREÇO DE VENDA FINAL"}
-                  </div>
-                  {d.modoCalc==="margem"
-                    ? <div style={{fontFamily:"'Montserrat',sans-serif",fontSize:44,fontWeight:800,letterSpacing:-1.5,lineHeight:1,display:"flex",alignItems:"flex-end",gap:4,
-                        color:c.mcSugerida!==null?(c.mcSugerida>=0?"#4ade80":"#f87171"):"#f1f5f9"}}>
-                        {c.mcSugerida!==null?n3(c.mcSugerida):"—"}
-                        <span style={{fontSize:18,fontWeight:400,marginBottom:6}}>%</span>
-                      </div>
-                    : <div style={{fontFamily:"'Montserrat',sans-serif",fontSize:44,fontWeight:800,color:"#f1f5f9",letterSpacing:-1.5,lineHeight:1,display:"flex",alignItems:"flex-start",gap:4}}>
-                        <span style={{fontSize:18,fontWeight:400,color:"#3CDBC0",marginTop:6}}>R$</span>{c.pF?n3(c.pF):"—"}
-                      </div>
-                  }
-                  <div style={{fontFamily:"'Montserrat',sans-serif",fontSize:9,color:"#5a6a84",marginTop:4,lineHeight:1.6}}>
-                    {prod?.nome?`${prod.nome} · ${d.origem||"—"}/${d.modalidade||"—"}`:"Aguardando o agente selecionar o produto..."}
-                  </div>
-                </div>
-                <div style={{display:"flex",gap:5,flexWrap:"wrap",marginTop:8}}>
-                  {[["CARGA","kpi-red",pct(c.cargaPct)],["ML","kpi-blue",pct(c.margPct)],["MC","kpi-green",pct(c.mc)],["MKP","",n3(c.mkp)+"x"]].map(([l,cls,v])=>(
-                    <div key={l} className={`kpi ${cls}`} style={{minWidth:60}}>
-                      <span style={{display:"block",fontFamily:"'Montserrat',sans-serif",fontSize:7,fontWeight:700,letterSpacing:1,color:"#475569",marginBottom:2}}>{l}</span>
-                      <span style={{fontFamily:"'Montserrat',sans-serif",fontSize:13,fontWeight:700}}>{v}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <BreakdownPanel c={c} d={d} prod={prod} ppbTot={ppbTot} calcs={calcs}/>
-            </div>
-          </aside>
-
-          {/* Chat em evidência */}
-          <ChatPanel embedded d={d} setD={setD} c={c} produtosDB={produtosDB} setProd={setProd} usuario={currentUser?.nome}
-            onClose={()=>{}} onPrecificando={v=>setChatPrecificando(v)}/>
-        </div>
-      </div>
-
-    {/* Modo manual também sempre montado (display toggle) */}
-    <div style={{display:viewMode==="manual"?"contents":"none"}}>
-    <div className={`app${chatPrecificando?" agent-ativo":""}`}>
-    <style>{CSS}</style>
-
-      {/* sub-header: badges de contexto + nome da aba + botões */}
-      <div style={{display:"flex",alignItems:"center",gap:6,padding:"6px 16px",background:"var(--card,#1a1b27)",borderBottom:"1px solid rgba(255,255,255,.07)",flexWrap:"wrap",flexShrink:0,flexBasis:"auto"}}>
-        {isZFM&&<span className="buf zmf">ZFM / MAO</span>}
-        {prodAtrib.uf==="BA"&&<span className="buf ios">IOS / BA</span>}
-        {prodAtrib.uf==="PR"&&<span className="buf cwb">CWB / PR</span>}
-        {isCBU&&<span className="buf" style={{background:"rgba(220,38,38,.15)",color:"#f87171",border:"1px solid rgba(220,38,38,.3)"}}>CBU</span>}
-        <span className="brt">{c.ufO} → {d.ufDestino}</span>
-        <span className="bdf">{c.difal>0?`DIFAL ${pct(c.difal)}`:"DIFAL 0%"}</span>
-        {/* Nome do registro */}
-        {nomeAba&&(
-          <span style={{fontSize:11,fontWeight:600,color:"#3CDBC0",padding:"2px 8px",background:"rgba(60,219,192,.15)",borderRadius:20,border:"1px solid rgba(60,219,192,.3)"}}>
-            {nomeAba}
-          </span>
-        )}
-        <div style={{flex:1}}/>
-        {/* Dólar Custo — PTAX para conversão de todos os custos USD */}
-        <div style={{display:"flex",alignItems:"center",gap:6,padding:"3px 10px",background:"rgba(255,255,255,.04)",border:"1px solid rgba(255,255,255,.1)",borderRadius:8}}>
-          <span style={{fontSize:9,fontWeight:700,color:"#5a6a84",letterSpacing:.5,textTransform:"uppercase"}}>Dólar Custo</span>
-          <span style={{fontSize:9,color:"#475569"}}>R$/USD</span>
-          <input type="number" step="0.01" value={d.ptax} onChange={e=>S("ptax")(parseFloat(e.target.value)||0)}
-            style={{background:"none",border:"none",outline:"none",fontFamily:"'Montserrat',sans-serif",fontSize:12,fontWeight:700,color:"#3CDBC0",width:52,textAlign:"right"}}/>
-        </div>
-        {/* Dólar Preço — cotação para precificação indexada em USD */}
-        <div style={{display:"flex",alignItems:"center",gap:6,padding:"3px 10px",background:"rgba(60,219,192,.06)",border:"1px solid rgba(60,219,192,.2)",borderRadius:8}}>
-          <span style={{fontSize:9,fontWeight:700,color:"#5a6a84",letterSpacing:.5,textTransform:"uppercase"}}>Dólar Preço</span>
-          <span style={{fontSize:9,color:"#475569"}}>R$/USD</span>
-          <input type="number" step="0.01" value={d.ptaxPreco||d.ptax} onChange={e=>S("ptaxPreco")(parseFloat(e.target.value)||0)}
-            style={{background:"none",border:"none",outline:"none",fontFamily:"'Montserrat',sans-serif",fontSize:12,fontWeight:700,color:"#60a5fa",width:52,textAlign:"right"}}/>
-        </div>
-        <RegistrosBtns
-          onNovo={()=>{setD({...DEF});setCalcs({...CALC_DEF});setTab("perfil");setIiStatus(null);if(onRenomear)onRenomear("Nova Precificação");}}
-          onRegistros={()=>setModal("registros")}/>
-        {isAdmin&&<button onClick={()=>setModal("gestao")}
-          style={{padding:"4px 12px",background:"rgba(5,150,105,.15)",border:"1px solid rgba(5,150,105,.4)",color:"#34d399",fontFamily:"'Montserrat',sans-serif",fontSize:11,fontWeight:700,letterSpacing:.5,cursor:"pointer",borderRadius:20,display:"flex",alignItems:"center",gap:5}}>
-          Gestão de Usuários
-        </button>}
-        <ViewToggle viewMode={viewMode} setViewMode={setViewMode}/>
-      </div>
 
       <div className="layout">
         <aside className="pleft">
@@ -4409,7 +4343,14 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
           </div>
         </aside>
 
-        <main className="pright">
+        {/* Conteúdo do body — só isto alterna entre Assistente e Calculadora, ledger/header intactos acima */}
+        <div style={{display:"flex",flexDirection:"column",minHeight:0,overflow:"hidden"}}>
+          <div style={{display:viewMode==="agent"?"flex":"none",flex:1,minHeight:0,overflow:"hidden"}}>
+            <ChatPanel embedded d={d} setD={setD} c={c} produtosDB={produtosDB} setProd={setProd} usuario={currentUser?.nome}
+              onClose={()=>{}} onPrecificando={v=>setChatPrecificando(v)}/>
+          </div>
+
+        <main className="pright" style={{display:viewMode==="manual"?"flex":"none"}}>
           <div className="form-topbar">
             <nav className="tnav" style={{flex:1,background:"transparent",borderBottom:"none"}}>
               {TABS.flatMap((t,i)=>[
