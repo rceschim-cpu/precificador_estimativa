@@ -4326,8 +4326,6 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
               </div>
             </div>
 
-            <RevCalc precoAlvo={d.precoAlvo} onChange={S("precoAlvo")} c={c} margem={d.margem}/>
-
             <BreakdownPanel c={c} d={d} prod={prod} ppbTot={ppbTot} calcs={calcs}/>
           </div>
         </aside>
