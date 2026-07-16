@@ -9,9 +9,11 @@ deploy_vercel:
     - if: $CI_COMMIT_BRANCH == "main"
   script:
     - npm install -g vercel
-    - vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
-    - vercel build --prod --token="$VERCEL_TOKEN"
-    - vercel deploy --prebuilt --prod --token="$VERCEL_TOKEN"
+    # Deploy remoto (sem --prebuilt): o build roda nos servidores do Vercel,
+    # que têm acesso direto e correto às env vars do projeto (VITE_CLAUDE_KEY,
+    # VITE_IA_BOX_KEY etc.). "vercel pull" + "vercel build" local trazia essas
+    # variáveis vazias (bug observado: bundle publicado com "x-api-key":"").
+    - vercel deploy --prod --token="$VERCEL_TOKEN" --yes
   environment:
     name: production
     url: https://precificador-estimativa.vercel.app
