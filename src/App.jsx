@@ -5693,6 +5693,7 @@ export default function App() {
   return (
     <>
       <style>{CSS_AUTH}</style>
+      <style>{CSS}</style>
       <div className="dash">
         <div className="topbar">
           <div className="topbar-logo">
