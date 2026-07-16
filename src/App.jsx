@@ -4263,19 +4263,8 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
     <div className={`app${chatPrecificando?" agent-ativo":""}`}>
         <style>{CSS}</style>
 
-        {/* header único — igual nos dois modos */}
+        {/* header único — igual nos dois modos (badges de ZFM/UF/DIFAL/nome da aba removidas — já aparecem no ledger/abas) */}
         <div style={{display:"flex",alignItems:"center",gap:6,padding:"6px 16px",background:"var(--card,#1a1b27)",borderBottom:"1px solid rgba(255,255,255,.07)",flexWrap:"wrap",flexShrink:0,flexBasis:"auto"}}>
-          {isZFM&&<span className="buf zmf">ZFM / MAO</span>}
-          {prodAtrib.uf==="BA"&&<span className="buf ios">IOS / BA</span>}
-          {prodAtrib.uf==="PR"&&<span className="buf cwb">CWB / PR</span>}
-          {isCBU&&<span className="buf" style={{background:"rgba(220,38,38,.15)",color:"#f87171",border:"1px solid rgba(220,38,38,.3)"}}>CBU</span>}
-          <span className="brt">{c.ufO} → {d.ufDestino}</span>
-          <span className="bdf">{c.difal>0?`DIFAL ${pct(c.difal)}`:"DIFAL 0%"}</span>
-          {nomeAba&&(
-            <span style={{fontSize:11,fontWeight:600,color:"#3CDBC0",padding:"2px 8px",background:"rgba(60,219,192,.15)",borderRadius:20,border:"1px solid rgba(60,219,192,.3)"}}>
-              {nomeAba}
-            </span>
-          )}
           <div style={{flex:1}}/>
           {/* Dólar Custo — PTAX para conversão de todos os custos USD */}
           <div style={{display:"flex",alignItems:"center",gap:6,padding:"3px 10px",background:"rgba(255,255,255,.04)",border:"1px solid rgba(255,255,255,.1)",borderRadius:8}}>
