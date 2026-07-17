@@ -3167,11 +3167,17 @@ Resultado: pF R$ ${cc.pF?.toFixed(2)||"—"} | ML ${cc.margPct?.toFixed(2)||"—
 
   const handleToolCall = async (name, inp) => {
     if (name === "buscar_produto") {
-      const termo = (inp.termo || "").toLowerCase();
-      const matches = produtosDB
-        .filter(p => p.nome?.toLowerCase().includes(termo) || p.sku?.toLowerCase().includes(termo) || p.modelo?.toLowerCase().includes(termo))
+      // Busca por TODAS as palavras (AND), não a frase inteira como substring —
+      // "vaio fe16 16gb 512gb" não batia com "VAIO FE16 ... (... / 16GB / 512GB / ...)"
+      // porque a pontuação/espaçamento do nome real nunca é igual ao termo digitado.
+      const tokens = (inp.termo || "").toLowerCase().trim().split(/\s+/).filter(Boolean);
+      const matches = tokens.length ? produtosDB
+        .filter(p => {
+          const texto = `${p.nome||""} ${p.sku||""} ${p.modelo||""}`.toLowerCase();
+          return tokens.every(t => texto.includes(t));
+        })
         .slice(0, 10)
-        .map(p => ({ id: p.id, nome: p.nome, sku: p.sku || null, bu: p.bu || null }));
+        .map(p => ({ id: p.id, nome: p.nome, sku: p.sku || null, bu: p.bu || null })) : [];
       return { found: matches.length > 0, total: matches.length, produtos: matches,
         msg: matches.length ? `${matches.length} produto(s) encontrado(s)` : `Nenhum produto com "${inp.termo}"` };
     }
