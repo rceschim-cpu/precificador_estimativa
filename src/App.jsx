@@ -2949,11 +2949,11 @@ const CALC_TOOLS = [
       prazo_dias:{type:"number",description:"Prazo de pagamento em dias (0 se à vista)"},
       taxa_pct:{type:"number",description:"Taxa financeira mensal % (padrão 1,14% a.m. se não informado)"},
     }, required:["prazo_dias"] } } },
-  { type:"function", function:{ name:"salvar_ajuste_indice", description:"Grava PERMANENTEMENTE uma correção de índice/valor que o usuário informou (ex: 'o frete da Stone na verdade é 0,9%'). O valor corrigido passa a sobrescrever automaticamente o histórico em TODAS as consultas futuras (de todos os usuários). Use SEMPRE que o usuário corrigir um número — e confirme o que foi salvo. Antes de salvar, confirme com o usuário via perguntar_usuario se o ajuste vale só para este SKU, para o canal todo, ou global.",
+  { type:"function", function:{ name:"salvar_ajuste_indice", description:"Grava PERMANENTEMENTE uma correção de índice/valor que o usuário informou (ex: 'o frete da Stone na verdade é 0,9%'). O valor corrigido passa a sobrescrever automaticamente o histórico em TODAS as consultas futuras (de todos os usuários). Use SEMPRE que o usuário corrigir um número — e confirme o que foi salvo. Antes de salvar, confirme com o usuário via perguntar_usuario se o ajuste vale só para este SKU, para o canal todo, ou global. ⚠⚠custo_usd e taxa_dolar são SEMPRE específicos de um produto — NUNCA salve global (sem sku) pra esses dois campos, a tool bloqueia e devolve erro. Já aconteceu de um VPL de um produto vazar pra todas as precificações por isso. Pergunte o SKU/produto exato antes de chamar.",
     parameters:{ type:"object", properties:{
       campo:{type:"string",enum:["rebate","mkt","frete","zv09","zv11","pd","scrap","comis","custo_usd","taxa_dolar"],description:"Qual índice/valor está sendo corrigido"},
       valor:{type:"number",description:"O valor correto informado pelo usuário"},
-      sku:{type:"string",description:"SKU específico (omitir = vale para todos os SKUs)"},
+      sku:{type:"string",description:"SKU específico. OBRIGATÓRIO quando campo=custo_usd ou taxa_dolar (omitir só é válido pros outros campos, tipo frete/comis/rebate de canal)"},
       canal_sap:{type:"string",description:"Canal SAP específico (omitir = vale para todos os canais)"},
       motivo:{type:"string",description:"Breve justificativa dita pelo usuário"},
     }, required:["campo","valor"] } } },
@@ -3302,6 +3302,13 @@ Resultado: pF R$ ${cc.pF?.toFixed(2)||"—"} | ML ${cc.margPct?.toFixed(2)||"—
     }
     if (name === "salvar_ajuste_indice") {
       try {
+        // trava de segurança: custo_usd/taxa_dolar são específicos de produto — um ajuste
+        // "global" (sem sku) nesses campos sobrescreveria o VPL de TODO produto da base.
+        // Já aconteceu (VPL de um terminal POS vazando pra todas as precificações) — bloqueia
+        // no código em vez de confiar só na instrução do prompt.
+        if ((inp.campo === "custo_usd" || inp.campo === "taxa_dolar") && !inp.sku) {
+          return { ok:false, msg:`Bloqueado: "${inp.campo}" precisa de um SKU específico — não pode ser salvo como ajuste global (afetaria o VPL de todos os produtos). Pergunte ao usuário o SKU/produto exato antes de salvar.` };
+        }
         await sbFetch("indices_ajustes", { method:"POST", body: JSON.stringify({
           sku: inp.sku || null, canal_sap: inp.canal_sap || null,
           campo: inp.campo, valor: inp.valor, motivo: inp.motivo || null,
