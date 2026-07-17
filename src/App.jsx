@@ -2860,7 +2860,7 @@ REGRAS OBRIGATÓRIAS:
 - NUNCA peça FOB (USD) ao usuário. O VPL (custo_usd_unit do fechamento mais recente) JÁ inclui o FOB — buscar e aplicar automaticamente via query_custos_historico + set_custo. FOB nunca precisa ser perguntado nem informado separadamente.
 - ⚠NUNCA ASSUMA valores que só o usuário sabe — em especial UF de destino, canal/cliente e prazo de pagamento. Se o usuário não informou, use perguntar_usuario (interativo, com opções) em vez de adivinhar ou perguntar em texto livre solto. Nunca assuma São Paulo (ou qualquer UF) como destino por padrão.
 - ⚠SEMPRE chame calcular_cf_venda com o prazo de pagamento do cliente antes de get_resultado (pergunte o prazo via perguntar_usuario se não foi dito — opções: 'À vista','30 dias','60 dias','90 dias'). Sem isso, a MC fica igual à ML, o que é sempre incorreto quando há prazo de pagamento.
-- ⚠MC ≠ ML: MC = ML + Custo Fixo. Se o usuário pedir para ajustar/atingir uma MC específica, use set_mc_alvo (nunca calcule a ML equivalente de cabeça — é fácil errar essa subtração).
+- ⚠MC ≠ ML: MC = ML + Custo Fixo. Se o usuário pedir para ajustar/atingir uma MC específica, use set_mc_alvo (nunca calcule a ML equivalente de cabeça — é fácil errar essa subtração). ⚠O CF Venda (custo financeiro do prazo de pagamento) afeta a ML, mas NÃO afeta a MC — se depois de set_mc_alvo a MC real não bater com o alvo pedido, NUNCA invente uma explicação (ex: "é o efeito do prazo de pagamento na MC") — isso é falso. Reporte o resultado_real tal como veio e, se não bateu, diga que não sabe o motivo exato em vez de inventar uma justificativa.
 - ⚠PREÇO FIXO: se o usuário pedir um preço de venda específico ("quero vender a USD 106", "fixa em R$ 542,72"), use set_preco_alvo — NUNCA tente adivinhar/iterar uma margem chamando set_margem várias vezes, e NUNCA calcule na mão "quanto ficaria a margem com esse preço". A calculadora já tem esse modo pronto.
 - ⚠DÓLAR CUSTO ≠ DÓLAR PREÇO — são dois campos DIFERENTES, nunca confunda: Dólar Custo (set_custo/dolar) converte o VPL/custo em USD→BRL; Dólar Preço (set_dolar_preco) converte um preço de VENDA em USD→BRL (usado por set_preco_alvo com moeda='USD'). Se o usuário disser "dólar de custo" e "dólar de preço" como valores diferentes, use a tool certa para cada um — nunca aplique o mesmo valor nos dois campos sem o usuário confirmar que são iguais.
 - ⚠⚠PROIBIDO CALCULAR NA MÃO: você NUNCA deve somar/subtrair/multiplicar índices, custos ou preços para chegar num resultado de precificação — nem em texto explicativo, nem no resultado final. TODA tool de alteração (set_margem, set_mc_alvo, set_preco_alvo, set_custo, set_indices, set_canal, aplicar_indices_completo, calcular_cf_venda) já devolve um campo resultado_real com pF/ml/mc REAIS recalculados pela calculadora — use SOMENTE esses números na sua resposta. Se por algum motivo uma tool não devolver resultado_real, chame get_resultado antes de responder. Nunca diga "ficaria aproximadamente X%" baseado em conta própria.
@@ -3256,17 +3256,22 @@ Resultado: pF R$ ${cc.pF?.toFixed(2)||"—"} | ML ${cc.margPct?.toFixed(2)||"—
     }
     if (name === "set_mc_alvo") {
       notifyFill();
-      // MC = ML + Custo Fixo. Calcula o ML necessário para a MC pedida sem depender
-      // do modelo fazer a subtração — evita a MC sair diferente do pedido.
+      // ML = margem + margGerPct (SEMPRE, independente do toggle de Margem Gerencial).
+      // MC = ML + Custo Fixo (+ margGerPct DE NOVO, só se o toggle estiver ligado).
+      // Por isso o desconto de margGerPct pra achar a margem necessária tem que valer
+      // sempre (ML já inclui), e o desconto EXTRA só se o toggle estiver ativo — antes
+      // só descontava quando o toggle tava ligado, deixando a MC final desviada do
+      // alvo em exatamente o valor de margGerPct quando o toggle tava desligado.
       await aguardarRecalculo(); // garante que alterações anteriores do turno já refletiram em c
       const cfixoEf = cRef.current.cfixoEf || 0;
-      const mgAtiva = dRef.current.margGerAtivo ? (cRef.current.margGerPct || 0) : 0;
-      const margemNecessaria = +(inp.mc_pct - cfixoEf - mgAtiva).toFixed(2);
+      const margGerPct = cRef.current.margGerPct || 0;
+      const margGerExtra = dRef.current.margGerAtivo ? margGerPct : 0;
+      const margemNecessaria = +(inp.mc_pct - cfixoEf - margGerPct - margGerExtra).toFixed(2);
       setD(p => ({...p, margem: margemNecessaria, modoCalc:"preco", precoSugerido:0})); // sai do modo preço-fixo se estava nele
       const cc = await lerResultadoReal();
       return { ok:true, mc_alvo: inp.mc_pct, custo_fixo_pct: cfixoEf, ml_calculada: margemNecessaria,
         resultado_real: cc,
-        msg:`ML ajustada para ${margemNecessaria}% (MC ${inp.mc_pct}% − Custo Fixo ${cfixoEf}%). Resultado REAL recalculado: pF R$ ${cc.pF}, ML ${cc.ml}%, MC ${cc.mc}% — use ESTES números na resposta.` };
+        msg:`ML ajustada para ${margemNecessaria}% (MC ${inp.mc_pct}% − Custo Fixo ${cfixoEf}% − Margem Gerencial ${margGerPct}%${margGerExtra?` ×2`:""}). Resultado REAL recalculado: pF R$ ${cc.pF}, ML ${cc.ml}%, MC ${cc.mc}% — use ESTES números na resposta.` };
     }
     if (name === "set_indices") {
       notifyFill();
