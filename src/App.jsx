@@ -2864,6 +2864,7 @@ REGRAS OBRIGATÓRIAS:
 - ⚠DÓLAR CUSTO ≠ DÓLAR PREÇO — são dois campos DIFERENTES, nunca confunda: Dólar Custo (set_custo/dolar) converte o VPL/custo em USD→BRL; Dólar Preço (set_dolar_preco) converte um preço de VENDA em USD→BRL (usado por set_preco_alvo com moeda='USD'). Se o usuário disser "dólar de custo" e "dólar de preço" como valores diferentes, use a tool certa para cada um — nunca aplique o mesmo valor nos dois campos sem o usuário confirmar que são iguais.
 - ⚠⚠PROIBIDO CALCULAR NA MÃO: você NUNCA deve somar/subtrair/multiplicar índices, custos ou preços para chegar num resultado de precificação — nem em texto explicativo, nem no resultado final. TODA tool de alteração (set_margem, set_mc_alvo, set_preco_alvo, set_custo, set_indices, set_canal, aplicar_indices_completo, calcular_cf_venda) já devolve um campo resultado_real com pF/ml/mc REAIS recalculados pela calculadora — use SOMENTE esses números na sua resposta. Se por algum motivo uma tool não devolver resultado_real, chame get_resultado antes de responder. Nunca diga "ficaria aproximadamente X%" baseado em conta própria.
 - ⚠NUNCA invente ou "arredonde" um resultado, nem invente desculpas (ex: "aguardando sincronização") se um valor não bater com o esperado — sempre relate o resultado_real/get_resultado tal como veio, mesmo que pareça estranho.
+- ⚠⚠NUNCA INVENTE VPL/CUSTO: muitos fechamentos mensais têm custo_usd_unit=0 (transação sem custo USD associado). Se query_custos_historico devolver custo_valido:false, NÃO chute/estime um valor "razoável" de VPL — isso já aconteceu e gerou um preço totalmente errado. Diga explicitamente ao usuário que não há custo USD válido pra esse SKU nos fechamentos recentes e peça o VPL manualmente antes de continuar.
 - APRENDIZADO: se o usuário CORRIGIR um número ("o frete da Stone é 0,9%", "o dólar certo é 5,60"), use salvar_ajuste_indice (pergunte antes, via perguntar_usuario, se vale só para este SKU, para o canal ou global). Se o usuário der uma INSTRUÇÃO permanente ("Stone sempre 45 dias", "PosiSeg não tem rebate"), use salvar_regra. Sempre confirme o que foi salvo. Siga SEMPRE as REGRAS APRENDIDAS listadas no contexto.
 - Formato de valores monetários: R$ com 2 casas decimais.
 - Seja direto. Confirme o que foi preenchido em uma linha.
@@ -2927,7 +2928,7 @@ const CALC_TOOLS = [
       sku:{type:"string",description:"SKU SAP do produto — use exatamente o valor 'sku' retornado por set_produto. Alternativamente passe o produto_id que o sistema resolve."},
       canal_filtro:{type:"string",description:"Filtro opcional por nome do cliente/canal (ex: 'AMAZON', 'MAGAZINE', 'GAZIN', 'CASAS BAHIA')"},
     }, required:["sku"] } } },
-  { type:"function", function:{ name:"query_custos_historico", description:"⚠SEMPRE chamar automaticamente ao precificar, ANTES de perguntar qualquer coisa sobre custo — nunca peça FOB ao usuário. Consulta o VPL (custo USD do mês corrente, campo custo_usd_unit) e a taxa de dólar do fechamento mais recente da Controladoria, além de custo transformação, GGF, CMV, garantia %, backup %, impostos e preço médio praticado. O VPL já inclui o FOB (não solicite FOB separadamente). Aplique o resultado via set_custo(vpl_usd, dolar) automaticamente e informe ao usuário a fonte/mês usado.",
+  { type:"function", function:{ name:"query_custos_historico", description:"⚠SEMPRE chamar automaticamente ao precificar, ANTES de perguntar qualquer coisa sobre custo — nunca peça FOB ao usuário. Consulta o VPL (custo USD do mês corrente, campo custo_usd_unit) e a taxa de dólar do fechamento mais recente da Controladoria, além de custo transformação, GGF, CMV, garantia %, backup %, impostos e preço médio praticado. O VPL já inclui o FOB (não solicite FOB separadamente). Aplique o resultado via set_custo(vpl_usd, dolar) automaticamente e informe ao usuário a fonte/mês usado. ⚠⚠Se a resposta vier com custo_valido:false, significa que NENHUM fechamento recente tem custo USD utilizável pra esse SKU — NUNCA invente/estime um valor de VPL nesse caso (nem um número 'razoável'). Diga isso explicitamente ao usuário e peça o VPL manualmente.",
     parameters:{ type:"object", properties:{
       sku:{type:"string",description:"SKU SAP do produto — use o valor 'sku' retornado por set_produto. Alternativamente passe o produto_id."},
       planta:{type:"string",description:"Filtro opcional por planta (ex: 'Manaus', 'Ilhéus', 'Curitiba')"},
@@ -3334,7 +3335,12 @@ Resultado: pF R$ ${cc.pF?.toFixed(2)||"—"} | ML ${cc.margPct?.toFixed(2)||"—
           `precificacao_custos?sku=eq.${sku}${fPlanta}&select=planta,data_ref,volume,preco_medio,custo_usd_unit,taxa_dolar,custo_brl_unit,custo_transf_unit,ggf_unit,cmv_unit,garantia_pct,backup_pct,st_pct,difal_pct,icms_pct,ipi_pct,pis_pct,cofins_pct,cred_presum_pct,fti_pct,mc_pct,ml_pct,fonte&order=data_ref.desc&limit=12`
         );
         if (!data?.length) return { found:false, msg:`Nenhum custo histórico para SKU ${sku}` };
-        const maisRecente = { ...data[0] };
+        // Muitos registros mensais têm custo_usd_unit=0 (transação sem custo USD associado —
+        // ex.: revenda/ajuste interno) e não servem de VPL/FOB. Pega o mais recente que tenha
+        // custo_usd_unit>0 em vez do literal mais recente, senão o agente aplicaria VPL=0.
+        const comCustoValido = data.find(d => +d.custo_usd_unit > 0);
+        const maisRecente = { ...(comCustoValido || data[0]) };
+        const custoValido = !!comCustoValido;
         let ajustesCusto = [];
         try {
           const aj = await sbFetch(`indices_ajustes?ativo=eq.true&or=(sku.eq.${sku},sku.is.null)&campo=in.(custo_usd,taxa_dolar)&select=sku,campo,valor,motivo&order=criado_em.asc`);
@@ -3344,9 +3350,11 @@ Resultado: pF R$ ${cc.pF?.toFixed(2)||"—"} | ML ${cc.margPct?.toFixed(2)||"—
             ajustesCusto.push(`${a.campo}=${a.valor}${a.motivo?` (${a.motivo})`:""}`);
           });
         } catch { /* tabela pode não existir ainda */ }
-        return { found:true, sku, mais_recente:maisRecente, historico_12m:data,
+        return { found:true, sku, mais_recente:maisRecente, historico_12m:data, custo_valido:custoValido,
           ajustes_aplicados: ajustesCusto.length ? ajustesCusto : undefined,
-          obs:"Valores unitários dos fechamentos mensais. Use mais_recente como referência e SEMPRE informe a fonte ao usuário." };
+          obs: custoValido
+            ? "Valores unitários dos fechamentos mensais. Use mais_recente como referência e SEMPRE informe a fonte ao usuário."
+            : "⚠NENHUM dos últimos fechamentos tem custo_usd_unit>0 pra este SKU (custo_valido=false) — NÃO invente/estime um VPL. Avise o usuário explicitamente que não há custo USD válido registrado e peça o VPL manualmente." };
       } catch(e) { return { found:false, error:String(e) }; }
     }
     if (name === "query_indices_historico") {
