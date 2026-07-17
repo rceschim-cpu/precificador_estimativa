@@ -2872,8 +2872,10 @@ FLUXO OBRIGATÓRIO PARA PRECIFICAR (siga sempre nesta ordem; use perguntar_usuar
 1. buscar_produto se o produto_id não for conhecido → set_produto (guarda o SKU retornado)
 2. set_origem_modalidade → perguntar_usuario para UF de destino se não informada (opções: UFs mais comuns, ex: 'SP','RJ','MG','PR') → set_uf_destino
 3. ⚠OBRIGATÓRIO E AUTOMÁTICO: query_custos_historico com o SKU → aplique IMEDIATAMENTE via
-   set_custo(vpl_usd: custo_usd_unit, dolar: taxa_dolar) do registro mais_recente.
-   Isso já é o VPL completo — não peça FOB, não pergunte custo ao usuário.
+   set_custo(vpl_usd: custo_usd_unit, dolar: taxa_dolar, producao: custo_transf_unit,
+   garantia_pct: garantia_pct, backup_pct: backup_pct) do registro mais_recente — TUDO na
+   MESMA chamada, nunca só vpl_usd/dolar. Isso já é o VPL completo — não peça FOB, não
+   pergunte custo ao usuário.
    Informe ao usuário de qual mês veio (ex: "VPL de Mar/2026: USD 68,32 × 5,54").
 4. perguntar_usuario para canal/cliente se não informado → set_canal
 5. ⚠OBRIGATÓRIO E AUTOMÁTICO: query_indices_historico com o SKU → aplicar_indices_completo
@@ -2901,8 +2903,8 @@ const CALC_TOOLS = [
     parameters:{ type:"object", properties:{ origem:{type:"string",enum:["MAO","IOS","CWB"]}, modalidade:{type:"string",enum:["CKD","SKD","CBU"]} }, required:["origem","modalidade"] } } },
   { type:"function", function:{ name:"set_canal", description:"Seleciona canal de venda",
     parameters:{ type:"object", properties:{ canal_id:{type:"string",description:"ID do canal (ex: 't3', 'corp', 'amzn')"} }, required:["canal_id"] } } },
-  { type:"function", function:{ name:"set_custo", description:"Define o VPL (custo padrão do produto, já com FOB/duties incluídos) em modo manual. NUNCA pergunte FOB ao usuário — o VPL do fechamento mais recente (via query_custos_historico) já inclui o FOB, basta aplicar vpl_usd+dolar (ou vpl_brl direto) aqui. O parâmetro 'dolar' aqui é o DÓLAR CUSTO (converte VPL/custo) — para o DÓLAR PREÇO (usado ao vender em USD, ex: set_preco_alvo) use a tool set_dolar_preco, são valores DIFERENTES e não podem ser confundidos.",
-    parameters:{ type:"object", properties:{ vpl_usd:{type:"number",description:"VPL em USD (custo_usd_unit do fechamento mais recente)"}, dolar:{type:"number",description:"Dólar CUSTO — taxa do dólar do fechamento (taxa_dolar), usada só para converter o VPL/custo"}, vpl_brl:{type:"number",description:"VPL já em R$, caso já convertido — usa direto sem multiplicar pelo dólar"}, producao:{type:"number",description:"Custo de produção em R$ (componente separado do VPL)"} } } } },
+  { type:"function", function:{ name:"set_custo", description:"Define o VPL (custo padrão do produto, já com FOB/duties incluídos) em modo manual. NUNCA pergunte FOB ao usuário — o VPL do fechamento mais recente (via query_custos_historico) já inclui o FOB, basta aplicar vpl_usd+dolar (ou vpl_brl direto) aqui. O parâmetro 'dolar' aqui é o DÓLAR CUSTO (converte VPL/custo) — para o DÓLAR PREÇO (usado ao vender em USD, ex: set_preco_alvo) use a tool set_dolar_preco, são valores DIFERENTES e não podem ser confundidos. ⚠SEMPRE que query_custos_historico devolver custo_transf_unit, garantia_pct ou backup_pct do fechamento mais recente, aplique TAMBÉM nesta mesma chamada via producao/garantia_pct/backup_pct — não use só vpl_usd/dolar e deixe esses de fora.",
+    parameters:{ type:"object", properties:{ vpl_usd:{type:"number",description:"VPL em USD (custo_usd_unit do fechamento mais recente)"}, dolar:{type:"number",description:"Dólar CUSTO — taxa do dólar do fechamento (taxa_dolar), usada só para converter o VPL/custo"}, vpl_brl:{type:"number",description:"VPL já em R$, caso já convertido — usa direto sem multiplicar pelo dólar"}, producao:{type:"number",description:"Custo de produção em R$ (componente separado do VPL) — vem de custo_transf_unit do fechamento mais recente (query_custos_historico)"}, garantia_pct:{type:"number",description:"Garantia realizada (%) do fechamento mais recente (campo garantia_pct de query_custos_historico) — a calculadora converte para R$/unidade automaticamente"}, backup_pct:{type:"number",description:"Backup realizado (%) do fechamento mais recente (campo backup_pct de query_custos_historico)"} } } } },
   { type:"function", function:{ name:"set_dolar_preco", description:"Define o DÓLAR PREÇO — a cotação usada para converter um preço de VENDA em USD para R$ (ex: usado por set_preco_alvo com moeda='USD', e na exibição do preço final em USD). É DIFERENTE do Dólar Custo (que converte o VPL/custo) — nunca use o mesmo valor dos dois sem confirmar que são realmente iguais no caso.",
     parameters:{ type:"object", properties:{ valor:{type:"number",description:"Cotação do Dólar Preço (R$ por USD)"} }, required:["valor"] } } },
   { type:"function", function:{ name:"set_uf_destino", description:"Define UF de destino (para cálculo de ICMS e DIFAL)",
@@ -3205,8 +3207,13 @@ Resultado: pF R$ ${cc.pF?.toFixed(2)||"—"} | ML ${cc.margPct?.toFixed(2)||"—
         upd.vplManual = +(inp.vpl_usd * (dolarUsado || 0)).toFixed(2);
       }
       if (inp.producao !== undefined) upd.producao = inp.producao;
+      if (inp.backup_pct !== undefined) upd.bkpPct = inp.backup_pct;
+      if (inp.garantia_pct !== undefined) {
+        const vplBase = upd.vplManual !== undefined ? upd.vplManual : (dRef.current.vplManual || 0);
+        upd.garantia = +(vplBase * inp.garantia_pct / 100).toFixed(2);
+      }
       setD(p => ({...p, ...upd}));
-      return { ok:true, msg:"VPL atualizado (modo manual, FOB não é necessário)", vpl_brl: upd.vplManual, resultado_real: await lerResultadoReal() };
+      return { ok:true, msg:"VPL atualizado (modo manual, FOB não é necessário)", vpl_brl: upd.vplManual, garantia_brl: upd.garantia, backup_pct: upd.bkpPct, resultado_real: await lerResultadoReal() };
     }
     if (name === "set_dolar_preco") {
       notifyFill();
