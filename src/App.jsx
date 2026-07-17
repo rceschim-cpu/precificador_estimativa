@@ -2929,7 +2929,7 @@ const CALC_TOOLS = [
       sku:{type:"string",description:"SKU SAP do produto — use exatamente o valor 'sku' retornado por set_produto. Alternativamente passe o produto_id que o sistema resolve."},
       canal_filtro:{type:"string",description:"Filtro opcional por nome do cliente/canal (ex: 'AMAZON', 'MAGAZINE', 'GAZIN', 'CASAS BAHIA')"},
     }, required:["sku"] } } },
-  { type:"function", function:{ name:"query_custos_historico", description:"⚠SEMPRE chamar automaticamente ao precificar, ANTES de perguntar qualquer coisa sobre custo — nunca peça FOB ao usuário. Consulta o VPL (custo USD do mês corrente, campo custo_usd_unit) e a taxa de dólar do fechamento mais recente da Controladoria, além de custo transformação, GGF, CMV, garantia %, backup %, impostos e preço médio praticado. O VPL já inclui o FOB (não solicite FOB separadamente). Aplique o resultado via set_custo(vpl_usd, dolar) automaticamente e informe ao usuário a fonte/mês usado. ⚠⚠Se a resposta vier com custo_valido:false, significa que NENHUM fechamento recente tem custo USD utilizável pra esse SKU — NUNCA invente/estime um valor de VPL nesse caso (nem um número 'razoável'). Diga isso explicitamente ao usuário e peça o VPL manualmente.",
+  { type:"function", function:{ name:"query_custos_historico", description:"⚠SEMPRE chamar automaticamente ao precificar, ANTES de perguntar qualquer coisa sobre custo — nunca peça FOB ao usuário. Consulta o VPL (custo USD do mês corrente, campo custo_usd_unit) e a taxa de dólar do fechamento mais recente da Controladoria, além de custo transformação, GGF, CMV, garantia %, backup %, impostos e preço médio praticado. O VPL já inclui o FOB (não solicite FOB separadamente). Aplique o resultado via set_custo(vpl_usd, dolar) automaticamente e informe ao usuário a fonte/mês usado. ⚠⚠Se a resposta vier com custo_valido:false, significa que NENHUM fechamento recente tem custo USD utilizável pra esse SKU — NUNCA invente/estime um valor de VPL você mesmo. Se vier sugestao_similar (VPL de outro produto do mesmo NCM), proponha ESSE valor ao usuário como estimativa, citando claramente o SKU/produto de referência (nunca apresente como se fosse o custo real do produto pedido). Se não vier sugestao_similar nenhuma, diga que não há nenhuma referência de VPL e peça o valor manualmente.",
     parameters:{ type:"object", properties:{
       sku:{type:"string",description:"SKU SAP do produto — use o valor 'sku' retornado por set_produto. Alternativamente passe o produto_id."},
       planta:{type:"string",description:"Filtro opcional por planta (ex: 'Manaus', 'Ilhéus', 'Curitiba')"},
@@ -3348,13 +3348,30 @@ Resultado: pF R$ ${cc.pF?.toFixed(2)||"—"} | ML ${cc.margPct?.toFixed(2)||"—
         const data = await sbFetch(
           `precificacao_custos?sku=eq.${sku}${fPlanta}&select=planta,data_ref,volume,preco_medio,custo_usd_unit,taxa_dolar,custo_brl_unit,custo_transf_unit,ggf_unit,cmv_unit,garantia_pct,backup_pct,st_pct,difal_pct,icms_pct,ipi_pct,pis_pct,cofins_pct,cred_presum_pct,fti_pct,mc_pct,ml_pct,fonte&order=data_ref.desc&limit=12`
         );
-        if (!data?.length) return { found:false, msg:`Nenhum custo histórico para SKU ${sku}` };
+        // Sem custo válido pra este SKU exato (sem registro nenhum, ou só com custo_usd_unit=0):
+        // busca um produto do MESMO NCM com custo válido pra sugerir como estimativa — sempre
+        // deixando claro pro agente que é de OUTRO produto, não deste.
+        const buscarSimilar = async () => {
+          if (!prod?.ncm) return null;
+          try {
+            const rows = await sbFetch(`precificacao_custos?ncm=eq.${encodeURIComponent(prod.ncm)}&custo_usd_unit=gt.0&sku=neq.${sku}&select=sku,custo_usd_unit,taxa_dolar,fonte,data_ref&order=data_ref.desc&limit=1`);
+            return rows?.[0] || null;
+          } catch { return null; }
+        };
+        if (!data?.length) {
+          const similar = await buscarSimilar();
+          return { found:false, msg:`Nenhum custo histórico para SKU ${sku}`, sugestao_similar: similar || undefined,
+            obs: similar
+              ? `Não há custo histórico pra este SKU, mas o produto SKU ${similar.sku} (mesmo NCM ${prod.ncm}, fechamento ${similar.fonte}) tem custo_usd_unit=${similar.custo_usd_unit} válido. Proponha esse valor como VPL ESTIMADO ao usuário, deixando bem claro que veio de outro produto semelhante (informe o SKU/nome do produto de referência), não deste SKU exato. NUNCA aplique como se fosse o custo real deste produto sem essa ressalva.`
+              : "Nenhum produto do mesmo NCM com custo válido encontrado — avise o usuário que não há nenhuma referência de VPL e peça o valor manualmente." };
+        }
         // Muitos registros mensais têm custo_usd_unit=0 (transação sem custo USD associado —
         // ex.: revenda/ajuste interno) e não servem de VPL/FOB. Pega o mais recente que tenha
         // custo_usd_unit>0 em vez do literal mais recente, senão o agente aplicaria VPL=0.
         const comCustoValido = data.find(d => +d.custo_usd_unit > 0);
         const maisRecente = { ...(comCustoValido || data[0]) };
         const custoValido = !!comCustoValido;
+        const sugestaoSimilar = custoValido ? null : await buscarSimilar();
         let ajustesCusto = [];
         try {
           const aj = await sbFetch(`indices_ajustes?ativo=eq.true&or=(sku.eq.${sku},sku.is.null)&campo=in.(custo_usd,taxa_dolar)&select=sku,campo,valor,motivo&order=criado_em.asc`);
@@ -3365,10 +3382,13 @@ Resultado: pF R$ ${cc.pF?.toFixed(2)||"—"} | ML ${cc.margPct?.toFixed(2)||"—
           });
         } catch { /* tabela pode não existir ainda */ }
         return { found:true, sku, mais_recente:maisRecente, historico_12m:data, custo_valido:custoValido,
+          sugestao_similar: sugestaoSimilar || undefined,
           ajustes_aplicados: ajustesCusto.length ? ajustesCusto : undefined,
           obs: custoValido
             ? "Valores unitários dos fechamentos mensais. Use mais_recente como referência e SEMPRE informe a fonte ao usuário."
-            : "⚠NENHUM dos últimos fechamentos tem custo_usd_unit>0 pra este SKU (custo_valido=false) — NÃO invente/estime um VPL. Avise o usuário explicitamente que não há custo USD válido registrado e peça o VPL manualmente." };
+            : sugestaoSimilar
+              ? `⚠Nenhum fechamento deste SKU tem custo_usd_unit>0 — mas o produto SKU ${sugestaoSimilar.sku} (mesmo NCM, fechamento ${sugestaoSimilar.fonte}) tem custo_usd_unit=${sugestaoSimilar.custo_usd_unit} válido. Proponha esse valor como VPL ESTIMADO, deixando claro que é de outro produto semelhante (cite o SKU), NUNCA como se fosse o custo real deste SKU.`
+              : "⚠NENHUM dos últimos fechamentos tem custo_usd_unit>0 pra este SKU, e não achei produto semelhante (mesmo NCM) com custo válido — NÃO invente/estime um VPL. Avise o usuário explicitamente e peça o VPL manualmente." };
       } catch(e) { return { found:false, error:String(e) }; }
     }
     if (name === "query_indices_historico") {
