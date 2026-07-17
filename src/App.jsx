@@ -24,11 +24,16 @@ const sbFetch = async (path, opts = {}) => {
 };
 
 const db = {
-  getUsers:       ()         => sbFetch("usuarios_publico?select=*&order=criado_em.asc"),
+  getUsers:       ()         => sbFetch("rpc/listar_usuarios", { method:"POST", body: JSON.stringify({}) }),
   verificarLogin: (email, senha) => sbFetch("rpc/verificar_login", { method:"POST", body: JSON.stringify({ p_email: email, p_senha: senha }) }),
   criarUsuario:   (nome, email, senha, perfil) => sbFetch("rpc/criar_usuario", { method:"POST", body: JSON.stringify({ p_nome: nome, p_email: email, p_senha: senha, p_perfil: perfil }) }),
-  updateUser:     (id, data) => sbFetch(`usuarios?id=eq.${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  // "return=minimal": a tabela usuarios não dá SELECT pro anon key (só a coluna senha era
+  // pra ser protegida, mas a revogação saiu mais ampla) — pedir a linha de volta
+  // (o padrão "return=representation") quebrava TODO update com "permission denied".
+  updateUser:     (id, data) => sbFetch(`usuarios?id=eq.${id}`, { method: "PATCH", body: JSON.stringify(data), prefer: "return=minimal" }),
   deleteUser:     (id)       => sbFetch(`usuarios?id=eq.${id}`, { method: "DELETE", prefer: "return=minimal" }),
+  solicitarResetSenha: (email) => sbFetch("rpc/solicitar_reset_senha", { method:"POST", body: JSON.stringify({ p_email: email }) }),
+  adminResetarSenha:   (userId, novaSenha) => sbFetch("rpc/admin_resetar_senha", { method:"POST", body: JSON.stringify({ p_user_id: userId, p_nova_senha: novaSenha }) }),
   getProdutos:    ()         => sbFetch("produtos_catalogo?select=*&order=nome.asc"),
   insertProduto:  (p)        => sbFetch("produtos_catalogo", { method: "POST", body: JSON.stringify(p) }),
   updateProduto:  (id, data) => sbFetch(`produtos_catalogo?id=eq.${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(data) }),
@@ -558,8 +563,23 @@ function AuthScreen({ onLogin }) {
   const [form, setForm] = useState({ email: "", senha: "", nome: "", confirma: "", perfil: "custos" });
   const [msg, setMsg] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [resetEmail, setResetEmail] = useState("");
 
   const F = k => v => setForm(p => ({ ...p, [k]: v }));
+
+  const handleResetSenha = async () => {
+    setMsg(null);
+    if (!resetEmail.includes("@")) return setMsg({ type: "err", text: "Informe um e-mail válido." });
+    setLoading(true);
+    try {
+      await db.solicitarResetSenha(resetEmail.toLowerCase().trim());
+      // sempre a mesma mensagem, exista ou não a conta — evita confirmar/negar e-mails cadastrados
+      setMsg({ type: "ok", text: "Se este e-mail estiver cadastrado e ativo, o administrador foi notificado e vai definir uma nova senha em breve. Combine com ele o novo acesso." });
+      setResetEmail("");
+    } catch(e) {
+      setMsg({ type: "err", text: "Erro ao solicitar. Tente novamente." });
+    } finally { setLoading(false); }
+  };
 
   const handleLogin = async () => {
     setMsg(null); setLoading(true);
@@ -627,9 +647,28 @@ function AuthScreen({ onLogin }) {
               <input type="password" placeholder="••••••••" value={form.senha} onChange={e => F("senha")(e.target.value)} onKeyDown={e => e.key === "Enter" && handleLogin()} autoComplete="current-password"/>
             </div>
             <button className="btn-primary" onClick={handleLogin} disabled={loading}>{loading?"Entrando...":"Entrar"}</button>
+            <button
+              style={{background:"none",border:"none",color:"var(--muted)",fontSize:11,cursor:"pointer",textDecoration:"underline",textAlign:"center",padding:4}}
+              onClick={() => { setAba("reset"); setMsg(null); setResetEmail(form.email); }}>
+              Esqueci minha senha
+            </button>
             <div style={{ textAlign: "center", fontSize: 11, color: "var(--muted)" }}>
               Acesso inicial: admin@positec.com.br / Positec@2026
             </div>
+          </> : aba === "reset" ? <>
+            <div style={{fontSize:12,color:"var(--muted)",marginBottom:4}}>
+              Informe seu e-mail cadastrado. O administrador será avisado e vai definir uma nova senha pra você.
+            </div>
+            <div className="fld">
+              <label>E-mail</label>
+              <input placeholder="seu@email.com.br" value={resetEmail} onChange={e => setResetEmail(e.target.value)} onKeyDown={e => e.key === "Enter" && handleResetSenha()} autoComplete="username"/>
+            </div>
+            <button className="btn-primary" onClick={handleResetSenha} disabled={loading}>{loading?"Enviando...":"Solicitar redefinição"}</button>
+            <button
+              style={{background:"none",border:"none",color:"var(--muted)",fontSize:11,cursor:"pointer",textDecoration:"underline",textAlign:"center",padding:4}}
+              onClick={() => { setAba("login"); setMsg(null); }}>
+              Voltar pro login
+            </button>
           </> : <>
             <div className="fld">
               <label>Nome completo</label>
@@ -2446,12 +2485,27 @@ function ModalGestaoUsers({ onClose, currentUser }) {
   const [modalPerfil, setModalPerfil] = useState(null);
   const [confirmDel, setConfirmDel] = useState(null);
 
+  const [resetPassUser, setResetPassUser] = useState(null);
+  const [novaSenha, setNovaSenha] = useState("");
+  const [resetSalvando, setResetSalvando] = useState(false);
+
   const refresh = useCallback(async () => {
     setLoading(true);
-    try { setUsers((await db.getUsers()).map(u=>({...u,criadoEm:u.criado_em,aprovadoEm:u.aprovado_em,aprovadoPor:u.aprovado_por}))); }
+    try { setUsers((await db.getUsers()).map(u=>({...u,criadoEm:u.criado_em,aprovadoEm:u.aprovado_em,aprovadoPor:u.aprovado_por,resetSolicitadoEm:u.reset_solicitado_em}))); }
     catch(e) { console.error(e); }
     finally { setLoading(false); }
   }, []);
+
+  const confirmarResetSenha = async () => {
+    if (!resetPassUser || novaSenha.length < 6) return;
+    setResetSalvando(true);
+    try {
+      await db.adminResetarSenha(resetPassUser.id, novaSenha);
+      await refresh();
+      setResetPassUser(null); setNovaSenha("");
+    } catch(e) { alert("Erro ao redefinir senha: " + e.message); }
+    finally { setResetSalvando(false); }
+  };
 
   useEffect(() => { refresh(); }, [refresh]);
 
@@ -2479,6 +2533,7 @@ function ModalGestaoUsers({ onClose, currentUser }) {
   };
 
   const pendentes = users.filter(u => u.status === "pendente");
+  const resetsPendentes = users.filter(u => u.resetSolicitadoEm);
   const todos = users.filter(u => {
     const q = search.toLowerCase();
     return !q || u.nome.toLowerCase().includes(q) || u.email.toLowerCase().includes(q);
@@ -2505,6 +2560,9 @@ function ModalGestaoUsers({ onClose, currentUser }) {
             ⏳ Pendentes {pendentes.length>0&&<span style={{marginLeft:4,background:"#d97706",color:"#fff",borderRadius:20,padding:"0 6px",fontSize:10}}>{pendentes.length}</span>}
           </button>
           <button style={btnStyle(aba==="usuarios")} onClick={()=>setAba("usuarios")}>Usuários</button>
+          <button style={btnStyle(aba==="resets")} onClick={()=>setAba("resets")}>
+            Redefinições de senha {resetsPendentes.length>0&&<span style={{marginLeft:4,background:"#d97706",color:"#fff",borderRadius:20,padding:"0 6px",fontSize:10}}>{resetsPendentes.length}</span>}
+          </button>
           <button style={btnStyle(aba==="perfis")} onClick={()=>setAba("perfis")}>Perfis</button>
         </div>
 
@@ -2566,8 +2624,9 @@ function ModalGestaoUsers({ onClose, currentUser }) {
                       <td style={{padding:"10px 12px"}}><PerfilBadge perfil={u.perfil}/></td>
                       <td style={{padding:"10px 12px"}}><StatusBadge status={u.status}/></td>
                       <td style={{padding:"10px 12px"}}>
-                        <div style={{display:"flex",gap:5}}>
-                          {u.id!=="master"&&<button className="btn-sm btn-edit" onClick={()=>setModal({type:"edit",user:u})}></button>}
+                        <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
+                          {u.id!=="master"&&<button className="btn-sm btn-edit" onClick={()=>setModal({type:"edit",user:u})}>Editar</button>}
+                          {u.id!=="master"&&<button className="btn-sm btn-disable" onClick={()=>{setResetPassUser(u);setNovaSenha("");}}>Redefinir senha</button>}
                           {u.id!=="master"&&u.status==="ativo"&&<button className="btn-sm btn-disable" onClick={()=>saveUser({...u,status:"inativo"})}>Desativar</button>}
                           {u.id!=="master"&&u.status==="inativo"&&<button className="btn-sm btn-approve" onClick={()=>saveUser({...u,status:"ativo"})}>Reativar</button>}
                           {u.id!=="master"&&u.status==="pendente"&&<button className="btn-sm btn-approve" onClick={()=>setModal({type:"aprovar",user:u})}>Analisar</button>}
@@ -2579,6 +2638,32 @@ function ModalGestaoUsers({ onClose, currentUser }) {
                 </tbody>
               </table>
             </>
+          )}
+
+          {/* ABA RESETS DE SENHA */}
+          {aba==="resets"&&(resetsPendentes.length===0
+            ? <div className="empty"><div className="empty-icon">✓</div><div className="empty-text">Nenhuma solicitação de redefinição de senha</div></div>
+            : <table style={{width:"100%",borderCollapse:"collapse"}}>
+                <thead><tr>
+                  {["Usuário","Solicitado em","Ação"].map(h=>(
+                    <th key={h} style={{padding:"8px 12px",textAlign:"left",fontSize:11,fontWeight:700,color:"var(--muted)",textTransform:"uppercase",letterSpacing:".8px",borderBottom:"1px solid var(--border)"}}>{h}</th>
+                  ))}
+                </tr></thead>
+                <tbody>
+                  {resetsPendentes.map(u=>(
+                    <tr key={u.id} style={{background:"rgba(217,119,6,.04)"}}>
+                      <td style={{padding:"10px 12px"}}>
+                        <div style={{fontWeight:600,color:"#fff"}}>{u.nome}</div>
+                        <div style={{fontSize:11,color:"var(--muted)"}}>{u.email}</div>
+                      </td>
+                      <td style={{padding:"10px 12px",fontFamily:"'Montserrat',sans-serif",fontSize:11,color:"var(--muted)"}}>{fmtDate(u.resetSolicitadoEm)}</td>
+                      <td style={{padding:"10px 12px"}}>
+                        <button className="btn-sm btn-approve" onClick={()=>{setResetPassUser(u);setNovaSenha("");}}>Definir nova senha</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
           )}
 
           {/* ABA PERFIS */}
@@ -2630,6 +2715,32 @@ function ModalGestaoUsers({ onClose, currentUser }) {
       </div>
       {modal?.type==="edit"&&<ModalEditUser user={modal.user} onClose={()=>setModal(null)} onSave={saveUser}/>}
       {modal?.type==="aprovar"&&<ModalAprovar user={modal.user} currentUser={currentUser} onClose={()=>setModal(null)} onSave={saveUser}/>}
+      {resetPassUser&&(
+        <div className="modal-ov" onClick={()=>setResetPassUser(null)}>
+          <div className="modal-box" style={{maxWidth:380}} onClick={e=>e.stopPropagation()}>
+            <div className="modal-head">
+              <span className="modal-title">Redefinir senha</span>
+              <button className="modal-close" onClick={()=>setResetPassUser(null)}>×</button>
+            </div>
+            <div className="mbody" style={{padding:16,display:"flex",flexDirection:"column",gap:10}}>
+              <div style={{fontSize:12,color:"var(--muted)"}}>
+                {resetPassUser.nome} ({resetPassUser.email})
+              </div>
+              <div className="fld">
+                <label>Nova senha (mín. 6 caracteres)</label>
+                <input type="password" value={novaSenha} onChange={e=>setNovaSenha(e.target.value)}
+                  onKeyDown={e=>e.key==="Enter"&&confirmarResetSenha()} autoComplete="new-password"/>
+              </div>
+              <div style={{fontSize:11,color:"var(--muted)"}}>
+                Combine a nova senha com o usuário fora do sistema (chat, e-mail) — não existe envio automático.
+              </div>
+              <button className="btn-primary" onClick={confirmarResetSenha} disabled={resetSalvando||novaSenha.length<6}>
+                {resetSalvando?"Salvando...":"Definir nova senha"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
