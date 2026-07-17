@@ -69,13 +69,20 @@ if __name__ == "__main__":
     out = sys.argv[3]
     rows = build_indices(path, label)
     print(f"{path}: {len(rows)} linhas de precificacao_indices geradas")
-    with open(out, "w", encoding="utf-8") as f:
-        cols = ["sku","canal","cliente","cliente_nome","planta","data_ref","ipi_pct","icms_pct","cred_pct","fti_pct",
-                "pd_pct","scrap_pct","frete_pct","zv09_pct","zv11_pct","mkt_pct","bkp_pct","rebate_pct",
-                "margger_pct","margem_pct","mc_pct","ml_pct","fonte"]
-        f.write(f"insert into precificacao_indices ({','.join(cols)}) values\n")
-        vals = []
-        for row in rows:
-            vals.append("(" + ",".join(sq(row[c]) for c in cols) + ")")
-        f.write(",\n".join(vals))
-        f.write(";\n")
+    cols = ["sku","canal","cliente","cliente_nome","planta","data_ref","ipi_pct","icms_pct","cred_pct","fti_pct",
+            "pd_pct","scrap_pct","frete_pct","zv09_pct","zv11_pct","mkt_pct","bkp_pct","rebate_pct",
+            "margger_pct","margem_pct","mc_pct","ml_pct","fonte"]
+    # arquivos SEPARADOS (não só statements separados) — o SQL Editor do Supabase rejeita
+    # "query too large" pelo tamanho total do texto colado, não por statement
+    BATCH = 1000
+    base_out = out[:-4] if out.endswith(".sql") else out
+    n_parts = (len(rows) + BATCH - 1) // BATCH
+    for part, i in enumerate(range(0, len(rows), BATCH), start=1):
+        chunk = rows[i:i+BATCH]
+        fname = f"{base_out}_part{part:02d}de{n_parts:02d}.sql"
+        with open(fname, "w", encoding="utf-8") as f:
+            f.write(f"insert into precificacao_indices ({','.join(cols)}) values\n")
+            vals = ["(" + ",".join(sq(row[c]) for c in cols) + ")" for row in chunk]
+            f.write(",\n".join(vals))
+            f.write(";\n")
+    print(f"  -> {n_parts} arquivos gerados ({base_out}_part01de{n_parts:02d}.sql ... part{n_parts:02d}de{n_parts:02d}.sql)")

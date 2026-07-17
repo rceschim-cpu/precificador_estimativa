@@ -101,10 +101,17 @@ if __name__ == "__main__":
     cols = ["sku","planta","ncm","data_ref","volume","receita_liq","preco_medio","custo_usd_unit","taxa_dolar",
             "custo_brl_unit","custo_transf_unit","ggf_unit","cmv_unit","garantia_pct","backup_pct","st_pct",
             "difal_pct","icms_pct","ipi_pct","cred_presum_pct","fti_pct","mc_pct","ml_pct","fonte"]
-    with open(out, "w", encoding="utf-8") as f:
-        f.write(f"insert into precificacao_custos ({','.join(cols)}) values\n")
-        vals = []
-        for row in rows:
-            vals.append("(" + ",".join(sq(row[c]) for c in cols) + ")")
-        f.write(",\n".join(vals))
-        f.write(";\n")
+    # arquivos SEPARADOS (não só statements separados) — o SQL Editor do Supabase rejeita
+    # "query too large" pelo tamanho total do texto colado, não por statement
+    BATCH = 500
+    base_out = out[:-4] if out.endswith(".sql") else out
+    n_parts = max(1, (len(rows) + BATCH - 1) // BATCH)
+    for part, i in enumerate(range(0, len(rows), BATCH) or [0], start=1):
+        chunk = rows[i:i+BATCH]
+        fname = f"{base_out}_part{part:02d}de{n_parts:02d}.sql"
+        with open(fname, "w", encoding="utf-8") as f:
+            f.write(f"insert into precificacao_custos ({','.join(cols)}) values\n")
+            vals = ["(" + ",".join(sq(row[c]) for c in cols) + ")" for row in chunk]
+            f.write(",\n".join(vals))
+            f.write(";\n")
+    print(f"  -> {n_parts} arquivo(s) gerado(s) ({base_out}_part01de{n_parts:02d}.sql ...)")
