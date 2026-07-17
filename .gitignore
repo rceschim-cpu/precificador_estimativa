@@ -24,3 +24,4 @@ dist-ssr
 *.sw?
 .vercel
 .env*
+scripts/ingest_mensal/__pycache__/

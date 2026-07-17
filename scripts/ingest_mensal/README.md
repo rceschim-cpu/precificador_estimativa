@@ -9,10 +9,29 @@ por segurança) — os scripts só geram o `.sql`, quem roda no Supabase SQL Edi
 
 ## Uso
 
+**`precificacao_indices` tem unique constraint em `(sku,canal,cliente,planta)`
+— sem o mês/data. Só existe 1 linha por combinação, sempre a mais recente.**
+Um INSERT puro falha com `duplicate key` assim que a combinação já existe
+(cliente que repete compra em outro mês). Use `build_indices_upsert.py`
+(gera `insert ... on conflict (...) do update`) — nunca o CSV Import do
+Table Editor pra essa tabela, ele não faz upsert e para no primeiro conflito
+(comprovado: uma tentativa via CSV parou depois de ~1000 linhas de 37 mil).
+
 ```
-python build_indices.py "<caminho do xlsx>" "Mmm/AAAA" saida_indices.sql
-python build_custos.py  "<caminho do xlsx>" "Mmm/AAAA" "AAAA-MM-01" <taxas_ref.json> saida_custos.sql
+python build_indices_upsert.py "<pasta com os xlsx>" saida_prefixo "04:Abr/2026" "05:Mai/2026" ...
+# gera saida_prefixo_part01deNN.sql ... rodar cada um no SQL Editor, em qualquer ordem
+
+python build_custos.py  "<caminho do xlsx>" "Mmm/AAAA" "AAAA-MM-01" <taxas_ref.json> saida_custos
+# gera saida_custos_part01deNN.sql — essa tabela não teve conflito nos testes (agregado por mês,
+# então SKU×Planta×mês novo não colide with meses anteriores); INSERT puro ou CSV Import funcionam.
+
+python export_csv.py "<pasta com os xlsx>" <taxas_ref.json> <pasta_saida> "04:Abr/2026:2026-04-01" ...
+# gera 1 CSV por tabela (todos os meses juntos) — só use pra precificacao_custos (indices precisa
+# do upsert acima, CSV Import não serve pra ela)
 ```
+
+`build_indices.py`/`build_custos.py` (INSERT puro, sem upsert) ainda existem
+mas só servem pra `precificacao_custos` ou pra uma tabela vazia/sem overlap.
 
 `taxas_ref.json` é um dump de `precificacao_custos` (sku, planta, icms_pct, ipi_pct,
 cred_presum_pct, fti_pct, data_ref) — usado como referência de tributos, já que eles
