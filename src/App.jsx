@@ -2984,6 +2984,13 @@ REGRAS OBRIGATÓRIAS:
 FLUXO OBRIGATÓRIO PARA PRECIFICAR (siga sempre nesta ordem; use perguntar_usuario nos passos que dependem só do usuário, sem pausar nos passos que a base resolve sozinha):
 1. buscar_produto se o produto_id não for conhecido → set_produto (guarda o SKU retornado)
 2. set_origem_modalidade → perguntar_usuario para UF de destino se não informada (opções: UFs mais comuns, ex: 'SP','RJ','MG','PR') → set_uf_destino
+2b. ⚠OBRIGATÓRIO SE ORIGEM=MAO (Manaus) E MODALIDADE=CKD ou SKD: perguntar_usuario o regime
+   tributário do comprador (opções: 'Dentro da ZFM (Manaus/Pres.Figueiredo/Rio Preto da Eva)',
+   'Lucro Real 100% não-cumulativo', 'Lucro Presumido/Simples/Misto/Órgão Público',
+   'ONG/PF fora da ZFM') → set_regime_comprador_zfm. NUNCA pule este passo nem assuma um regime
+   — o padrão do sistema (Lucro Real, 3,65%) só vale se for MESMO esse o caso. Mesmo quando a
+   entrega é em Manaus, confirme com o usuário se o comprador está de fato dentro da ZFM — não
+   assuma nem um nem outro sem perguntar.
 3. ⚠OBRIGATÓRIO E AUTOMÁTICO: query_custos_historico com o SKU → aplique IMEDIATAMENTE via
    set_custo(vpl_usd: custo_usd_unit, dolar: taxa_dolar, producao: custo_transf_unit,
    garantia_pct: garantia_pct, backup_pct: backup_pct) do registro mais_recente — TUDO na
@@ -3028,6 +3035,10 @@ const CALC_TOOLS = [
     parameters:{ type:"object", properties:{} } } },
   { type:"function", function:{ name:"set_uf_destino", description:"Define UF de destino (para cálculo de ICMS e DIFAL)",
     parameters:{ type:"object", properties:{ uf:{type:"string",description:"Sigla do estado (ex: SP, RJ, MG)"} }, required:["uf"] } } },
+  { type:"function", function:{ name:"set_regime_comprador_zfm", description:"⚠OBRIGATÓRIO perguntar ao usuário (via perguntar_usuario) e aplicar SEMPRE que a origem for MAO/Manaus com modalidade CKD ou SKD — define o regime tributário do COMPRADOR, que determina a alíquota de P/C (PIS/COFINS) debitada na venda (varia de 0% a 9,25%, NUNCA assuma). Sem chamar esta tool, o sistema usa 'nao_cumulativo' (3,65%) por padrão, o que pode estar bem errado — ex.: comprador dentro da própria ZFM (Manaus/Pres. Figueiredo/Rio Preto da Eva) é 0%, não 3,65%.",
+    parameters:{ type:"object", properties:{
+      regime:{type:"string",enum:["dentro_zmf","nao_cumulativo","cumulativo","outros"],description:"dentro_zmf = comprador PJ/PF dentro de Manaus/Pres.Figueiredo/Rio Preto da Eva (0%); nao_cumulativo = Lucro Real 100% não-cumulativo fora da ZFM (3,65%); cumulativo = Lucro Presumido/Simples/Misto/Órgão Público (7,30%); outros = ONG/entidade sem fins lucrativos/PF fora da ZFM (9,25%)"},
+    }, required:["regime"] } } },
   { type:"function", function:{ name:"set_margem", description:"Define margem líquida alvo (ML%). Use quando o usuário pedir uma ML específica. Se o usuário pedir uma MC (Margem de Contribuição) específica, use set_mc_alvo em vez desta — MC ≠ ML, não faça a conta de cabeça.",
     parameters:{ type:"object", properties:{ margem:{type:"number",description:"Percentual de margem líquida"} }, required:["margem"] } } },
   { type:"function", function:{ name:"set_mc_alvo", description:"Define a Margem de Contribuição (MC) alvo — use quando o usuário pedir para atingir/ajustar uma MC específica (ex: 'aumenta o preço pra 10% de MC'). NUNCA calcule a ML equivalente de cabeça (MC = ML + Custo Fixo, uma subtração fácil de errar) — esta ferramenta faz o cálculo exato e já devolve o resultado_real na resposta. Use SEMPRE os números de resultado_real na sua resposta ao usuário, nunca calcule por conta própria.",
@@ -3366,6 +3377,12 @@ Resultado: pF R$ ${cc.pF?.toFixed(2)||"—"} | ML ${cc.margPct?.toFixed(2)||"—
       notifyFill();
       setD(p => ({...p, ufDestino: inp.uf.toUpperCase()}));
       return { ok:true, msg:`UF: ${inp.uf.toUpperCase()}`, resultado_real: await lerResultadoReal() };
+    }
+    if (name === "set_regime_comprador_zfm") {
+      notifyFill();
+      setD(p => ({...p, pcZfmKey: inp.regime}));
+      const entry = PC_ZFM.find(e=>e.k===inp.regime);
+      return { ok:true, msg:`Regime do comprador: ${entry?.label||inp.regime} (P/C ${entry?pct(entry.pct):"?"}). Resultado_real recalculado.`, resultado_real: await lerResultadoReal() };
     }
     if (name === "set_preco_alvo") {
       notifyFill();
