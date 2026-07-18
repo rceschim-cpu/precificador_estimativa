@@ -2996,6 +2996,10 @@ FLUXO OBRIGATÓRIO PARA PRECIFICAR (siga sempre nesta ordem; use perguntar_usuar
    os números sozinho — inclusive o Custo Fixo, que compõe a MC). Não redigite valores.
 6. perguntar_usuario para prazo de pagamento se não informado → calcular_cf_venda (OBRIGATÓRIO,
    nunca pule este passo — sem ele MC = ML incorretamente)
+6b. ⚠OBRIGATÓRIO E AUTOMÁTICO SE O PRODUTO FOR MÁQUINA DE PAGAMENTO (terminal de pagamento,
+   ex: L300, L400, D300, D400, S300, S350, Cielo, Stone, Rede, TON): buscar_ptax_media_mes_anterior
+   → aplique o resultado via set_dolar_preco. Não pule nem pergunte ao usuário — só pra essa
+   categoria de produto, nunca pra outras.
 7. set_margem se o usuário definiu margem alvo
 8. get_resultado → apresente pF, ML%, MC%, de qual canal vieram os índices e de qual mês veio o VPL
 
@@ -3020,6 +3024,8 @@ const CALC_TOOLS = [
     parameters:{ type:"object", properties:{ vpl_usd:{type:"number",description:"VPL em USD (custo_usd_unit do fechamento mais recente)"}, dolar:{type:"number",description:"Dólar CUSTO — taxa do dólar do fechamento (taxa_dolar), usada só para converter o VPL/custo"}, vpl_brl:{type:"number",description:"VPL já em R$, caso já convertido — usa direto sem multiplicar pelo dólar"}, producao:{type:"number",description:"Custo de produção em R$ (componente separado do VPL) — vem de custo_transf_unit do fechamento mais recente (query_custos_historico)"}, garantia_pct:{type:"number",description:"Garantia realizada (%) do fechamento mais recente (campo garantia_pct de query_custos_historico) — a calculadora converte para R$/unidade automaticamente"}, backup_pct:{type:"number",description:"Backup realizado (%) do fechamento mais recente (campo backup_pct de query_custos_historico)"} } } } },
   { type:"function", function:{ name:"set_dolar_preco", description:"Define o DÓLAR PREÇO — a cotação usada para converter um preço de VENDA em USD para R$ (ex: usado por set_preco_alvo com moeda='USD', e na exibição do preço final em USD). É DIFERENTE do Dólar Custo (que converte o VPL/custo) — nunca use o mesmo valor dos dois sem confirmar que são realmente iguais no caso.",
     parameters:{ type:"object", properties:{ valor:{type:"number",description:"Cotação do Dólar Preço (R$ por USD)"} }, required:["valor"] } } },
+  { type:"function", function:{ name:"buscar_ptax_media_mes_anterior", description:"⚠SEMPRE chamar automaticamente (sem perguntar ao usuário) quando o produto sendo precificado for uma MÁQUINA DE PAGAMENTO/terminal de pagamento (ex: L300, L400, D300, D400, S300, S350, POS, Cielo, Stone, Rede, TON — qualquer variante). Busca no Banco Central (série SGS 3695, PTAX venda média mensal) a cotação média do dólar do MÊS ANTERIOR ao atual. Aplique o resultado via set_dolar_preco automaticamente e informe ao usuário de qual mês veio a cotação. NÃO use pra outras categorias de produto.",
+    parameters:{ type:"object", properties:{} } } },
   { type:"function", function:{ name:"set_uf_destino", description:"Define UF de destino (para cálculo de ICMS e DIFAL)",
     parameters:{ type:"object", properties:{ uf:{type:"string",description:"Sigla do estado (ex: SP, RJ, MG)"} }, required:["uf"] } } },
   { type:"function", function:{ name:"set_margem", description:"Define margem líquida alvo (ML%). Use quando o usuário pedir uma ML específica. Se o usuário pedir uma MC (Margem de Contribuição) específica, use set_mc_alvo em vez desta — MC ≠ ML, não faça a conta de cabeça.",
@@ -3338,6 +3344,23 @@ Resultado: pF R$ ${cc.pF?.toFixed(2)||"—"} | ML ${cc.margPct?.toFixed(2)||"—
       notifyFill();
       setD(p => ({...p, ptaxPreco: inp.valor}));
       return { ok:true, msg:`Dólar Preço definido: R$ ${inp.valor}/USD (usado para converter preços de venda em USD — diferente do Dólar Custo)`, resultado_real: await lerResultadoReal() };
+    }
+    if (name === "buscar_ptax_media_mes_anterior") {
+      try {
+        const hoje = new Date();
+        const mesAnt = new Date(hoje.getFullYear(), hoje.getMonth()-1, 1);
+        const mm = String(mesAnt.getMonth()+1).padStart(2,"0");
+        const yyyy = mesAnt.getFullYear();
+        const ultimoDia = new Date(yyyy, mesAnt.getMonth()+1, 0).getDate();
+        const url = `https://api.bcb.gov.br/dados/serie/bcdata.sgs.3695/dados?formato=json&dataInicial=01/${mm}/${yyyy}&dataFinal=${String(ultimoDia).padStart(2,"0")}/${mm}/${yyyy}`;
+        const res = await fetch(url);
+        if (!res.ok) return { found:false, msg:"Banco Central indisponível no momento — peça o Dólar Preço ao usuário." };
+        const data = await res.json();
+        if (!data?.length) return { found:false, msg:`PTAX média de ${mm}/${yyyy} ainda não publicada pelo Banco Central — peça o Dólar Preço ao usuário.` };
+        const ptax = parseFloat(data[0].valor);
+        return { found:true, mes_referencia:`${mm}/${yyyy}`, ptax_media: ptax,
+          obs:`PTAX média (SGS 3695, Banco Central) de ${mm}/${yyyy} = R$ ${ptax}. Aplique via set_dolar_preco e informe ao usuário de qual mês veio.` };
+      } catch(e) { return { found:false, error:String(e), msg:"Erro ao consultar o Banco Central — peça o Dólar Preço ao usuário." }; }
     }
     if (name === "set_uf_destino") {
       notifyFill();
