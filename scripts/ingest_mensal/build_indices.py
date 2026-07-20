@@ -60,6 +60,15 @@ def build_indices(path, mes_ano_label):
             "ml_pct": (r[idx['ML - %']] or 0),
             "fonte": mes_ano_label,
         }
+        # sanidade: descarta linha lixo (sku/cliente/canal == "NA", sem dado real) e
+        # outliers claramente errados na origem (% > 100 é impossível pra esses campos;
+        # visto na prática: "pd_pct": 34800 numa linha com erro de digitação no SAP)
+        if row["sku"] == "NA" or row["data_ref"] == "NA":
+            continue
+        pct_fields = ["ipi_pct","icms_pct","cred_pct","fti_pct","pd_pct","scrap_pct","frete_pct",
+                      "zv09_pct","zv11_pct","mkt_pct","bkp_pct","rebate_pct","margger_pct"]
+        if any(abs(row[f]) > 100 for f in pct_fields):
+            continue
         inserts.append(row)
     return inserts
 
