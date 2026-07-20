@@ -3961,6 +3961,19 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
   const prodAtrib=useMemo(()=>getProdAtributos(prod,d.origem||"MAO",d.modalidade||"CKD"),[prod,d.origem,d.modalidade]);
   const isZFM=prodAtrib.isZFM;
   const isCBU=prodAtrib.isCBU;
+
+  // ST por destino (PLAN_TRIB): MVA e alíquota interna variam por UF de destino.
+  // Sobrescreve os campos de ST sempre que produto/origem/destino mudam; o
+  // usuário ainda pode editar manualmente depois (o efeito só roda nessas mudanças).
+  useEffect(()=>{
+    const ncm=prodAtrib?.ncm;
+    if(!ncm)return;
+    const porDest=ST_DEST[`${ncm}|${prodAtrib.uf}`];
+    if(porDest===undefined)return; // NCM não mapeado na PLAN_TRIB: mantém comportamento antigo
+    const e=porDest[d.ufDestino];
+    if(e)setD(p=>({...p,stAtivo:true,mva:e.mva,icmsDestST:e.aliq}));
+    else setD(p=>({...p,stAtivo:false,mva:0}));
+  },[d.prodId,d.origem,d.modalidade,d.ufDestino]);
   const pcEntry=PC_ZFM.find(e=>e.k===d.pcZfmKey)||PC_ZFM[1];
   const temCadastro=useMemo(()=>{
     const pm=getPerfisMap(loadPerfis());
