@@ -101,6 +101,25 @@ icmsEfPct = max(0, aliqInter − cred)
 
 CWB (PR): deságio 35% → icmsOrigemEf = icms × (1 − 0,35) = 7,8% para icms=12%
 CBU: icmsDiferimento% pode reduzir ICMS (campo editável)
+
+REGRA CONFIRMADA (2026-07-20, fonte: PLAN_TRIB 26.03.2026): venda DENTRO do
+próprio estado de origem (ufOrigem===ufDestino) usa alíquota destacada e
+crédito presumido ESPECÍFICOS por NCM×UF, não a matriz interestadual MX menos
+o crédito interestadual. Tabela ICMS_INTRA em src/planTrib.js (gerado por
+scripts/plan_trib/extrair_dados.py). Ex.: Terminal de Pagamento/Notebook/CPU/
+Smartphone/Câmera fabricados em MAO e vendidos dentro do AM → 7% destacado,
+7% crédito → efetivo 0%. Não se aplica a CBU (sem benefício de fabricação).
+```
+
+### ST (Substituição Tributária) por destino
+```
+REGRA CONFIRMADA (2026-07-20, fonte: PLAN_TRIB 26.03.2026): MVA e alíquota
+interna do ST variam por UF de DESTINO, não são um par fixo por produto.
+Tabela ST_DEST em src/planTrib.js, chave "NCM|UFOrigem" → {UFdest: {mva,aliq}}.
+Um useEffect no componente Calculadora sincroniza d.stAtivo/d.mva/d.icmsDestST
+sempre que produto/origem/destino mudam (usuário pode sobrescrever depois — o
+efeito só reage a essas 4 dependências). NCM fora da tabela mantém o
+comportamento anterior (valor fixo do cadastro/perfil PRODUTOS[]).
 ```
 
 ### IPI
@@ -119,9 +138,24 @@ Crédito IPI IOS (entra NEGATIVO na soma):
 ```
 deveDifal = tipoComprador==="naocontrib"
             OU (contrib && destinacao==="imobilizado")
+aliqDest_interna = DIFAL_INT["NCM|UFdest"] (PLAN_TRIB, quando existe) senão ALIQ_INT[UFdest]
 delta = aliqDest_interna − aliqInter
+# REGRA CONFIRMADA (2026-07-20, fonte PLAN_TRIB): contribuinte consumidor final
+# (destinacao===imobilizado) usa BASE DUPLA (gross-up, LC 190/2022):
+#   delta = delta / (1 − aliqDest_interna/100)
+# Não-contribuinte usa a fórmula simples (já batia com a planilha).
 difal = delta > 0 ? delta : 0
-# Exceção: produto com ST e delta < aliqST → difal = 0
+# Exceção: produto com ST e delta < aliqST → difal = 0 (mantida como está —
+# só alterar com confirmação do Rafael, ver docs/PLANO_TRIBUTACAO_PLAN_TRIB.md)
+```
+
+### FCP (Fundo de Combate à Pobreza)
+```
+REGRA CONFIRMADA (2026-07-20, fonte PLAN_TRIB 26.03.2026): FCP é por
+PRODUTO×UF, não flat por UF. Tabela FCP_PROD em src/planTrib.js ("NCM" →
+{UF:pct}), com fallback pro FCP={AL:1,RJ:2,SE:1} fixo (que já batia com a
+planilha). Ex.: MG só cobra 2% de smartphone/feature phone/câmera, 0% do
+resto; PB cobra 2% de luminárias/LED.
 ```
 
 ### FTI / UEA-AM
