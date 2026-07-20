@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { ICMS_INTRA, ST_DEST, DIFAL_INT, FCP_PROD } from "./planTrib.js";
 
 // ── SUPABASE CONFIG ───────────────────────────────────────────────────────────
 const SB_URL = "https://eiihpyzihiqhhwirqwxe.supabase.co";
@@ -1470,6 +1471,7 @@ const getProdAtributos = (prod, origem, modalidade) => {
   // CKD/SKD em IOS/CWB: impostos cheios (CWB tem ICMS com possível deságio 35%)
   return {
     uf: o.uf,
+    ncm: prod.ncm || "",
     // CBU: produto importado pronto — nunca tem isenção ZFM de IPI; usa alíquota cheia (ipiIOS ou ipiCWB)
     ipi:  isCBU ? (prod.ipiIOS || prod.ipiCWB || prod[`ipi${origem}`] || 0) : prod[`ipi${origem}`],
     pcBase: o.zmf && !isCBU ? "zmf" : 9.25,
@@ -4120,11 +4122,16 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
     else{pcPct=d.regimeVendedor==="presumido"?3.65:9.25;pcLabel=pct(pcPct);}
 
     const ufO=prodAtrib.uf,ufD=d.ufDestino,intra=ufO===ufD;
-    const aliqInter=getICMS(ufO,ufD);
+    let aliqInter=getICMS(ufO,ufD);
+    let credProd=prodAtrib.cred;
+    // Venda dentro do próprio estado de origem: alíquota destacada e crédito presumido são
+    // específicos por NCM (PLAN_TRIB), diferentes dos valores cadastrados p/ venda interestadual.
+    const intraInfo=(intra&&!isCBU)?ICMS_INTRA[`${prodAtrib.ncm}|${ufO}`]:null;
+    if(intraInfo){aliqInter=intraInfo.aliq;credProd=intraInfo.cred;}
     const aliqDest=ALIQ_INT[ufD]||18;
     const icmsOrigemEf = prodAtrib.uf==="PR" ? prodAtrib.icms*(1-0.35) : prodAtrib.icms;
     const icmsImpEf = isCBU ? prodAtrib.icms*(1-(d.icmsDiferimento||0)/100) : icmsOrigemEf;
-    const icmsEfPct=Math.max(0,aliqInter-prodAtrib.cred);
+    const icmsEfPct=Math.max(0,aliqInter-credProd);
     let difal=0;
     const deveDifal=d.tipoComprador==="naocontrib"||(d.tipoComprador==="contrib"&&d.destinacaoCliente==="imobilizado");
     if(!intra&&deveDifal){const delta=aliqDest-aliqInter;if(delta>0)difal=(prodAtrib.aliqST>0&&delta<prodAtrib.aliqST)?0:delta;}
