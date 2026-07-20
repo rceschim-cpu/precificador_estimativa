@@ -1540,7 +1540,7 @@ const MX={
   TO:[12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,12,20],
 };
 const ALIQ_INT={AC:19,AL:21.5,AM:20,AP:18,BA:20.5,CE:20,DF:20,ES:17,GO:19,MA:23,MG:18,MS:17,MT:17,PA:19,PB:20,PE:20.5,PI:22.5,PR:19.5,RJ:22,RN:20,RO:19.5,RR:20,RS:17,SC:17,SE:20,SP:18,TO:20};
-const FCP={AL:1,MG:1,RJ:2,SE:1};
+const FCP={AL:1,RJ:2,SE:1}; // MG e PB são por produto — ver FCP_PROD (PLAN_TRIB)
 const getICMS=(o,d)=>{if(o===d)return ALIQ_INT[o]||18;const r=MX[o],i=UFS.indexOf(d);return(r&&i>=0)?r[i]:12;};
 
 const PPB_ITEMS=[
@@ -4141,13 +4141,20 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
     // específicos por NCM (PLAN_TRIB), diferentes dos valores cadastrados p/ venda interestadual.
     const intraInfo=(intra&&!isCBU)?ICMS_INTRA[`${prodAtrib.ncm}|${ufO}`]:null;
     if(intraInfo){aliqInter=intraInfo.aliq;credProd=intraInfo.cred;}
-    const aliqDest=ALIQ_INT[ufD]||18;
+    const aliqDest=DIFAL_INT[`${prodAtrib.ncm}|${ufD}`] ?? (ALIQ_INT[ufD]||18);
     const icmsOrigemEf = prodAtrib.uf==="PR" ? prodAtrib.icms*(1-0.35) : prodAtrib.icms;
     const icmsImpEf = isCBU ? prodAtrib.icms*(1-(d.icmsDiferimento||0)/100) : icmsOrigemEf;
     const icmsEfPct=Math.max(0,aliqInter-credProd);
     let difal=0;
     const deveDifal=d.tipoComprador==="naocontrib"||(d.tipoComprador==="contrib"&&d.destinacaoCliente==="imobilizado");
-    if(!intra&&deveDifal){const delta=aliqDest-aliqInter;if(delta>0)difal=(prodAtrib.aliqST>0&&delta<prodAtrib.aliqST)?0:delta;}
+    if(!intra&&deveDifal){
+      let delta=aliqDest-aliqInter;
+      // contribuinte consumidor final (imobilizado): base dupla (LC 190/2022) — gross-up pela interna do destino
+      if(d.tipoComprador==="contrib"&&delta>0)delta=delta/(1-aliqDest/100);
+      // exceção documentada: produto com ST zera DIFAL quando delta < aliqST — mantida como está,
+      // só alterar com confirmação do Rafael (ver docs/PLANO_TRIBUTACAO_PLAN_TRIB.md, Etapa 3b)
+      if(delta>0)difal=(prodAtrib.aliqST>0&&delta<prodAtrib.aliqST)?0:delta;
+    }
 
     // P/C efetivo:
     // IOS: (pcPct × (1 - aliqInter% - difal%)) / (1 + IPI%)  — base exclui IPI
@@ -4164,7 +4171,7 @@ function Calculadora({user:currentUser, isAdmin=false, nomeAba="", onRenomear=nu
       : prodAtrib.cred>0 ? +(9.25*(prodAtrib.cred/100)).toFixed(6) : 0;
 
     const ftiPct=(isZFM&&d.ftiAtivo)?prodAtrib.fti:0;
-    const fcpPct=FCP[ufD]||0;
+    const fcpPct=FCP_PROD[prodAtrib.ncm]?.[ufD] ?? FCP[ufD] ?? 0;
 
     // Crédito IPI IOS: -12,97% / (1+IPI%) como índice negativo no soma
     const ipiCreditoIOSPct = d.origem==="IOS" && ipi>0 ? 12.97/(1+ipi/100) : 0;
