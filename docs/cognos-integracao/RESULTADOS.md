@@ -10,9 +10,9 @@
 - [x] API REST confirmada — **TM1 REST API v1 (OData), padrão `/prism/harmony/tm1serverexplorer/api/v1/Servers('<db>')/Cubes('<cubo>')/Views('<view>')`** — capturada na rede real. Falta confirmar se aceita ESCRITA (POST/PATCH de células) e se esse path funciona sem sessão de usuário logado (ver item de autenticação abaixo).
 - [ ] Mecanismo de autenticação p/ uso por backend identificado — ainda não; só vimos a sessão SSO do usuário logado
 - [x] Cubo/dimensão de índices tributários identificado — **`PCF.230.Premissa_Impostos`** (banco `POS_COST_PRICING`), dimensionado por NCM×UF×Centro×Versão×Período×regime tributário, com % ICMS, ICMS Presumido, ISS, IPI, PIS/COFINS, DIFAL (3 variantes) e **IBS** (reforma tributária). Fonte exata dos índices que o Precificador precisa consumir.
-- [~] Cubo/dimensão para formalização de precificações — **candidato forte identificado**: `PCF.011.Aberturas_PO` (Simulador de Custos, conceito de "PO" com status tipo PRECIFICADO e botão Aprovar PO) — falta confirmar campos completos e o que "Aprovar PO" muda de estado
+- [x] Cubo/dimensão para formalização de precificações — **GAP CONFIRMADO, não existe tela pronta**: `PCF.011.Aberturas_PO` (Simulador de Custos) foi descartado — é sobre custo de IMPORTAÇÃO/aquisição (FOB, câmbio, LC, transit time), sem campos de cliente/canal/UF. Geral/Cliente/PEP são tabelas em lote. Nenhuma tela mapeada até agora serve pra "1 venda precificada = 1 registro". Provável necessidade de cubo novo — ver observação de arquitetura.
 - [x] Workspace `pa-plan-contribute` da URL inicial — **resolvido**: é só a perspectiva-tipo do link, sempre abre o Home/Menu Principal — não é uma tela de contribuição específica
-- [ ] Decisão: vale abrir chamado GLPI pedindo API/credencial de serviço? — **sim, muito provável**, mas aguardando confirmar escrita via PO antes de formalizar o pedido (saber exatamente o que pedir)
+- [x] Decisão: vale abrir chamado GLPI pedindo API/credencial de serviço? — **SIM** — ver recomendação consolidada ao final do arquivo
 
 ---
 
@@ -84,10 +84,10 @@ Aba "Premissas Por Impostos" (dentro do submenu Premissas, 10 sub-abas no total:
 ### Pricing Governo → "Simulador Governo"
 20 abas: Cadastro Produto, Premissas Gerais, Tabela Reposição, Curva VPL, Consulta Custos, Consulta Pricing, Custos, Exportação, Distribuição, Tempo Produção, Backup, Garantia e Instalação, Frete, NCM, Pricing, Impostos, Hedge, Exequibilidade, Margem Inversa, Versionamentos, Rejeitados. Ciclo completo de simulação (custo/imposto/frete/hedge/viabilidade) por produto/projeto governo. Botão `Transferir Produto` na aba Pricing (não clicado) — nome sugere ser o mecanismo que leva a simulação pra tabela oficial. É o MESMO objeto acessível como "Simulador Governo" no submenu da Tabela PEP — duas portas de entrada, um recurso só.
 
-### 🎯 Simulador de Custos → "Simulação Pricing" — CANDIDATO MAIS FORTE
+### ~~Simulador de Custos → "Simulação Pricing" — candidato~~ **DESCARTADO na Rodada 4**
 Estruturado em torno do conceito de **"PO"** (aqui = Pedido/Proposta, não elemento SAP). Registro real visto: `PO D000011.01 - ME TL12`, status **PRECIFICADO**, período 202602. Botões: `Copiar PO` (cria nova a partir de molde "P.O. DUMMY"), `Aprovar PO` (formaliza). **Cubo:** `PCF.011.Aberturas_PO` (banco `POS_COST_PRICING`).
 
-Esta é, de longe, a estrutura mais parecida com **"1 precificação = 1 registro formal"** encontrada até agora: tem identidade própria (número da PO), status de workflow (PRECIFICADO — sugere que existem outros estados), e um botão de aprovação/formalização.
+Parecia ser a estrutura mais próxima de "1 precificação = 1 registro formal" (identidade própria, status de workflow, botão de aprovação) — **mas a Rodada 4 corrigiu isso: "PO" aqui é Purchase Order de importação/compra de componentes, não venda a cliente.** Ver correção na Rodada 4 abaixo.
 
 ### URL original revisitada
 Confirmado: `?perspective=pa-plan-contribute&id=...&dashboardId=...` sempre abre o **Home/Menu Principal Pricing** — é a raiz do app, não uma tela de contribuição específica. `pa-plan-contribute` é só o tipo de perspectiva do link salvo, não indica destino. Pergunta original das rodadas 1 fechada.
@@ -97,3 +97,43 @@ Nenhum clique em ação de gravação. Cliques apenas em abas/tiles de navegaç�
 
 ### Em aberto pra próxima rodada
 (a) Abrir uma PO existente e listar todos os campos/dimensões de um item (produto, cliente, canal, UF, preço, margem, quem precificou); (b) entender o que `Aprovar PO` muda de estado (workflow — quais status existem além de PRECIFICADO?); (c) desta vez chamar a leitura de rede ANTES de qualquer clique (ex. antes de abrir uma PO ou trocar de item) pra não perder as chamadas iniciais, já que a tentativa anterior só pegou assets estáticos.
+
+---
+
+## Rodada 4 — 2026-07-29 — Correção: PO é custo de importação, não venda. Gap de formalização confirmado.
+
+**Confiança:** confirmado visualmente e via rede, exceto a hipótese sobre o que `Aprovar PO` altera (inferência, não testada).
+
+### ❌ Correção da Rodada 3: "PO" é custo de importação, não venda a cliente
+Ao detalhar `PO D000011.01 - ME TL12`: cabeçalho tem Período Base, Status, Quantidade, Peso, Organização de Venda (código SAP), Versão, **% Abertura LC** (carta de crédito de importação), Condição de Pgt., Transit Time, THC. Grade "Itens" (cubo `PCF.011.Aberturas_PO`): Alterar Origem?, Custo, Dólar, TX VP%, Quantidade, FOB, Moeda Contrato, Moeda, Por PO, Transit Time, Condição de Pgt., CF TOTAL, Juros. **Nenhum campo de cliente/canal/UF de destino** — é 100% custo de aquisição/importação (frete, câmbio, financiamento) que alimenta as Premissas, não a venda ao cliente final. Grade sem linhas populadas com os filtros testados.
+
+### Status/Versão
+O filtro "PRECIFICADO" é membro da dimensão `ALL.D.Versao` (não uma dimensão de status separada). Membros vistos: PRECIFICADO, PRECIFICADO 2, snapshots por data (20250501, 20250502, 20250504, 20250701, 2026.0401, 2026.0501...), REAL. Sem membros tipo APROVADO/REJEITADO — a coluna "Status" da grade (em branco pro registro visto) é provavelmente onde `Aprovar PO` grava, não a Versão. Não confirmado.
+
+### ⚠️ Achado técnico relevante pra integração: nem todo cubo tem view pública "Default"
+Chamando a API pública confirmada nas rodadas anteriores contra este cubo — `GET /prism/harmony/tm1serverexplorer/api/v1/Servers('POS_COST_PRICING')/Cubes('PCF.011.Aberturas_PO')/Views('Default')` — **retornou 404**. A grade é montada dinamicamente via MDX pelo `gridservice` interno (`CreateHierarchyQuery`, `DestroyCellset`, `Hierarchies`), não por uma view TM1 salva. **Implicação:** a API pública existe e funciona (200 confirmado em outros cubos), mas o cubo que o Precificador for consumir/gravar pode precisar de uma **view TM1 nomeada e publicada** especificamente pra isso — não dá pra assumir que "Default" sempre existe.
+
+### "Nova PO" / criação de registro
+Não há botão "+"/"Adicionar" separado. O único caminho visto é `Copiar PO` (a partir de molde "P.O. DUMMY") ou, tecnicamente, "Inserir membro" no menu de 3 pontos do filtro de PO (ação de escrita de metadado de dimensão — não testada).
+
+### Bloqueios
+Nenhum clique em ação de gravação. Toggle "Editar" apareceu ligado de novo (2ª vez, mesmo padrão de Premissas) — desta vez já veio desligado pela navegação normal; a árvore de acessibilidade indicou "on" mas o visual (fonte confiável) mostrava desligado. Editor de Conjunto aberto e cancelado sem aplicar/salvar.
+
+---
+
+## 📋 Recomendação consolidada (pós Rodadas 1-4)
+
+### O que está resolvido
+- **Índices tributários**: fonte confirmada — `PCF.230.Premissa_Impostos`, acessível via API pública TM1 (view a confirmar).
+- **API de leitura**: existe, é REST/OData padrão IBM, funciona (200 confirmado em cubos com view `Default`).
+
+### O que é um gap real (não resolvido pela exploração — é decisão de negócio/arquitetura)
+**Não existe hoje, pronto, nenhuma tela/cubo em PA pra "1 venda precificada pelo Precificador = 1 registro formal".** Geral/Cliente/PEP são tabelas de índice em lote com pipeline próprio pro SAP; a PO do Simulador de Custos é sobre custo de importação. Isso não é uma limitação da API — é que a modelagem de dados do PA hoje não tem esse conceito.
+
+### Recomendação: vale abrir o chamado GLPI — com 3 pedidos específicos
+1. **Confirmar o gap**: perguntar ao time que administra o PA/Pricing se existe alguma tela que o mapeamento não encontrou pra "registro individual de precificação formalizada" (Mapas e Segurança, os 2 tiles do menu principal ainda não explorados, ficam como última checagem antes de assumir que não existe).
+2. **Se confirmado o gap, pedir o desenho de um cubo novo** dedicado (ex. `PCF.xxx.Precificacoes_Formalizadas`), com as dimensões que o Precificador já tem: produto/NCM, cliente, canal, UF destino, data, preço final, margem, quem precificou — e que esse cubo tenha uma **view TM1 nomeada e publicada** (não depender de "Default").
+3. **Pedir uma conta de serviço/API key** pra uso por backend (não sessão de usuário SSO) — ainda não sabemos como um sistema (sem humano logado) autenticaria contra a API TM1 v1.
+
+### Antes de escrever o texto final do chamado
+Sugiro 1 última rodada rápida (opcional) só pra fechar os 2 tiles não visitados (Mapas, Segurança) — caso um deles seja exatamente o que procuramos e evite o retrabalho de desenhar um cubo novo à toa.
