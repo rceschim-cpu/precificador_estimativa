@@ -137,3 +137,21 @@ Nenhum clique em ação de gravação. Toggle "Editar" apareceu ligado de novo (
 
 ### Antes de escrever o texto final do chamado
 Sugiro 1 última rodada rápida (opcional) só pra fechar os 2 tiles não visitados (Mapas, Segurança) — caso um deles seja exatamente o que procuramos e evite o retrabalho de desenhar um cubo novo à toa.
+
+---
+
+## Rodada 5 (final) — 2026-07-29 — Mapas e Segurança descartados, mapeamento encerrado
+
+**Confiança:** confirmado visualmente (screenshots + nomes de cubo na UI).
+
+### Mapas → "Mapas Pricing"
+6 abas: Mapa Produto Custos, Mapa Cliente, Mapa PEP, Mapa Código de Garantia, Mapa Área, Rejeitados. Cubo confirmado: `MAP.030.Produto` (banco `POS_COST_PRICING`), com "Dimensão de Componentes"/"Dimensão de Produtos" (`ALL.D.Material_Controladoria`, `ALL.D.Material_Controladoria_Detalhe`) e botões `Atualizar Dimensões`/`Atualizar Mapa` (não clicados). **É de-para de códigos SAP ↔ dimensões internas do TM1** (produto, cliente, PEP, garantia, área) — master data, sem relação com registro individual de venda.
+
+### Segurança → "Segurança Pricing"
+3 abas: Segurança - User/Grupo, Segurança - Cubos, Segurança - Processos. Cubo de controle nativo `}ClientGroups` — matriz de permissões (usuários × grupos/papéis: ADMIN, SecurityAdmin, DataAdmin, Operations, GRP_CUSTO, etc.). Botão `Cria Grupo de usuários` (não clicado). **É administração de acesso do próprio PA** — sem relação com dados de precificação.
+
+### Bloqueios
+Nenhum. A sessão SSO expirou uma vez no meio da rodada (tela de login IBMid) — o Rafael refez o login manualmente e a exploração retomou sem problema.
+
+### ✅ Conclusão — fase de exploração ENCERRADA
+Mapas e Segurança confirmam o esperado (master data / administração de acesso) — nenhuma relação com "1 precificação de venda = 1 registro". **Todos os 7 blocos do menu principal foram mapeados** (Mapas, Simulador de Custos, Tabela de Preço Geral, Tabela de Preço Cliente, Tabela de Preço PEP, Pricing Governo, Segurança). O gap identificado nas Rodadas 3-4 se mantém: **não existe hoje nenhuma tela/cubo em PA pronto pra formalizar precificações de venda individuais** — a recomendação consolidada (3 pedidos pro GLPI, ver acima) está confirmada e pronta pra virar chamado.
