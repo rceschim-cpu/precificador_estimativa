@@ -9,10 +9,10 @@
 
 - [x] API REST confirmada — **TM1 REST API v1 (OData), padrão `/prism/harmony/tm1serverexplorer/api/v1/Servers('<db>')/Cubes('<cubo>')/Views('<view>')`** — capturada na rede real. Falta confirmar se aceita ESCRITA (POST/PATCH de células) e se esse path funciona sem sessão de usuário logado (ver item de autenticação abaixo).
 - [ ] Mecanismo de autenticação p/ uso por backend identificado — ainda não; só vimos a sessão SSO do usuário logado
-- [ ] Cubo/dimensão de índices tributários identificado — encontramos cubos de TABELA DE PREÇO (PCF.400, PCF.500), mas não onde ficam os índices tributários (ICMS/IPI/PIS-COFINS/MVA) em si — candidato mais provável: submenu "Premissas" (aparece em Geral, Cliente e PEP), ainda não explorado
-- [x] Cubo/dimensão para formalização de precificações — **gap confirmado**: nenhuma das 3 tabelas (Geral, Cliente, PEP) é "1 clique = 1 registro individual" — todas são grades em lote/índice. Precisa decisão de arquitetura (ver observação abaixo)
-- [~] Workspace `pa-plan-contribute` da URL inicial — entendemos a aplicação "Precificação" via menu, mas ainda não confirmamos se a URL EXATA original aponta pra essa mesma tela (Tabela Geral) ou outra
-- [ ] Decisão: vale abrir chamado GLPI pedindo API/credencial de serviço? — **sim, provavelmente** (ver observação), mas aguardando fechar mais 1-2 rodadas antes de formalizar o pedido
+- [x] Cubo/dimensão de índices tributários identificado — **`PCF.230.Premissa_Impostos`** (banco `POS_COST_PRICING`), dimensionado por NCM×UF×Centro×Versão×Período×regime tributário, com % ICMS, ICMS Presumido, ISS, IPI, PIS/COFINS, DIFAL (3 variantes) e **IBS** (reforma tributária). Fonte exata dos índices que o Precificador precisa consumir.
+- [~] Cubo/dimensão para formalização de precificações — **candidato forte identificado**: `PCF.011.Aberturas_PO` (Simulador de Custos, conceito de "PO" com status tipo PRECIFICADO e botão Aprovar PO) — falta confirmar campos completos e o que "Aprovar PO" muda de estado
+- [x] Workspace `pa-plan-contribute` da URL inicial — **resolvido**: é só a perspectiva-tipo do link, sempre abre o Home/Menu Principal — não é uma tela de contribuição específica
+- [ ] Decisão: vale abrir chamado GLPI pedindo API/credencial de serviço? — **sim, muito provável**, mas aguardando confirmar escrita via PO antes de formalizar o pedido (saber exatamente o que pedir)
 
 ---
 
@@ -67,3 +67,33 @@ Nenhum. Não clicou em `Aplicar`, `Carga Tabela Cliente/PEP`, `Enviar Proposta p
 
 ### Em aberto pra próxima rodada
 (a) significado exato de "PEP" — confirmar com Pricing/SAP; (b) se a API TM1 v1 aceita ESCRITA de células (não só leitura de Views) — crítico pro botão "subir precificação"; (c) explorar "Pricing Governo", "Mapas" e "Simulador de Custos" (menu principal, ainda não visitados); (d) revisitar a URL exata original (`pa-plan-contribute`) e comparar com o que foi encontrado via menu.
+
+---
+
+## Rodada 3 — 2026-07-29 — Índices tributários confirmados (com IBS!) e candidato forte pra formalização (PO)
+
+**Confiança:** confirmado visualmente (screenshots + nomes de cubo na UI). Captura de rede desta rodada foi inconclusiva (só pegou assets estáticos).
+
+### 🎯 Índices tributários — FONTE CONFIRMADA
+Aba "Premissas Por Impostos" (dentro do submenu Premissas, 10 sub-abas no total: Premissas Gerais por Centro, Premissa Dólar, Premissas Custos Serviços, Premissas Tempo de Produção, **Premissas Por Impostos**, Premissas Categoria por Produtos, Premissas por Área - Custo Fixo, Premissas Variáveis Comerciais - PEP, Premissas Custos Financeiros, Rejeitados).
+
+**Cubo:** `PCF.230.Premissa_Impostos` (banco `POS_COST_PRICING`). Dimensionado por **NCM × UF × Centro × Versão × Período**, quebrado por **regime tributário** (Lucro Real, Lucro Presumido, Simples Nacional, Governo Estadual/Municipal/Federal, Outros). Colunas: % ICMS, % ICMS Presumido, % ISS, % IPI, % PIS/COFINS (2 variantes), % DIFAL (3 variantes), **% IBS** (o tributo novo da reforma tributária).
+
+> ⚠️ Nota separada (fora do escopo desta integração, mas relevante pro Precificador): o PA já rastreia **IBS** por NCM/UF — a lógica tributária atual do Precificador (ICMS/PIS-COFINS/IPI clássicos) não tem esse tributo ainda. Vale um item de backlog à parte quando a reforma tributária começar a valer de fato.
+
+### Pricing Governo → "Simulador Governo"
+20 abas: Cadastro Produto, Premissas Gerais, Tabela Reposição, Curva VPL, Consulta Custos, Consulta Pricing, Custos, Exportação, Distribuição, Tempo Produção, Backup, Garantia e Instalação, Frete, NCM, Pricing, Impostos, Hedge, Exequibilidade, Margem Inversa, Versionamentos, Rejeitados. Ciclo completo de simulação (custo/imposto/frete/hedge/viabilidade) por produto/projeto governo. Botão `Transferir Produto` na aba Pricing (não clicado) — nome sugere ser o mecanismo que leva a simulação pra tabela oficial. É o MESMO objeto acessível como "Simulador Governo" no submenu da Tabela PEP — duas portas de entrada, um recurso só.
+
+### 🎯 Simulador de Custos → "Simulação Pricing" — CANDIDATO MAIS FORTE
+Estruturado em torno do conceito de **"PO"** (aqui = Pedido/Proposta, não elemento SAP). Registro real visto: `PO D000011.01 - ME TL12`, status **PRECIFICADO**, período 202602. Botões: `Copiar PO` (cria nova a partir de molde "P.O. DUMMY"), `Aprovar PO` (formaliza). **Cubo:** `PCF.011.Aberturas_PO` (banco `POS_COST_PRICING`).
+
+Esta é, de longe, a estrutura mais parecida com **"1 precificação = 1 registro formal"** encontrada até agora: tem identidade própria (número da PO), status de workflow (PRECIFICADO — sugere que existem outros estados), e um botão de aprovação/formalização.
+
+### URL original revisitada
+Confirmado: `?perspective=pa-plan-contribute&id=...&dashboardId=...` sempre abre o **Home/Menu Principal Pricing** — é a raiz do app, não uma tela de contribuição específica. `pa-plan-contribute` é só o tipo de perspectiva do link salvo, não indica destino. Pergunta original das rodadas 1 fechada.
+
+### Bloqueios
+Nenhum clique em ação de gravação. Cliques apenas em abas/tiles de navegação + desligou o toggle "Editar" (que abriu ligado por padrão na tela de Premissas) antes de tocar em qualquer coisa — ação de segurança, não de gravação. Não clicou em: Atualizar Mapa, Atualizar Dimensões, Novo Produto, Atualizar Lista Técnica, Transferir Produto, Copiar PO, Aprovar PO.
+
+### Em aberto pra próxima rodada
+(a) Abrir uma PO existente e listar todos os campos/dimensões de um item (produto, cliente, canal, UF, preço, margem, quem precificou); (b) entender o que `Aprovar PO` muda de estado (workflow — quais status existem além de PRECIFICADO?); (c) desta vez chamar a leitura de rede ANTES de qualquer clique (ex. antes de abrir uma PO ou trocar de item) pra não perder as chamadas iniciais, já que a tentativa anterior só pegou assets estáticos.
